@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P01",
-  "currentStep": "P01.PUBLISH",
-  "status": "VERIFIED",
-  "baseMainSha": "a4f894d0d7aba7135969b7bb9a08a10fe4dbf8d1",
-  "lastCommitSha": "55692b2035a4c0585c7b2cb15a1df35df9e3acd0",
+  "currentPhase": "P02",
+  "currentStep": "P02.2",
+  "status": "IMPLEMENTING",
+  "baseMainSha": "85c68d133a89ebf5578ab8a9a79618d1daba6d16",
+  "lastCommitSha": "85c68d133a89ebf5578ab8a9a79618d1daba6d16",
   "verification": {
-    "attemptsUsed": 1,
+    "attemptsUsed": 0,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": "55692b2035a4c0585c7b2cb15a1df35df9e3acd0",
-    "result": "PASS",
-    "exitCode": 0
+    "targetCommitSha": null,
+    "result": "NOT_RUN",
+    "exitCode": null
   },
   "publication": {
-    "branch": "cat/p01-foundation",
+    "branch": "cat/p02-config-auth",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Create and publish cat/p01-foundation, then review and merge its PR",
+  "nextAction": "Implement P02.2 and commit it",
   "blocker": null
 }

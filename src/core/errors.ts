@@ -60,3 +60,19 @@ export class ProtocolError extends CatError {
     super("protocol_failure", message, options);
   }
 }
+
+export class ConfigurationError extends CatError {
+  override name = "ConfigurationError";
+
+  constructor(message: string, options?: ErrorOptions) {
+    super("invalid_configuration", message, options);
+  }
+}
+
+export class StorageError extends CatError {
+  override name = "StorageError";
+
+  constructor(message: string, options?: ErrorOptions) {
+    super("storage_failure", message, options);
+  }
+}
