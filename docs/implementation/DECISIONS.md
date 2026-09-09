@@ -76,3 +76,13 @@
 - 결과: 기존 `~/.smileserv`는 알려진 항목의 존재만 탐지한다. 일반 파일 도구는
   `.cat`과 `.smileserv`의 credential/profile secret 및 이를 가리키는 symbolic
   link나 hard-link alias에 접근할 수 없다.
+
+## D010 — 인증된 모델 transport의 재시도와 proxy
+
+- 상태: 승인됨
+- 결정: 모델 HTTP transport만 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY`를 읽고
+  소유한 dispatcher를 종료한다. transport가 재시도 판단의 유일한 소유자이며
+  호출자가 전달한 공통 retry budget port의 승인을 얻은 최대 2회만 재시도한다.
+- 결과: 응답 body를 읽기 시작한 뒤에는 재시도하지 않는다. 인증 요청 redirect는
+  같은 origin에서 method를 보존하는 경우만 제한적으로 따르며 public web transport와
+  dispatcher를 공유하지 않는다.

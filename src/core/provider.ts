@@ -1,4 +1,5 @@
 import type { ConversationMessage } from "./messages.js";
+import type { RetryBudgetPort } from "./execution.js";
 import type { JsonObject } from "./json.js";
 
 export type ProviderProtocol = "openai-responses" | "openai-chat";
@@ -25,6 +26,7 @@ export interface ProviderRequest {
   messages: readonly ConversationMessage[];
   tools: readonly ProviderToolSpec[];
   maxOutputTokens?: number;
+  retryBudget: RetryBudgetPort;
 }
 
 export interface ProviderUsage {

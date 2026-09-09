@@ -6,8 +6,8 @@
 | 단계 | 상태 | 검증 | 게시 |
 |---|---|---|---|
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
-| P02 설정·인증·trust | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
-| P03 provider·transport | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
+| P03 provider·transport | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
 | P04 권한·기본 도구 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -31,3 +31,6 @@ P02.1은 `5359cfab201cf4dbe3e811167933f82e38614d16`, P02.2는
 확인한 보완은 `60378f41e5dac63a7f6132b38110a3958eb3bbb6`에 묶었다. 기준 main이
 변하지 않았음을 확인했다. `0c36e853b21ffee3af2cf5560f418d9e508e5cc2`를
 대상으로 한 유일한 `npm run check`가 통과했으며 다음은 단계 branch와 PR 게시다.
+P02는 PR #2의 검토 head `1416ef4`를 merge commit `2429b41`로 병합했고 tree와
+부모 정합성을 확인했다. 현재 작업은 P03.1 인증된 모델용 bounded HTTP/SSE
+transport이며 다음은 Responses adapter 구현이다.
