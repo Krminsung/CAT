@@ -7,7 +7,7 @@ P03 기준 main은 `2429b419dc403132a69c4c9883b8dd374c284996`이다. 구현은 �
 |---|---|---|---|
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
-| P03 provider·transport | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
+| P03 provider·transport | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
 | P04 권한·기본 도구 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -35,6 +35,9 @@ P02는 PR #2의 검토 head `1416ef4`를 merge commit `2429b41`로 병합했고 
 부모 정합성을 확인했다. P03.1 인증된 모델용 bounded HTTP/SSE transport는
 `b8b8631c7d520aa1e33d58e38dcfc88c30fcfe0b`로 완료했다. P03.2 Responses adapter는
 `ae4e5fe6d311cf570819adfd87a2cbc64b2fa363`로 완료했다. P03.3 Chat-compatible
-adapter는 `dd4583343e6c31da05432dc221cec441a5a92c3d`로 완료했다. 현재 P03.4는
-13개 provider 기본값과 protocol별 capability, adapter factory, bounded model 목록과
-독립적인 수동 model ID 검증을 구현했으며 다음은 P03 전체 정적 검토다.
+adapter는 `dd4583343e6c31da05432dc221cec441a5a92c3d`로 완료했다. P03.4의 13개
+provider 기본값과 protocol별 capability, adapter factory, bounded model 목록과
+독립적인 수동 model ID 검증은 `ba9e9f31696a768efff890745491a7b7d1c42801`로
+완료했다. 전체 정적 검토에서 확인한 경계 보완은
+`22e77eb5ca0b4e8b054a6737de2c41619f4f077f`에 묶었고, 원격 main이 기준 SHA와
+같음을 확인했다. 다음은 예약된 P03 검증을 정확히 한 번 실행하는 일이다.

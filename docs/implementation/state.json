@@ -3,12 +3,12 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P03",
-  "currentStep": "P03.REVIEW",
-  "status": "IMPLEMENTING",
+  "currentStep": "P03.VERIFY",
+  "status": "VERIFYING",
   "baseMainSha": "2429b419dc403132a69c4c9883b8dd374c284996",
-  "lastCommitSha": "dd4583343e6c31da05432dc221cec441a5a92c3d",
+  "lastCommitSha": "22e77eb5ca0b4e8b054a6737de2c41619f4f077f",
   "verification": {
-    "attemptsUsed": 0,
+    "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
     "targetCommitSha": null,
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Commit P03.4, then review the complete P03 diff",
+  "nextAction": "Run the reserved npm run check exactly once",
   "blocker": null
 }
