@@ -4,14 +4,18 @@ export type RunTermination =
   | "budget_exhausted"
   | "permission_denied"
   | "provider_error"
-  | "protocol_error";
+  | "protocol_error"
+  | "concurrent_run"
+  | "no_progress";
 
 export interface RunBudget {
-  modelRequests: number;
-  toolCalls: number;
-  recoveryAttempts: number;
-  compactions: number;
-  deadlineAt: number;
+  readonly turns: number;
+  readonly modelRequests: number;
+  readonly toolCalls: number;
+  readonly recoveryAttempts: number;
+  readonly compactions: number;
+  readonly stopContinuations: number;
+  readonly deadlineAt: number;
 }
 
 export interface RunIdentity {

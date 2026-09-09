@@ -139,3 +139,44 @@
   `not_started`, 종료 코드가 확인된 실패는 `failed`, 시작 뒤 강제 종료·상태 유실은
   `unknown`으로 보존하고 부분 stdout/stderr를 제한된 오류 상세로 돌려준다. 이 경계가 임의
   셸 프로그램의 외부 파일·네트워크 접근을 완전히 격리한다고 주장하지 않는다.
+
+## D016 — 단일 실행 소유권과 공통 예산
+
+- 상태: 승인됨
+- 결정: process 안의 session별 coordinator가 동시에 하나의 run만 소유한다. owner loop는
+  명시적인 상태 전이를 따르고 모델 첫 요청과 transport 재시도가 같은 모델 시도 예산을
+  소비한다. wall-clock timer와 caller 취소는 하나의 signal로 하위 경계에 전달한다.
+- 결과: provider, 도구, 복구, compaction과 Stop hook은 새 agent run을 만들지 않는다.
+  future 기능은 현재 run의 복구·모델·도구 예산 port를 받아야 하며 종료 시 timer와 session
+  lease는 각각 한 번만 정리한다.
+
+## D017 — 전체 메시지 fallback과 실행 기록
+
+- 상태: 승인됨
+- 결정: native tool call이 하나라도 있으면 text fallback을 해석하지 않는다. text fallback은
+  완성된 assistant 메시지 전체가 `call:<등록 이름> <객체>` 문법일 때만 사용한다. 기본은
+  표준 JSON이고 relaxed는 profile의 명시적 선택에서만 제한된 비실행 parser를 사용한다.
+- 결과: 코드 펜스, 인용문, 설명 속 `call:`과 임의 표현식은 실행하지 않는다. 모든 call ID는
+  run 전체에서 중복 확인하고 입력 schema를 먼저 검증한다. 중앙 executor가 handler를 실제로
+  시작하는 지점에서 기록을 `started`로 바꾸며 완료·실패·실행 여부 불명 상태를 덮어쓰지 않는다.
+
+## D018 — agent 상호작용과 event 전달
+
+- 상태: 승인됨
+- 결정: agent owner는 provider stream, 중앙 executor와 control tool을 순차 loop에서 직접
+  연결한다. permission policy와 runner는 동일한 interaction hub를 사용하고, hub가 현재
+  run/call ID를 approval·사용자 입력 event에 결합한 뒤 UI decision port로 전달한다.
+- 결과: `update_plan`과 연결된 경우의 `request_user_input`만 registry에 등록한다. event sink의
+  render 실패는 내부 원장 기록을 없애거나 모델을 재호출하지 않는다. 모든 정상·오류·취소 경로는
+  interaction, timer와 session lease를 멱등적으로 정리한 뒤 `run_end`를 한 번 기록한다.
+
+## D019 — 무진전 실행과 교정 복구
+
+- 상태: 승인됨
+- 결정: call ID가 달라도 도구 이름과 canonical 입력, canonical 결과가 연속 두 번 같으면
+  세 번째 동일 handler를 시작 전에 차단한다. malformed/unknown/schema 오류는 올바른 호출과
+  분리하되 같은 run에서 한 번의 교정 feedback만 허용한다.
+- 결과: 반복 차단은 `no_progress` terminal reason으로 드러나며 차단된 batch의 handler 예산과
+  부작용을 소비하지 않는다. 모든 permission denial은 즉시 run을 끝내므로 대체 도구 우회가
+  없다. transport 외부에는 HTTP retry loop를 두지 않고 compaction, Stop hook과 web 복구는
+  P05의 공통 extension budget port를 사용해야 한다.

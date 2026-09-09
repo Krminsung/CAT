@@ -90,6 +90,10 @@ export interface CentralToolExecutorOptions {
   redactor?: Redactor;
 }
 
+export interface ToolExecutionObserver {
+  handlerStarted(): void;
+}
+
 interface InternalRegistration {
   definition: ToolDefinition;
   preflight: NonNullable<ToolRegistration["preflight"]>;
@@ -472,6 +476,7 @@ export class CentralToolExecutor {
     toolName: string,
     rawInput: unknown,
     context: ToolExecutionContext,
+    observer?: ToolExecutionObserver,
   ): Promise<ToolExecutionResult> {
     if (!TOOL_NAME_PATTERN.test(toolName)) {
       return failure(
@@ -590,6 +595,20 @@ export class CentralToolExecutor {
     }
     if (executionContext.signal.aborted) {
       return { status: "cancelled", reason: "도구 실행 직전에 작업이 취소되었습니다." };
+    }
+
+    try {
+      observer?.handlerStarted();
+    } catch {
+      return sanitizeResult(
+        failure(
+          "tool_execution_record_failed",
+          "도구 실행 시작 상태를 기록하지 못해 handler를 실행하지 않았습니다.",
+          "not_started",
+        ),
+        registration.definition,
+        this.#redactor,
+      );
     }
 
     let result: ToolExecutionResult;
