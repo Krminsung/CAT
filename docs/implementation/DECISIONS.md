@@ -44,3 +44,35 @@
 - 결정: P01.2부터 모든 커밋 제목과 필요한 본문을 알기 쉬운 한국어로 작성한다.
   추적성을 위해 `P01.2`와 같은 단계 식별자는 유지한다.
 - 결과: 기준 문서에 제시된 영문 예시 문구보다 이 후속 사용자 지시를 우선한다.
+
+## D007 — CAT_HOME과 프로젝트 설정 신뢰
+
+- 상태: 승인됨
+- 결정: `CAT_HOME`은 CWD에 따라 credential 위치가 달라지지 않도록 절대 경로만
+  허용한다. user 설정은 항상 읽지만 `.cat/settings.json`과
+  `.cat/settings.local.json`은 workspace가 명시적으로 신뢰된 뒤에만 읽는다.
+- 결과: 신뢰 전 프로젝트 설정에 포함될 수 있는 hook/MCP 값이 실행 경로로 유입되지
+  않는다. 환경변수와 CLI overlay는 파일 layer 뒤에 적용한다.
+
+## D008 — API key와 profile 분리
+
+- 상태: 승인됨
+- 결정: profile에는 API key 대신 endpoint origin에 묶인 불투명 `secretRef`만
+  저장한다. `CAT_API_KEY`가 우선하고, 기존 `SMILECODE_API_KEY`와
+  `SMILESERV_API_KEY`는 internal provider에서 서로 충돌하지 않을 때만 읽는다.
+  외부 provider의 기존 API key 환경변수도 유지하되 여러 후보 값이 충돌하면
+  명시적인 `CAT_API_KEY`를 요구한다.
+- 결과: base URL의 origin이 달라지면 기존 key를 재사용하지 않는다. 기존
+  `~/.smileserv` credential 파일은 P02에서 읽거나 자동 이관하지 않는다. 저장된
+  key를 사용할 때는 secret reference, endpoint origin과 provider를 함께 확인한다.
+
+## D009 — workspace trust와 자식 프로세스 경계
+
+- 상태: 승인됨
+- 결정: workspace trust는 canonical path와 장치·inode가 모두 일치할 때만
+  유지한다. trust 추가는 사용자 확인으로 생성한 grant만 허용한다. 자식 프로세스는
+  최소 환경변수 allowlist로 시작하며 secret과 실행 주입 변수는 명시적 pass-through도
+  거부한다.
+- 결과: 기존 `~/.smileserv`는 알려진 항목의 존재만 탐지한다. 일반 파일 도구는
+  `.cat`과 `.smileserv`의 credential/profile secret 및 이를 가리키는 symbolic
+  link나 hard-link alias에 접근할 수 없다.

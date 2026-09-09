@@ -60,3 +60,27 @@ export class ProtocolError extends CatError {
     super("protocol_failure", message, options);
   }
 }
+
+export class ConfigurationError extends CatError {
+  override name = "ConfigurationError";
+
+  constructor(message: string, options?: ErrorOptions) {
+    super("invalid_configuration", message, options);
+  }
+}
+
+export class StorageError extends CatError {
+  override name = "StorageError";
+
+  constructor(message: string, options?: ErrorOptions) {
+    super("storage_failure", message, options);
+  }
+}
+
+export class MissingCredentialError extends CatError {
+  override name = "MissingCredentialError";
+
+  constructor(message = "사용 가능한 API key가 없습니다.", options?: ErrorOptions) {
+    super("missing_credential", message, options);
+  }
+}
