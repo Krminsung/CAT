@@ -4,16 +4,16 @@
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P04",
   "currentStep": "P04.VERIFY",
-  "status": "VERIFYING",
+  "status": "BLOCKED_VERIFY",
   "baseMainSha": "3581145239fb622b647cb1d54fbe64c292ae8d7c",
-  "lastCommitSha": "e7bea7d9a5a52388fecf05b80821a8c8559a1f05",
+  "lastCommitSha": "c31e862179516070f88738fa0004d7b5b75e277b",
   "verification": {
     "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": null,
-    "result": "NOT_RUN",
-    "exitCode": null
+    "targetCommitSha": "c31e862179516070f88738fa0004d7b5b75e277b",
+    "result": "FAIL",
+    "exitCode": 2
   },
   "publication": {
     "branch": "cat/p04-tools-security",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Run the reserved npm run check exactly once",
-  "blocker": null
+  "nextAction": "Wait for explicit approval to fix P04 and run one additional npm run check",
+  "blocker": "The only reserved P04 check found two strict TypeScript errors in src/process/child-process.ts"
 }

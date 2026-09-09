@@ -8,7 +8,7 @@ P04 기준 main은 `3581145239fb622b647cb1d54fbe64c292ae8d7c`이다. 구현은 �
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
-| P04 권한·기본 도구 | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
+| P04 권한·기본 도구 | BLOCKED_VERIFY | FAIL (1/1) | NOT_PUBLISHED |
 | P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -53,4 +53,8 @@ checkpoint·rollback을 `1dffd2d`로 구현했다. P04.4의 정확한 command/cw
 foreground 실행은 `009d134`로 완료했다. 전체 정적 검토에서 확인한 승인 객체 불변성,
 파일 identity·내용 재확인, 검색 worker와 자식 프로세스 상한, 파괴 명령 판정 보완은
 `e7bea7d9a5a52388fecf05b80821a8c8559a1f05`에 묶었다. 원격 main이 기준 SHA와
-같음을 확인했으며 다음은 예약된 P04 검증을 정확히 한 번 실행하는 일이다.
+같음을 확인한 뒤 `c31e862179516070f88738fa0004d7b5b75e277b`를 대상으로 예약한
+유일한 `npm run check`를 실행했다. 검사는 `src/process/child-process.ts`의 spawn
+stdin 타입과 선택 속성 구성에서 엄격 타입 오류 2개를 보고하고 종료 코드 2로
+실패했다. 재검사, push, PR과 merge는 진행하지 않았으며 오류 수정과 P04 추가 검증에는
+사용자의 명시적 승인이 필요하다.
