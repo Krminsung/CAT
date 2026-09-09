@@ -20,5 +20,6 @@
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 
-P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`로 완료했다. 현재 위치는
-P01.2이며 다음 작업은 P01.3의 공통 실행 계약 정의다.
+P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
+`cfed67a6e8cf5e3de36983773a51414a4ca209d8`로 완료했다. 현재 위치는 P01.3이며
+다음 작업은 P01 전체 diff의 단일 정적 검토다.
