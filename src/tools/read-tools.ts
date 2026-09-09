@@ -1,8 +1,12 @@
 import { fileURLToPath } from "node:url";
+import { PermissionDeniedError } from "../core/errors.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
 import type { ToolExecutionContext, ToolExecutionResult } from "../core/index.js";
 import { buildChildEnvironment } from "../security/environment.js";
-import type { WorkspacePathGuard } from "../security/workspace-path.js";
+import type {
+  WorkspacePathGuard,
+  WorkspacePathResolution,
+} from "../security/workspace-path.js";
 import { captureChildProcess } from "../process/child-process.js";
 import {
   DEFAULT_TOOL_OUTPUT_BYTES,
@@ -39,6 +43,7 @@ interface SearchMatch {
   line: number;
   column: number;
   text: string;
+  text_truncated: boolean;
 }
 
 interface SearchResult {
@@ -61,10 +66,17 @@ function stringSchema(description: string, maximum = 32_768): JsonObject {
   return { type: "string", description, minLength: 1, maxLength: maximum };
 }
 
-function expectedPath(preflight: ToolPreflightResult): string {
-  const path = preflight.approvalScope.target.path;
-  if (typeof path !== "string") throw new Error("도구 사전 검사 경로가 유실되었습니다.");
-  return path;
+function readableScopeTarget(resolved: WorkspacePathResolution): JsonObject {
+  return {
+    path: resolved.absolutePath,
+    kind: resolved.kind,
+    device: resolved.device === undefined ? null : String(resolved.device),
+    inode: resolved.inode === undefined ? null : String(resolved.inode),
+    parent_path: resolved.parentPath,
+    parent_device: String(resolved.parentDevice),
+    parent_inode: String(resolved.parentInode),
+    access: "read",
+  };
 }
 
 async function pathPreflight(
@@ -78,7 +90,7 @@ async function pathPreflight(
     summary,
     approvalScope: {
       kind: "path",
-      target: { path: resolved.absolutePath, access: "read" },
+      target: readableScopeTarget(resolved),
     },
   };
 }
@@ -90,8 +102,11 @@ async function revalidatePath(
   preflight: ToolPreflightResult,
 ): Promise<void> {
   const resolved = await guard.resolveExisting(requested, kind);
-  if (resolved.absolutePath !== expectedPath(preflight)) {
-    throw new Error("승인 또는 검사 뒤 읽기 대상이 변경되었습니다.");
+  if (
+    JSON.stringify(readableScopeTarget(resolved)) !==
+    JSON.stringify(preflight.approvalScope.target)
+  ) {
+    throw new PermissionDeniedError("승인 또는 검사 뒤 읽기 대상이 변경되었습니다.");
   }
 }
 
@@ -217,6 +232,7 @@ function parseRipgrepOutput(
       line: Number(lineNumber),
       column: codePointColumn(typeof linesObject?.text === "string" ? linesObject.text : text, start),
       text,
+      text_truncated: false,
     });
   }
   return { matches, overflow };
@@ -278,6 +294,7 @@ async function searchWithRipgrep(
   pattern: string,
   files: readonly WorkspaceFileCandidate[],
   maximum: number,
+  guard: WorkspacePathGuard,
   context: ToolExecutionContext,
 ): Promise<SearchResult | undefined> {
   const matches: SearchMatch[] = [];
@@ -290,6 +307,9 @@ async function searchWithRipgrep(
       truncated = true;
       limitReason = "timed_out";
       break;
+    }
+    for (const file of batch) {
+      await guard.revalidateExisting(file.resolution, "file");
     }
     const displayByAbsolute = new Map<string, string>(
       batch.map((file) => [file.absolutePath, file.displayPath] as const),
@@ -318,8 +338,12 @@ async function searchWithRipgrep(
       },
     );
     if (captured.spawnErrorCode === "ENOENT") return undefined;
-    if (captured.spawnErrorCode) {
-      throw new Error(`rg 검색 프로세스를 시작하지 못했습니다(${captured.spawnErrorCode}).`);
+    if (captured.spawnErrorMessage) {
+      throw new Error(
+        captured.spawnErrorCode
+          ? `rg 검색 프로세스를 시작하지 못했습니다(${captured.spawnErrorCode}).`
+          : "rg 검색 프로세스를 시작하지 못했습니다.",
+      );
     }
     if (captured.cancelled) throw new Error("검색이 취소되었습니다.");
     if (captured.exitCode !== 0 && captured.exitCode !== 1 && !captured.timedOut && !captured.outputLimitReached) {
@@ -350,6 +374,7 @@ async function searchFallback(
   pattern: string,
   files: readonly WorkspaceFileCandidate[],
   maximum: number,
+  guard: WorkspacePathGuard,
   context: ToolExecutionContext,
 ): Promise<SearchResult> {
   const matches: SearchMatch[] = [];
@@ -364,9 +389,27 @@ async function searchFallback(
       limitReason = "timed_out";
       break;
     }
+    for (const file of batch) {
+      await guard.revalidateExisting(file.resolution, "file");
+    }
+    const candidateArguments = batch.flatMap((file) => {
+      if (file.resolution.device === undefined || file.resolution.inode === undefined) {
+        throw new Error("fallback 검색 파일 identity가 유실되었습니다.");
+      }
+      return [
+        file.absolutePath,
+        String(file.resolution.device),
+        String(file.resolution.inode),
+      ];
+    });
     const captured = await captureChildProcess(
       process.execPath,
-      [worker, pattern, String(Math.min(501, maximum - matches.length + 1)), ...batch.map((file) => file.absolutePath)],
+      [
+        worker,
+        pattern,
+        String(Math.min(501, maximum - matches.length + 1)),
+        ...candidateArguments,
+      ],
       {
         cwd: context.workspace,
         environment: buildChildEnvironment(),
@@ -375,8 +418,12 @@ async function searchFallback(
         signal: context.signal,
       },
     );
-    if (captured.spawnErrorCode) {
-      throw new Error(`내부 검색 프로세스를 시작하지 못했습니다(${captured.spawnErrorCode}).`);
+    if (captured.spawnErrorMessage) {
+      throw new Error(
+        captured.spawnErrorCode
+          ? `내부 검색 프로세스를 시작하지 못했습니다(${captured.spawnErrorCode}).`
+          : "내부 검색 프로세스를 시작하지 못했습니다.",
+      );
     }
     if (captured.cancelled) throw new Error("검색이 취소되었습니다.");
     if (captured.exitCode !== 0 && !captured.timedOut && !captured.outputLimitReached) {
@@ -407,7 +454,18 @@ async function searchFallback(
         limitReason = "max_results";
         break;
       }
-      matches.push({ path: file.displayPath, line: raw.line, column: raw.column, text: raw.text });
+      const textTruncated = raw.line_truncated === true;
+      matches.push({
+        path: file.displayPath,
+        line: raw.line,
+        column: raw.column,
+        text: raw.text,
+        text_truncated: textTruncated,
+      });
+      if (textTruncated) {
+        truncated = true;
+        limitReason ??= "line_bytes";
+      }
     }
     if (truncated || captured.timedOut || captured.outputLimitReached) {
       truncated = true;
@@ -427,19 +485,21 @@ async function searchFiles(
   pattern: string,
   candidates: readonly WorkspaceFileCandidate[],
   maximum: number,
+  guard: WorkspacePathGuard,
   context: ToolExecutionContext,
 ): Promise<SearchResult> {
   const direct = candidates.filter((file) => file.directRegularFile);
   const indirect = candidates.filter((file) => !file.directRegularFile);
   const ripgrep = direct.length > 0
-    ? await searchWithRipgrep(pattern, direct, maximum, context)
+    ? await searchWithRipgrep(pattern, direct, maximum, guard, context)
     : { matches: [], truncated: false, engine: "ripgrep" as const };
-  if (!ripgrep) return await searchFallback(pattern, candidates, maximum, context);
+  if (!ripgrep) return await searchFallback(pattern, candidates, maximum, guard, context);
   if (ripgrep.truncated || indirect.length === 0) return ripgrep;
   const fallback = await searchFallback(
     pattern,
     indirect,
     maximum - ripgrep.matches.length,
+    guard,
     context,
   );
   return {
@@ -598,6 +658,7 @@ export function registerWorkspaceReadTools(
           stringArgument(input, "pattern"),
           walked.files,
           maximum,
+          guard,
           context,
         );
         const bounded = boundMatches(result.matches);

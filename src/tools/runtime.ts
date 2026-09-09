@@ -103,6 +103,23 @@ const BUILTIN_ORDER = new Map<string, number>(
 const TOOL_NAME_PATTERN = /^[a-z][a-z0-9_]{0,127}$/u;
 const MIN_OUTPUT_BYTES = 1_024;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
+const MAX_PREFLIGHT_SUMMARY_BYTES = 128 * 1024;
+const TOOL_CATEGORIES = new Set<ToolDefinition["category"]>([
+  "read",
+  "edit",
+  "shell",
+  "web",
+  "external",
+]);
+const APPROVAL_SCOPE_KINDS = new Set<ApprovalScope["kind"]>([
+  "workspace",
+  "path",
+  "paths",
+  "command",
+  "network",
+  "external",
+  "invocation",
+]);
 
 function contents(registry: ToolRegistry): Map<string, InternalRegistration> {
   const registered = registryContents.get(registry);
@@ -114,6 +131,111 @@ function cloneJsonObject(value: JsonObject): JsonObject {
   const serialized = JSON.stringify(value);
   if (serialized === undefined) throw new Error("도구 schema를 JSON으로 복제할 수 없습니다.");
   return JSON.parse(serialized) as JsonObject;
+}
+
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return actual.length === expected.length &&
+    actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function assertPermissionDefinition(definition: ToolDefinition): void {
+  if (!TOOL_CATEGORIES.has(definition.category) || !record(definition.permission)) {
+    throw new Error(`${definition.name} 도구의 범주 또는 권한이 올바르지 않습니다.`);
+  }
+  const permission = definition.permission as unknown as Record<string, unknown>;
+  const kind = permission.kind;
+  const valid = kind === "none"
+    ? exactKeys(permission, ["kind"]) &&
+      (definition.category === "read" || definition.category === "edit")
+    : kind === "workspace"
+      ? exactKeys(permission, ["access", "kind"]) &&
+        (permission.access === "read" || permission.access === "write") &&
+        definition.category === (permission.access === "read" ? "read" : "edit")
+      : kind === "command"
+        ? exactKeys(permission, ["kind"]) && definition.category === "shell"
+        : kind === "network"
+          ? exactKeys(permission, ["destination", "kind"]) &&
+            (permission.destination === "public" || permission.destination === "provider") &&
+            definition.category === "web"
+          : kind === "external"
+            ? exactKeys(permission, ["kind", "service"]) &&
+              typeof permission.service === "string" &&
+              permission.service.length > 0 &&
+              permission.service.length <= 256 &&
+              !/\p{Cc}/u.test(permission.service) &&
+              definition.category === "external"
+            : false;
+  if (!valid) {
+    throw new Error(`${definition.name} 도구의 권한 계약이 올바르지 않습니다.`);
+  }
+}
+
+function freezeJson(value: JsonValue): void {
+  if (value === null || typeof value !== "object" || Object.isFrozen(value)) return;
+  for (const child of Array.isArray(value) ? value : Object.values(value)) freezeJson(child);
+  Object.freeze(value);
+}
+
+function stableDefinition(definition: ToolDefinition): ToolDefinition {
+  const inputSchema = cloneJsonObject(definition.inputSchema);
+  freezeJson(inputSchema);
+  const permission = Object.freeze({ ...definition.permission });
+  const stable: ToolDefinition = {
+    ...definition,
+    inputSchema,
+    permission,
+  };
+  Object.freeze(stable);
+  return stable;
+}
+
+function stableContext(context: ToolExecutionContext): ToolExecutionContext {
+  if (
+    !context.sessionId ||
+    !context.runId ||
+    !context.workspace ||
+    typeof context.workspaceTrusted !== "boolean"
+  ) {
+    throw new Error("도구 실행 context가 올바르지 않습니다.");
+  }
+  const stable: ToolExecutionContext = {
+    sessionId: context.sessionId,
+    runId: context.runId,
+    workspace: context.workspace,
+    workspaceTrusted: context.workspaceTrusted,
+    signal: context.signal,
+  };
+  Object.freeze(stable);
+  return stable;
+}
+
+function stablePreflight(value: ToolPreflightResult): ToolPreflightResult {
+  if (
+    !value.summary.trim() ||
+    Buffer.byteLength(value.summary, "utf8") > MAX_PREFLIGHT_SUMMARY_BYTES ||
+    !APPROVAL_SCOPE_KINDS.has(value.approvalScope.kind)
+  ) {
+    throw new Error("도구 사전 검사 결과가 올바르지 않습니다.");
+  }
+  const target = cloneJsonObject(value.approvalScope.target);
+  freezeJson(target);
+  const scope: ApprovalScope = {
+    kind: value.approvalScope.kind,
+    target,
+  };
+  Object.freeze(scope);
+  const stable: ToolPreflightResult = {
+    summary: value.summary,
+    approvalScope: scope,
+  };
+  Object.freeze(stable);
+  return stable;
 }
 
 function defaultPreflight(
@@ -149,15 +271,13 @@ export class ToolRegistry {
     ) {
       throw new Error(`${definition.name} 도구 출력 제한이 올바르지 않습니다.`);
     }
+    assertPermissionDefinition(definition);
     assertSupportedToolSchema(definition.inputSchema, definition.name);
     const registered = contents(this);
     if (registered.has(definition.name)) {
       throw new Error(`${definition.name} 도구가 중복 등록되었습니다.`);
     }
-    const storedDefinition: ToolDefinition = {
-      ...definition,
-      inputSchema: cloneJsonObject(definition.inputSchema),
-    };
+    const storedDefinition = stableDefinition(definition);
     registered.set(definition.name, {
       definition: storedDefinition,
       preflight: registration.preflight ?? (async (input) => defaultPreflight(storedDefinition, input)),
@@ -193,12 +313,13 @@ function failure(code: string, message: string, execution: "not_started" | "fail
 }
 
 function safeMessage(value: string, redactor: Redactor, maximumBytes = 8_192): string {
-  const redacted = redactor.redact(value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, "�");
+  const redacted = redactor.redact(value).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/gu, "�");
   const bytes = Buffer.from(redacted, "utf8");
   if (bytes.byteLength <= maximumBytes) return redacted;
-  let end = maximumBytes;
+  const suffix = "…";
+  let end = Math.max(0, maximumBytes - Buffer.byteLength(suffix, "utf8"));
   while (end > 0 && (bytes[end] ?? 0) >= 0x80 && (bytes[end] ?? 0) < 0xc0) end -= 1;
-  return `${bytes.subarray(0, end).toString("utf8")}…`;
+  return `${bytes.subarray(0, end).toString("utf8")}${suffix}`;
 }
 
 function redactJson(value: JsonValue, redactor: Redactor, depth = 0): JsonValue {
@@ -206,7 +327,7 @@ function redactJson(value: JsonValue, redactor: Redactor, depth = 0): JsonValue 
   if (value === null || typeof value !== "object") return value;
   if (depth >= 32) return "[출력 중첩 생략]";
   if (Array.isArray(value)) return value.slice(0, 20_000).map((item) => redactJson(item, redactor, depth + 1));
-  const result: JsonObject = {};
+  const result = Object.create(null) as JsonObject;
   let count = 0;
   for (const [key, child] of Object.entries(value)) {
     count += 1;
@@ -284,7 +405,7 @@ function sanitizeResult(
   definition: ToolDefinition,
   redactor: Redactor,
 ): ToolExecutionResult {
-  const warnings = result.warnings?.map((warning) =>
+  const warnings = result.warnings?.slice(0, 20).map((warning) =>
     sanitizeFailure(warning, redactor, 4_096)
   );
   if (result.status === "success") {
@@ -368,8 +489,13 @@ export class CentralToolExecutor {
       );
     }
     let input: JsonObject;
+    let executionContext: ToolExecutionContext;
     try {
-      input = validateToolInput(rawInput, registration.definition.inputSchema, toolName);
+      input = cloneJsonObject(
+        validateToolInput(rawInput, registration.definition.inputSchema, toolName),
+      );
+      freezeJson(input);
+      executionContext = stableContext(context);
     } catch (error) {
       const message = error instanceof ToolInputValidationError
         ? error.message
@@ -380,7 +506,7 @@ export class CentralToolExecutor {
     if (hardDenial) {
       return sanitizeResult({ status: "denied", reason: hardDenial }, registration.definition, this.#redactor);
     }
-    if (requiresTrustedWorkspace(registration.definition) && !context.workspaceTrusted) {
+    if (requiresTrustedWorkspace(registration.definition) && !executionContext.workspaceTrusted) {
       return sanitizeResult(
         { status: "denied", reason: "신뢰하지 않은 workspace에서는 이 도구를 실행할 수 없습니다." },
         registration.definition,
@@ -390,16 +516,24 @@ export class CentralToolExecutor {
 
     let preflight: ToolPreflightResult;
     try {
-      preflight = await registration.preflight(input, context);
+      preflight = stablePreflight(
+        await registration.preflight(input, executionContext),
+      );
     } catch (error) {
       if (error instanceof PermissionDeniedError) {
         return sanitizeResult({ status: "denied", reason: error.message }, registration.definition, this.#redactor);
       }
       const message = error instanceof Error ? error.message : "도구 실행 대상을 확인하지 못했습니다.";
-      return sanitizeResult(failure("tool_preflight_failed", message, "not_started"), registration.definition, this.#redactor);
+      const code = error instanceof CatError ? error.code : "tool_preflight_failed";
+      return sanitizeResult(failure(code, message, "not_started"), registration.definition, this.#redactor);
     }
 
-    const boundaryRequest: ToolBoundaryRequest = { toolName, input, context, preflight };
+    const boundaryRequest: ToolBoundaryRequest = Object.freeze({
+      toolName,
+      input,
+      context: executionContext,
+      preflight,
+    });
     let hookDecision: Awaited<ReturnType<ToolHookPort["beforeTool"]>>;
     try {
       hookDecision = await this.#hooks.beforeTool(boundaryRequest);
@@ -418,25 +552,35 @@ export class CentralToolExecutor {
       toolName,
       category: registration.definition.category,
       permission: registration.definition.permission,
-      summary: preflight.summary,
+      summary: safeMessage(preflight.summary, this.#redactor, MAX_PREFLIGHT_SUMMARY_BYTES),
       scope: preflight.approvalScope,
-      workspace: context.workspace,
-      sessionId: context.sessionId,
-      runId: context.runId,
-      signal: context.signal,
+      workspace: executionContext.workspace,
+      sessionId: executionContext.sessionId,
+      runId: executionContext.runId,
+      signal: executionContext.signal,
     };
-    const authorization = await this.#policy.authorize(permissionCheck);
+    let authorization: Awaited<ReturnType<PermissionPolicy["authorize"]>>;
+    try {
+      authorization = await this.#policy.authorize(permissionCheck);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "도구 권한을 확인하지 못했습니다.";
+      return sanitizeResult(
+        failure("permission_check_failed", message, "not_started"),
+        registration.definition,
+        this.#redactor,
+      );
+    }
     if (!authorization.allowed) {
       const result: ToolExecutionResult = authorization.cancelled
         ? { status: "cancelled", reason: authorization.reason }
         : { status: "denied", reason: authorization.reason };
       return sanitizeResult(result, registration.definition, this.#redactor);
     }
-    if (context.signal.aborted) {
+    if (executionContext.signal.aborted) {
       return { status: "cancelled", reason: "도구 실행 전에 작업이 취소되었습니다." };
     }
     try {
-      await registration.revalidate(input, context, preflight);
+      await registration.revalidate(input, executionContext, preflight);
     } catch (error) {
       if (error instanceof PermissionDeniedError) {
         return sanitizeResult({ status: "denied", reason: error.message }, registration.definition, this.#redactor);
@@ -444,15 +588,15 @@ export class CentralToolExecutor {
       const message = error instanceof Error ? error.message : "승인 뒤 실행 대상을 다시 확인하지 못했습니다.";
       return sanitizeResult(failure("tool_target_changed", message, "not_started"), registration.definition, this.#redactor);
     }
-    if (context.signal.aborted) {
+    if (executionContext.signal.aborted) {
       return { status: "cancelled", reason: "도구 실행 직전에 작업이 취소되었습니다." };
     }
 
     let result: ToolExecutionResult;
     try {
-      result = await registration.definition.handler(input, context);
+      result = await registration.definition.handler(input, executionContext);
     } catch (error) {
-      if (context.signal.aborted) {
+      if (executionContext.signal.aborted) {
         result = { status: "cancelled", reason: "도구 실행 중 작업이 취소되었습니다." };
       } else if (error instanceof PermissionDeniedError) {
         result = { status: "denied", reason: error.message };

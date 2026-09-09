@@ -58,20 +58,34 @@ function broadTarget(token: string, protectedRoots: ReadonlySet<string>): boolea
     .toLowerCase();
   const cleaned = slashed === "/" ? slashed : slashed.replace(/\/+$/u, "");
   if (
+    cleaned.includes("$") ||
+    cleaned.includes("`") ||
+    cleaned.split("/").includes("..")
+  ) return true;
+  if (
     /^(?:\/\**|~(?:\/\**)?|\$(?:home|pwd|\{home\}|\{pwd\})(?:\/\**)?|\.?\/\**|\.\.?|\*+)$/u
       .test(cleaned)
   ) {
     return true;
   }
   const withoutWildcard = cleaned.replace(/\/\*+$/u, "");
-  return protectedRoots.has(withoutWildcard);
+  if (protectedRoots.has(withoutWildcard)) return true;
+  if (!withoutWildcard.startsWith("/") && !/^[a-z]:\//u.test(withoutWildcard)) {
+    return false;
+  }
+  return [...protectedRoots].some((root) =>
+    root.startsWith(`${withoutWildcard}${withoutWildcard.endsWith("/") ? "" : "/"}`)
+  );
 }
 
 function destructiveSegment(segment: string, protectedRoots: ReadonlySet<string>): boolean {
   const tokens = segment.trim().split(/\s+/u).filter(Boolean);
+  let analyzedExecutables = 0;
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index] ?? "";
     if (executableIs(token, "rm")) {
+      analyzedExecutables += 1;
+      if (analyzedExecutables > 32) return true;
       const remainder = tokens.slice(index + 1);
       const recursive = remainder.some(recursiveFlag);
       if (
@@ -82,16 +96,23 @@ function destructiveSegment(segment: string, protectedRoots: ReadonlySet<string>
       }
     }
     if (executableIs(token, "git")) {
-      const rest = tokens.slice(index + 1).join(" ");
+      analyzedExecutables += 1;
+      if (analyzedExecutables > 32) return true;
+      const remainder = tokens.slice(index + 1);
+      const rest = remainder.join(" ");
+      const pushIndex = remainder.indexOf("push");
       if (
         /(?:^|\s)reset\s+--hard(?:\s|$)/u.test(rest) ||
         /(?:^|\s)clean\s+(?:-[a-z]*f[a-z]*|--force)(?:\s|$)/iu.test(rest) ||
-        /(?:^|\s)push(?:\s|$)[\s\S]*(?:--force(?:-with-lease|-if-includes)?|-f)(?:\s|$)/iu.test(rest)
+        /(?:^|\s)push(?:\s|$)[\s\S]*(?:--force(?:-with-lease|-if-includes)?|-f)(?:\s|$)/iu.test(rest) ||
+        (pushIndex >= 0 && remainder.slice(pushIndex + 1).some((item) => /^\+\S+/u.test(item)))
       ) {
         return true;
       }
     }
     if (executableIs(token, "find")) {
+      analyzedExecutables += 1;
+      if (analyzedExecutables > 32) return true;
       const remainder = tokens.slice(index + 1);
       if (
         remainder.includes("-delete") &&
@@ -101,6 +122,8 @@ function destructiveSegment(segment: string, protectedRoots: ReadonlySet<string>
       }
     }
     if (executableIs(token, "chmod") || executableIs(token, "chown")) {
+      analyzedExecutables += 1;
+      if (analyzedExecutables > 32) return true;
       const remainder = tokens.slice(index + 1);
       if (
         remainder.some(recursiveFlag) &&

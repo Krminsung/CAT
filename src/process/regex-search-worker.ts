@@ -29,13 +29,34 @@ function utf8Prefix(value: string, maximumBytes: number): string {
   return bytes.subarray(0, end).toString("utf8");
 }
 
-async function readText(path: string): Promise<string | undefined> {
+function sameIdentity(
+  device: number,
+  inode: number,
+  expectedDevice: number,
+  expectedInode: number,
+): boolean {
+  if (device !== expectedDevice) return false;
+  return process.platform === "win32" && (inode === 0 || expectedInode === 0)
+    ? true
+    : inode === expectedInode;
+}
+
+async function readText(
+  path: string,
+  expectedDevice: number,
+  expectedInode: number,
+): Promise<string | undefined> {
   let handle: FileHandle | undefined;
   try {
     const noFollow = process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0);
     handle = await open(path, fsConstants.O_RDONLY | noFollow | (fsConstants.O_NONBLOCK ?? 0));
     const info = await handle.stat();
-    if (!info.isFile() || info.size > MAX_FILE_BYTES) return undefined;
+    if (
+      !info.isFile() ||
+      info.nlink > 1 ||
+      info.size > MAX_FILE_BYTES ||
+      !sameIdentity(info.dev, info.ino, expectedDevice, expectedInode)
+    ) return undefined;
     const buffer = Buffer.alloc(MAX_FILE_BYTES + 1);
     let total = 0;
     while (total < buffer.length) {
@@ -75,6 +96,12 @@ async function main(): Promise<void> {
     process.exitCode = 2;
     return;
   }
+  const candidates = process.argv.slice(4);
+  if (candidates.length % 3 !== 0) {
+    process.stderr.write("fallback 검색 파일 identity 인자가 올바르지 않습니다.\n");
+    process.exitCode = 2;
+    return;
+  }
   let expression: RegExp;
   try {
     expression = new RegExp(pattern, "u");
@@ -85,8 +112,22 @@ async function main(): Promise<void> {
   }
 
   let count = 0;
-  for (const path of process.argv.slice(4)) {
-    const content = await readText(path);
+  for (let index = 0; index < candidates.length; index += 3) {
+    const path = candidates[index];
+    const device = Number(candidates[index + 1]);
+    const inode = Number(candidates[index + 2]);
+    if (
+      !path ||
+      !Number.isSafeInteger(device) ||
+      !Number.isSafeInteger(inode) ||
+      device < 0 ||
+      inode < 0
+    ) {
+      process.stderr.write("fallback 검색 파일 identity가 올바르지 않습니다.\n");
+      process.exitCode = 2;
+      return;
+    }
+    const content = await readText(path, device, inode);
     if (content === undefined) continue;
     for (const [index, line] of splitLines(content).entries()) {
       expression.lastIndex = 0;

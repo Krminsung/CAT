@@ -227,6 +227,12 @@ export async function registerForegroundCommandTool(
           );
         }
         if (completed.cancelled) {
+          if (!completed.started) {
+            return {
+              status: "cancelled",
+              reason: "셸 프로세스를 시작하기 전에 작업이 취소되었습니다.",
+            };
+          }
           return commandFailure(
             "command_cancelled_after_start",
             "명령 실행을 취소했습니다. 이미 수행된 변경은 남아 있을 수 있습니다.",

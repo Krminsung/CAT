@@ -56,8 +56,21 @@ function normalizedDisplay(path: string): string {
   return value || ".";
 }
 
+function managedParts(parts: readonly string[]): readonly string[] {
+  return process.platform === "win32"
+    ? parts.map((part) => part.toLowerCase())
+    : parts;
+}
+
+function samePath(left: string, right: string): boolean {
+  return process.platform === "win32"
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
+}
+
 function assertRelativePath(path: string): void {
   const parts = path.split(/[\\/]+/u);
+  const comparedParts = managedParts(parts);
   if (
     !path ||
     path.includes("\0") ||
@@ -73,16 +86,16 @@ function assertRelativePath(path: string): void {
   if (process.platform !== "win32" && path.includes("\\")) {
     throw new ConfigurationError("이 환경의 workspace 경로 구분자는 /를 사용해야 합니다.");
   }
-  if (parts.includes("..")) {
+  if (comparedParts.includes("..")) {
     throw new PermissionDeniedError("Workspace 파일 경로에 .. 구성요소를 사용할 수 없습니다.");
   }
-  if (parts.includes(".git")) {
+  if (comparedParts.includes(".git")) {
     throw new PermissionDeniedError("Git 내부 관리 경로에는 일반 파일 도구로 접근할 수 없습니다.");
   }
-  for (let index = 0; index < parts.length - 1; index += 1) {
+  for (let index = 0; index < comparedParts.length - 1; index += 1) {
     if (
-      (parts[index] === ".cat" || parts[index] === ".smileserv") &&
-      parts[index + 1] === "worktrees"
+      (comparedParts[index] === ".cat" || comparedParts[index] === ".smileserv") &&
+      comparedParts[index + 1] === "worktrees"
     ) {
       throw new PermissionDeniedError("관리되는 다른 worktree에는 일반 파일 도구로 접근할 수 없습니다.");
     }
@@ -93,7 +106,7 @@ function assertInsideAndManaged(workspace: string, candidate: string): void {
   if (!inside(workspace, candidate)) {
     throw new PermissionDeniedError("Workspace 밖의 파일에는 접근할 수 없습니다.");
   }
-  const parts = relative(workspace, candidate).split(sep).filter(Boolean);
+  const parts = managedParts(relative(workspace, candidate).split(sep).filter(Boolean));
   if (parts.includes(".git")) {
     throw new PermissionDeniedError("Git 내부 관리 경로에는 일반 파일 도구로 접근할 수 없습니다.");
   }
@@ -142,8 +155,9 @@ function sameIdentity(
   ) {
     return false;
   }
+  if (leftDevice !== rightDevice) return false;
   if (process.platform === "win32" && (leftInode === 0 || rightInode === 0)) return true;
-  return leftDevice === rightDevice && leftInode === rightInode;
+  return leftInode === rightInode;
 }
 
 export class WorkspacePathGuard {
@@ -209,6 +223,24 @@ export class WorkspacePathGuard {
 
   async resolveWritable(requestedPath: string): Promise<WorkspacePathResolution> {
     assertRelativePath(requestedPath);
+    const lexicalPath = resolve(this.workspace, requestedPath);
+    assertInsideAndManaged(this.workspace, lexicalPath);
+    try {
+      const lexicalTarget = await lstat(lexicalPath);
+      if (lexicalTarget.isSymbolicLink()) {
+        throw new PermissionDeniedError(
+          "쓰기 대상의 마지막 경로에는 symbolic link를 사용할 수 없습니다.",
+        );
+      }
+    } catch (error) {
+      const code = errnoCode(error);
+      if (
+        error instanceof PermissionDeniedError ||
+        (code !== "ENOENT" && code !== "ENOTDIR")
+      ) {
+        throw error;
+      }
+    }
     let absolutePath: string;
     try {
       absolutePath = await resolvePotentialPath(requestedPath, this.workspace);
@@ -257,7 +289,7 @@ export class WorkspacePathGuard {
   ): Promise<WorkspacePathResolution> {
     const current = await this.resolveExisting(expected.requestedPath, expectedKind);
     if (
-      current.absolutePath !== expected.absolutePath ||
+      !samePath(current.absolutePath, expected.absolutePath) ||
       current.kind !== expected.kind ||
       !sameIdentity(current.device, current.inode, expected.device, expected.inode)
     ) {
@@ -268,13 +300,13 @@ export class WorkspacePathGuard {
 
   async revalidateWritable(expected: WorkspacePathResolution): Promise<WorkspacePathResolution> {
     const current = await this.resolveWritable(expected.requestedPath);
-    const targetMatches = current.absolutePath === expected.absolutePath &&
+    const targetMatches = samePath(current.absolutePath, expected.absolutePath) &&
       current.exists === expected.exists &&
       current.kind === expected.kind &&
       (current.exists
         ? sameIdentity(current.device, current.inode, expected.device, expected.inode)
         : true);
-    const parentMatches = current.parentPath === expected.parentPath &&
+    const parentMatches = samePath(current.parentPath, expected.parentPath) &&
       sameIdentity(
         current.parentDevice,
         current.parentInode,

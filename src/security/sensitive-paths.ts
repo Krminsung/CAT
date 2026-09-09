@@ -90,6 +90,12 @@ function pathInside(root: string, candidate: string): boolean {
   );
 }
 
+function samePath(left: string, right: string): boolean {
+  return process.platform === "win32"
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
+}
+
 /**
  * 존재하지 않는 마지막 구성요소가 있어도 가장 가까운 기존 상위 경로의 symlink를
  * 해석한다. 호출자는 검사 뒤 원래 입력이 아니라 반환된 경로만 사용해야 한다.
@@ -204,8 +210,8 @@ export class SensitivePathPolicy {
     for (const protectedFile of this.#files) {
       const resolvedProtected = await resolvePotentialPath(protectedFile.path, this.#basePath);
       if (
-        requestedAbsolute === protectedFile.path ||
-        resolvedPath === resolvedProtected ||
+        samePath(requestedAbsolute, protectedFile.path) ||
+        samePath(resolvedPath, resolvedProtected) ||
         sameFile(candidateIdentity, await fileIdentity(resolvedProtected))
       ) {
         return {

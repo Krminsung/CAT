@@ -2,6 +2,11 @@ import { spawn } from "node:child_process";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import type { Readable } from "node:stream";
 
+const MAX_CAPTURE_TIMEOUT_MS = 300_000;
+const MAX_CAPTURE_OUTPUT_BYTES = 8 * 1024 * 1024;
+const MAX_CAPTURE_ARGUMENTS = 4_096;
+const MAX_CAPTURE_ARGUMENT_BYTES = 1024 * 1024;
+
 export interface ChildCaptureOptions {
   cwd: string;
   environment: NodeJS.ProcessEnv;
@@ -32,11 +37,40 @@ function decode(chunks: readonly Buffer[]): string {
   return new TextDecoder("utf-8").decode(Buffer.concat(chunks));
 }
 
+function assertCaptureRequest(
+  executable: string,
+  args: readonly string[],
+  options: ChildCaptureOptions,
+): void {
+  const argumentBytes = args.reduce(
+    (total, argument) => total + Buffer.byteLength(argument, "utf8") + 1,
+    0,
+  );
+  if (
+    !executable ||
+    executable.includes("\0") ||
+    !options.cwd ||
+    options.cwd.includes("\0") ||
+    args.length > MAX_CAPTURE_ARGUMENTS ||
+    args.some((argument) => argument.includes("\0")) ||
+    argumentBytes > MAX_CAPTURE_ARGUMENT_BYTES ||
+    !Number.isSafeInteger(options.timeoutMs) ||
+    options.timeoutMs < 1 ||
+    options.timeoutMs > MAX_CAPTURE_TIMEOUT_MS ||
+    !Number.isSafeInteger(options.maxOutputBytes) ||
+    options.maxOutputBytes < 1 ||
+    options.maxOutputBytes > MAX_CAPTURE_OUTPUT_BYTES
+  ) {
+    throw new RangeError("자식 프로세스 실행 제한이 올바르지 않습니다.");
+  }
+}
+
 export async function captureChildProcess(
   executable: string,
   args: readonly string[],
   options: ChildCaptureOptions,
 ): Promise<ChildCaptureResult> {
+  assertCaptureRequest(executable, args, options);
   if (options.signal.aborted) {
     return {
       started: false,

@@ -81,6 +81,26 @@ async function assertAnchorUnchanged(expected: WorkspacePathResolution): Promise
   }
 }
 
+async function assertExpectedDigest(
+  resolution: WorkspacePathResolution,
+  expectedDigest: string | undefined,
+): Promise<void> {
+  if (expectedDigest === undefined) {
+    if (resolution.exists) {
+      throw new PermissionDeniedError("새 파일 대상이 검사 뒤 생성되었습니다.");
+    }
+    return;
+  }
+  if (!/^[a-f0-9]{64}$/u.test(expectedDigest) || !resolution.exists) {
+    throw new PermissionDeniedError("기존 파일의 변경 전 상태가 올바르지 않습니다.");
+  }
+  const snapshot = await readWorkspaceFileBytes(resolution);
+  const currentDigest = createHash("sha256").update(snapshot.bytes).digest("hex");
+  if (currentDigest !== expectedDigest) {
+    throw new PermissionDeniedError("검사 뒤 파일 내용이 변경되었습니다.");
+  }
+}
+
 export async function refreshWritableTarget(
   guard: WorkspacePathGuard,
   expected: WorkspacePathResolution,
@@ -234,6 +254,7 @@ export async function writeWorkspaceFileAtomic(
   guard: WorkspacePathGuard,
   expected: WorkspacePathResolution,
   content: Uint8Array,
+  expectedDigest: string | undefined,
   modeOverride?: number,
 ): Promise<WorkspaceWriteResult> {
   if (content.byteLength > MAX_WORKSPACE_FILE_BYTES) {
@@ -264,6 +285,7 @@ export async function writeWorkspaceFileAtomic(
   let temporaryCreated = false;
   let renamed = false;
   try {
+    await assertExpectedDigest(current, expectedDigest);
     const existingMode = current.exists
       ? (await lstat(current.absolutePath)).mode
       : undefined;
@@ -275,7 +297,8 @@ export async function writeWorkspaceFileAtomic(
     if (process.platform !== "win32") await handle.chmod(selectedMode & 0o777);
     await handle.close();
     handle = undefined;
-    await refreshWritableTarget(guard, current);
+    const verified = await refreshWritableTarget(guard, current);
+    await assertExpectedDigest(verified, expectedDigest);
     await rename(temporary, current.absolutePath);
     renamed = true;
     await syncDirectory(parent);
@@ -331,9 +354,11 @@ export async function writeWorkspaceFileAtomic(
 export async function deleteWorkspaceFile(
   guard: WorkspacePathGuard,
   expected: WorkspacePathResolution,
+  expectedDigest: string,
 ): Promise<void> {
   const current = await refreshWritableTarget(guard, expected);
   if (!current.exists) throw new ConfigurationError("삭제할 파일이 존재하지 않습니다.");
+  await assertExpectedDigest(current, expectedDigest);
   let changed = false;
   try {
     await unlink(current.absolutePath);

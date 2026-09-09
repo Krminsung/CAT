@@ -279,12 +279,20 @@ async function executeStaged(
     try {
       if (context.signal.aborted) guardAbort();
       if (item.after === undefined) {
-        await deleteWorkspaceFile(guard, item.resolution);
+        if (item.before === undefined) {
+          throw new Error("삭제할 파일의 변경 전 내용이 유실되었습니다.");
+        }
+        await deleteWorkspaceFile(
+          guard,
+          item.resolution,
+          digestBytes(item.before),
+        );
       } else {
         const write = await writeWorkspaceFileAtomic(
           guard,
           item.resolution,
           item.after,
+          item.before === undefined ? undefined : digestBytes(item.before),
         );
         checkpoints.recordPreparedDirectories(checkpointId, write.preparedDirectories);
         for (const directory of write.preparedDirectories) preparedDirectories.add(directory);

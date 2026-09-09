@@ -137,7 +137,9 @@ function validateSchemaNode(value: unknown, path: string, depth: number): void {
       fail(`${path} schema의 required 항목이 중복됐습니다.`);
     }
     for (const name of requiredNames) {
-      if (!(name in value.properties)) fail(`${path} schema의 required 항목 ${name}이 정의되지 않았습니다.`);
+      if (!Object.hasOwn(value.properties, name)) {
+        fail(`${path} schema의 required 항목 ${name}이 정의되지 않았습니다.`);
+      }
     }
     for (const [name, nested] of Object.entries(value.properties)) {
       validateSchemaNode(nested, `${path}.${name}`, depth + 1);
@@ -226,7 +228,7 @@ function validateValue(value: unknown, schema: Record<string, unknown>, path: st
         if (!Object.hasOwn(value, name)) fail(`${path}.${name}: 필수 인자가 누락되었습니다.`);
       }
       for (const [name, nested] of Object.entries(value)) {
-        const childSchema = properties[name];
+        const childSchema = Object.hasOwn(properties, name) ? properties[name] : undefined;
         if (childSchema === undefined) fail(`${path}.${name}: 정의되지 않은 추가 인자입니다.`);
         validateValue(nested, childSchema as Record<string, unknown>, `${path}.${name}`);
       }

@@ -322,15 +322,22 @@ export class CheckpointManager {
           throw new PermissionDeniedError("Checkpoint 이후 다른 변경이 있어 덮어쓰지 않았습니다.");
         }
         if (state.beforeExists) {
+          if (state.before === undefined) {
+            throw new StorageError("Checkpoint의 변경 전 파일 내용이 유실되었습니다.");
+          }
           const write = await writeWorkspaceFileAtomic(
             this.guard,
             current.resolution,
-            state.before ?? Buffer.alloc(0),
+            state.before,
+            state.afterDigest,
             state.beforeMode,
           );
           for (const directory of write.preparedDirectories) record.preparedDirectories.add(directory);
         } else {
-          await deleteWorkspaceFile(this.guard, current.resolution);
+          if (!state.afterDigest) {
+            throw new StorageError("Checkpoint의 삭제 전 digest가 유실되었습니다.");
+          }
+          await deleteWorkspaceFile(this.guard, current.resolution, state.afterDigest);
         }
         const verified = await this.#currentState(state);
         if (!matchesState(verified.exists, verified.digest, state.beforeExists, state.beforeDigest)) {
@@ -364,7 +371,7 @@ export class CheckpointManager {
         if (sha256(snapshot.bytes) !== expectedDigest) {
           throw new PermissionDeniedError("남은 임시 파일 내용이 변경되어 제거하지 않았습니다.");
         }
-        await deleteWorkspaceFile(this.guard, resolution);
+        await deleteWorkspaceFile(this.guard, resolution, expectedDigest);
         record.residualFiles.delete(path);
       } catch (error) {
         const code = errnoCode(error);
