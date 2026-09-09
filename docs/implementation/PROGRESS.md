@@ -8,7 +8,7 @@ P04 기준 main은 `3581145239fb622b647cb1d54fbe64c292ae8d7c`이다. 구현은 �
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
-| P04 권한·기본 도구 | VERIFYING | 1차 FAIL, 2차 NOT_RUN (2/2 예약) | NOT_PUBLISHED |
+| P04 권한·기본 도구 | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
 | P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -58,4 +58,6 @@ foreground 실행은 `009d134`로 완료했다. 전체 정적 검토에서 확�
 stdin 타입과 선택 속성 구성에서 엄격 타입 오류 2개를 보고하고 종료 코드 2로
 실패했다. 사용자가 P04 오류 수정과 `npm run check` 추가 1회를 명시적으로 승인해,
 보고된 두 타입 오류만 `76917b48663f2cb90f78ad29012588820b69dffb`에서 수정했다.
-첫 실패 기록을 보존한 채 두 번째이자 마지막 승인 검사를 2/2로 예약했다.
+첫 실패 기록을 보존한 채 `cc7ac1ea55fc9370537b6b944988add2ccfb1834`를 대상으로
+두 번째이자 마지막 승인 검사를 실행했고 통과했다. 결과는 정적 검사 통과이며 실제
+파일 작업, child process와 앱 런타임은 검증하지 않았다.
