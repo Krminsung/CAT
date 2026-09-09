@@ -25,5 +25,6 @@ P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
 `f0e6726bb607dc736b5e245ab4722fb103638e0d`로 완료했다. 전체 diff의 정적 검토와
 base 대조를 마쳤다. `55692b2035a4c0585c7b2cb15a1df35df9e3acd0`을 대상으로 한
 유일한 `npm run check`가 통과했고 PR #1을 merge commit `85c68d1`로 병합했다.
-P02.1은 `5359cfab201cf4dbe3e811167933f82e38614d16`로 완료했다. 현재 작업은
-P02.2이며 다음은 canonical trust, child environment와 민감 경로 경계 구현이다.
+P02.1은 `5359cfab201cf4dbe3e811167933f82e38614d16`, P02.2는
+`3e3326faf8d06499735074d2b231a12d676a3f2a`로 완료했다. 현재 작업은 P02.3이며
+다음은 P02 전체 diff의 정적 검토와 단 한 번의 단계 검증 예약이다.

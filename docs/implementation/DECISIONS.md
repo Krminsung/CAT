@@ -62,3 +62,14 @@
   `SMILESERV_API_KEY`는 internal provider에서 서로 충돌하지 않을 때만 읽는다.
 - 결과: base URL의 origin이 달라지면 기존 key를 재사용하지 않는다. 기존
   `~/.smileserv` credential 파일은 P02에서 읽거나 자동 이관하지 않는다.
+
+## D009 — workspace trust와 자식 프로세스 경계
+
+- 상태: 승인됨
+- 결정: workspace trust는 canonical path와 장치·inode가 모두 일치할 때만
+  유지한다. trust 추가는 사용자 확인으로 생성한 grant만 허용한다. 자식 프로세스는
+  최소 환경변수 allowlist로 시작하며 secret과 실행 주입 변수는 명시적 pass-through도
+  거부한다.
+- 결과: 기존 `~/.smileserv`는 알려진 항목의 존재만 탐지한다. 일반 파일 도구는
+  `.cat`과 `.smileserv`의 credential/profile secret 및 이를 가리키는 symbolic
+  link나 hard-link alias에 접근할 수 없다.
