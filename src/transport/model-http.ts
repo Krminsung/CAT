@@ -152,9 +152,9 @@ function createEnvironmentDispatcher(
   }
   try {
     return new EnvHttpProxyAgent({
-      ...(httpProxy ? { httpProxy } : {}),
-      ...(httpsProxy ? { httpsProxy } : {}),
-      ...(noProxy ? { noProxy } : {}),
+      httpProxy: httpProxy ?? "",
+      httpsProxy: httpsProxy ?? "",
+      noProxy: noProxy ?? "",
     });
   } catch {
     throw new ConfigurationError("모델 transport proxy를 초기화하지 못했습니다.");
@@ -168,7 +168,11 @@ function assertHeaders(headers: Readonly<Record<string, string>>): void {
   }
   let totalBytes = 0;
   for (const [name, value] of entries) {
-    if (!HEADER_NAME.test(name) || /[\r\n\0]/u.test(value)) {
+    if (
+      typeof value !== "string" ||
+      !HEADER_NAME.test(name) ||
+      /[\r\n\0]/u.test(value)
+    ) {
       throw new ConfigurationError("모델 요청 header 형식이 올바르지 않습니다.");
     }
     totalBytes += Buffer.byteLength(name, "utf8") + Buffer.byteLength(value, "utf8");
@@ -250,6 +254,29 @@ function throwForAbort(
   }
 }
 
+interface RequestDeadline {
+  signal: AbortSignal;
+  clear(): void;
+}
+
+function createRequestDeadline(timeoutMs: number): RequestDeadline {
+  const controller = new AbortController();
+  let active = true;
+  const timer = setTimeout(() => {
+    active = false;
+    controller.abort();
+  }, timeoutMs);
+  timer.unref();
+  return {
+    signal: controller.signal,
+    clear: () => {
+      if (!active) return;
+      active = false;
+      clearTimeout(timer);
+    },
+  };
+}
+
 async function waitForRetry(
   milliseconds: number,
   signal: AbortSignal,
@@ -272,12 +299,18 @@ async function waitForRetry(
 }
 
 export class ModelHttpResponse {
+  readonly #releaseDeadline: () => void;
+  #completed = false;
+
   constructor(
     readonly response: Response,
     readonly signal: AbortSignal,
     readonly callerSignal: AbortSignal,
     readonly deadlineSignal: AbortSignal,
-  ) {}
+    releaseDeadline: () => void,
+  ) {
+    this.#releaseDeadline = releaseDeadline;
+  }
 
   get status(): number {
     return this.response.status;
@@ -296,11 +329,26 @@ export class ModelHttpResponse {
   }
 
   assertActive(): void {
-    throwForAbort(this.callerSignal, this.deadlineSignal);
+    try {
+      throwForAbort(this.callerSignal, this.deadlineSignal);
+    } catch (error) {
+      this.complete();
+      throw error;
+    }
+  }
+
+  complete(): void {
+    if (this.#completed) return;
+    this.#completed = true;
+    this.#releaseDeadline();
   }
 
   async cancel(): Promise<void> {
-    await this.response.body?.cancel().catch(() => undefined);
+    try {
+      await this.response.body?.cancel().catch(() => undefined);
+    } finally {
+      this.complete();
+    }
   }
 }
 
@@ -392,50 +440,81 @@ export class ModelHttpTransport {
     }
     const maximumRetries = retryCount(request.maxRetries);
     if (request.signal.aborted) throw new CancelledError("모델 요청이 취소됐습니다.");
-    const deadlineSignal = AbortSignal.timeout(timeoutMs);
+    const deadline = createRequestDeadline(timeoutMs);
+    const deadlineSignal = deadline.signal;
     const signal = AbortSignal.any([request.signal, deadlineSignal]);
-
-    for (let attempt = 0; ; attempt += 1) {
-      let response: Response;
-      try {
-        response = await this.#fetchWithRedirects(request, signal);
-      } catch (error) {
-        throwForAbort(request.signal, deadlineSignal);
-        if (error instanceof ConfigurationError || error instanceof ProtocolError) throw error;
-        const retryAttempt = attempt + 1;
-        if (
-          attempt >= maximumRetries ||
-          isTlsFailure(error) ||
-          !consumeRetry(request.retryBudget, retryAttempt, "network_error")
-        ) {
-          throw new ProviderError("모델 API에 연결하지 못했습니다.");
+    let responseOwnsDeadline = false;
+    try {
+      for (let attempt = 0; ; attempt += 1) {
+        let response: Response;
+        try {
+          response = await this.#fetchWithRedirects(request, signal);
+        } catch (error) {
+          throwForAbort(request.signal, deadlineSignal);
+          if (error instanceof ConfigurationError || error instanceof ProtocolError) throw error;
+          const retryAttempt = attempt + 1;
+          if (
+            attempt >= maximumRetries ||
+            isTlsFailure(error) ||
+            !consumeRetry(request.retryBudget, retryAttempt, "network_error")
+          ) {
+            throw new ProviderError("모델 API에 연결하지 못했습니다.");
+          }
+          const delayMs = Math.min(2_000, 500 * (2 ** attempt));
+          request.onRetry?.({
+            attempt: retryAttempt,
+            delayMs,
+            reason: "network_error",
+          });
+          await waitForRetry(delayMs, signal, request.signal, deadlineSignal);
+          continue;
         }
-        const delayMs = Math.min(2_000, 500 * (2 ** attempt));
+
+        const delayMs = retryDelay(response, attempt, this.#now);
+        if (delayMs === undefined || attempt >= maximumRetries) {
+          responseOwnsDeadline = true;
+          return new ModelHttpResponse(
+            response,
+            signal,
+            request.signal,
+            deadlineSignal,
+            deadline.clear,
+          );
+        }
+        const retryAttempt = attempt + 1;
+        let retryApproved: boolean;
+        try {
+          retryApproved = consumeRetry(
+            request.retryBudget,
+            retryAttempt,
+            "http_status",
+            response.status,
+          );
+        } catch (error) {
+          await response.body?.cancel().catch(() => undefined);
+          throw error;
+        }
+        if (!retryApproved) {
+          responseOwnsDeadline = true;
+          return new ModelHttpResponse(
+            response,
+            signal,
+            request.signal,
+            deadlineSignal,
+            deadline.clear,
+          );
+        }
+        await response.body?.cancel().catch(() => undefined);
         request.onRetry?.({
           attempt: retryAttempt,
           delayMs,
-          reason: "network_error",
+          reason: "http_status",
+          statusCode: response.status,
         });
         await waitForRetry(delayMs, signal, request.signal, deadlineSignal);
-        continue;
       }
-
-      const delayMs = retryDelay(response, attempt, this.#now);
-      if (delayMs === undefined || attempt >= maximumRetries) {
-        return new ModelHttpResponse(response, signal, request.signal, deadlineSignal);
-      }
-      const retryAttempt = attempt + 1;
-      if (!consumeRetry(request.retryBudget, retryAttempt, "http_status", response.status)) {
-        return new ModelHttpResponse(response, signal, request.signal, deadlineSignal);
-      }
-      await response.body?.cancel().catch(() => undefined);
-      request.onRetry?.({
-        attempt: retryAttempt,
-        delayMs,
-        reason: "http_status",
-        statusCode: response.status,
-      });
-      await waitForRetry(delayMs, signal, request.signal, deadlineSignal);
+    } finally {
+      if (!responseOwnsDeadline) deadline.clear();
     }
   }
 
@@ -469,7 +548,10 @@ export async function readResponseBytes(
     throw new ProtocolError("모델 응답이 허용 크기를 초과했습니다.");
   }
   const body = source.body;
-  if (!body) return new Uint8Array();
+  if (!body) {
+    source.complete();
+    return new Uint8Array();
+  }
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -499,6 +581,7 @@ export async function readResponseBytes(
     throw new ProviderError("모델 응답 본문을 읽지 못했습니다.");
   } finally {
     if (!completed) await reader.cancel().catch(() => undefined);
+    source.complete();
     reader.releaseLock();
   }
   const joined = new Uint8Array(total);
@@ -517,7 +600,10 @@ export async function readResponsePrefix(
   const maximum = assertBodyLimit(maximumBytes);
   source.assertActive();
   const body = source.body;
-  if (!body) return new Uint8Array();
+  if (!body) {
+    source.complete();
+    return new Uint8Array();
+  }
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -542,6 +628,7 @@ export async function readResponsePrefix(
     throw new ProviderError("모델 오류 응답을 읽지 못했습니다.");
   } finally {
     await reader.cancel().catch(() => undefined);
+    source.complete();
     reader.releaseLock();
   }
   const joined = new Uint8Array(total);

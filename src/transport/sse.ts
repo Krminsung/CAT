@@ -12,6 +12,7 @@ const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
 const DEFAULT_MAX_EVENTS = 100_000;
 const DEFAULT_MAX_LINES = 200_000;
 const MAX_STREAM_LIMIT = 64 * 1024 * 1024;
+const MAX_STREAM_CHUNKS = 200_000;
 
 export interface ServerSentEvent {
   data: string;
@@ -31,6 +32,7 @@ export interface ServerSentEventLimits {
 interface ParsedLine {
   line: string;
   rest: string;
+  delimiterBytes: number;
 }
 
 function boundedInteger(
@@ -54,7 +56,11 @@ function takeLine(
   for (let index = startIndex; index < input.length; index += 1) {
     const character = input[index];
     if (character === "\n") {
-      return { line: input.slice(0, index), rest: input.slice(index + 1) };
+      return {
+        line: input.slice(0, index),
+        rest: input.slice(index + 1),
+        delimiterBytes: 1,
+      };
     }
     if (character !== "\r") continue;
     if (index + 1 === input.length && !endOfStream) return undefined;
@@ -62,9 +68,12 @@ function takeLine(
     return {
       line: input.slice(0, index),
       rest: input.slice(index + delimiterLength),
+      delimiterBytes: delimiterLength,
     };
   }
-  if (endOfStream && input.length > 0) return { line: input, rest: "" };
+  if (endOfStream && input.length > 0) {
+    return { line: input, rest: "", delimiterBytes: 0 };
+  }
   return undefined;
 }
 
@@ -102,19 +111,27 @@ export async function* readServerSentEvents(
     "SSE line 수",
     DEFAULT_MAX_LINES,
   );
-  const contentType = source.headers.get("content-type")?.toLowerCase();
+  const contentType = source.headers.get("content-type")
+    ?.split(";", 1)[0]
+    ?.trim()
+    .toLowerCase();
   source.assertActive();
-  if (contentType && !contentType.startsWith("text/event-stream")) {
+  if (contentType && contentType !== "text/event-stream") {
     await source.cancel();
     throw new ProtocolError("모델 streaming 응답의 content-type이 SSE가 아닙니다.");
   }
   const body = source.body;
-  if (!body) throw new ProtocolError("모델 streaming 응답 본문이 없습니다.");
+  if (!body) {
+    source.complete();
+    throw new ProtocolError("모델 streaming 응답 본문이 없습니다.");
+  }
 
   const reader = body.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let pending = "";
+  let pendingBytes = 0;
   let totalBytes = 0;
+  let chunkCount = 0;
   let eventBytes = 0;
   let lineCount = 0;
   let eventCount = 0;
@@ -141,7 +158,10 @@ export async function* readServerSentEvents(
     return event;
   };
 
-  const consumeLine = (line: string): ServerSentEvent | undefined => {
+  const consumeLine = (
+    line: string,
+    delimiterBytes: number,
+  ): ServerSentEvent | undefined => {
     lineCount += 1;
     if (lineCount > maxLines) {
       throw new ProtocolError("모델 SSE line 수가 허용 한도를 초과했습니다.");
@@ -149,7 +169,7 @@ export async function* readServerSentEvents(
     if (Buffer.byteLength(line, "utf8") > maxLineBytes) {
       throw new ProtocolError("모델 SSE line이 허용 크기를 초과했습니다.");
     }
-    eventBytes += Buffer.byteLength(line, "utf8") + 1;
+    eventBytes += Buffer.byteLength(line, "utf8") + delimiterBytes;
     if (eventBytes > maxEventBytes) {
       throw new ProtocolError("모델 SSE event가 허용 크기를 초과했습니다.");
     }
@@ -190,10 +210,16 @@ export async function* readServerSentEvents(
       source.assertActive();
       if (done) {
         completed = true;
-        pending += decoder.decode();
+        const decoded = decoder.decode();
+        pending += decoded;
+        pendingBytes += Buffer.byteLength(decoded, "utf8");
         break;
       }
       const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+      chunkCount += 1;
+      if (chunkCount > MAX_STREAM_CHUNKS) {
+        throw new ProtocolError("모델 SSE 응답 chunk 수가 허용 한도를 초과했습니다.");
+      }
       totalBytes += chunk.byteLength;
       if (totalBytes > maxTotalBytes) {
         throw new ProtocolError("모델 SSE 응답이 전체 크기 한도를 초과했습니다.");
@@ -205,16 +231,18 @@ export async function* readServerSentEvents(
       }
       const previousLength = pending.length;
       pending += decoded;
+      pendingBytes += Buffer.byteLength(decoded, "utf8");
       let searchIndex = Math.max(0, previousLength - 1);
       while (true) {
         const parsed = takeLine(pending, false, searchIndex);
         if (!parsed) break;
         pending = parsed.rest;
+        pendingBytes -= Buffer.byteLength(parsed.line, "utf8") + parsed.delimiterBytes;
         searchIndex = 0;
-        const event = publish(consumeLine(parsed.line));
+        const event = publish(consumeLine(parsed.line, parsed.delimiterBytes));
         if (event) yield event;
       }
-      if (pending.length > maxLineBytes) {
+      if (pendingBytes > maxLineBytes) {
         throw new ProtocolError("모델 SSE line이 허용 크기를 초과했습니다.");
       }
     }
@@ -223,7 +251,8 @@ export async function* readServerSentEvents(
       const parsed = takeLine(pending, true);
       if (!parsed) break;
       pending = parsed.rest;
-      const event = publish(consumeLine(parsed.line));
+      pendingBytes -= Buffer.byteLength(parsed.line, "utf8") + parsed.delimiterBytes;
+      const event = publish(consumeLine(parsed.line, parsed.delimiterBytes));
       if (event) yield event;
     }
     const finalEvent = publish(dispatchEvent());
@@ -240,6 +269,7 @@ export async function* readServerSentEvents(
     throw new ProtocolError("모델 SSE 응답을 해석하지 못했습니다.");
   } finally {
     if (!completed) await reader.cancel().catch(() => undefined);
+    source.complete();
     reader.releaseLock();
   }
 }

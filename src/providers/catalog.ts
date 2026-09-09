@@ -347,6 +347,9 @@ function assertProfileCatalogBinding(
   if (profile.provider !== definition.id) {
     throw new ConfigurationError("Provider profile과 catalog ID가 일치하지 않습니다.");
   }
+  if (profile.endpointSource !== "provider_default" && profile.endpointSource !== "user") {
+    throw new ConfigurationError("Provider profile endpoint source가 올바르지 않습니다.");
+  }
   if (definition.defaults && profile.protocol !== definition.defaults.protocol) {
     throw new ConfigurationError("기본 provider의 protocol은 catalog 값과 일치해야 합니다.");
   }
@@ -368,6 +371,14 @@ function assertProfileCatalogBinding(
   }
 }
 
+export function validateProviderProfileCatalog(
+  profile: ProviderProfile,
+): ProviderDefinition {
+  const definition = requireProviderDefinition(profile.provider);
+  assertProfileCatalogBinding(profile, definition);
+  return definition;
+}
+
 export interface CreateProviderAdapterOptions {
   profile: ProviderProfile;
   credential: ProviderCredentialAccess;
@@ -379,8 +390,7 @@ export interface CreateProviderAdapterOptions {
 export function createProviderAdapter(
   options: CreateProviderAdapterOptions,
 ): ProviderAdapter {
-  const definition = requireProviderDefinition(options.profile.provider);
-  assertProfileCatalogBinding(options.profile, definition);
+  const definition = validateProviderProfileCatalog(options.profile);
   const common = {
     id: definition.id,
     displayName: definition.displayName,
@@ -644,6 +654,6 @@ class HttpModelCatalog implements ModelCatalog {
 export function createModelCatalog(
   options: CreateModelCatalogOptions,
 ): ModelCatalog {
-  const definition = requireProviderDefinition(options.profile.provider);
+  const definition = validateProviderProfileCatalog(options.profile);
   return new HttpModelCatalog({ ...options, definition });
 }

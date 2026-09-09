@@ -38,7 +38,10 @@ export function configurationString(
   maximum: number,
   allowEmpty = false,
 ): string {
-  const selected = typeof value === "string" ? value.trim() : "";
+  if (typeof value !== "string") {
+    throw new ConfigurationError(`${label} 형식이 올바르지 않습니다.`);
+  }
+  const selected = value.trim();
   if (
     (!allowEmpty && !selected) ||
     /\p{Cc}/u.test(selected) ||

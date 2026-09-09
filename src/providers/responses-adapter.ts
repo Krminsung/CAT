@@ -46,6 +46,8 @@ const MAX_TOOL_ARGUMENT_BYTES = 2 * 1024 * 1024;
 const MAX_ALL_TOOL_ARGUMENT_BYTES = 8 * 1024 * 1024;
 const MAX_TOOL_ARGUMENT_CHUNKS = 65_536;
 const MAX_MESSAGES = 10_000;
+const MAX_CONTENT_PARTS = 100_000;
+const MAX_INPUT_ITEMS = 20_000;
 const PROVIDER_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 
 export interface ResponsesAdapterOptions {
@@ -116,9 +118,25 @@ type ContentMessage = Exclude<ConversationMessage, { role: "tool" }>;
 function messageText(message: ContentMessage): string {
   const texts: string[] = [];
   for (const part of message.content) {
-    if (part.type === "text") texts.push(part.text);
+    if (part.type === "text") {
+      if (typeof part.text !== "string") {
+        throw new ConfigurationError("Responses message text가 문자열이 아닙니다.");
+      }
+      texts.push(part.text);
+    }
   }
   return texts.join("\n");
+}
+
+function assertContentLimit(messages: readonly ConversationMessage[]): void {
+  let count = 0;
+  for (const message of messages) {
+    if (message.role === "tool") continue;
+    count += message.content.length;
+    if (count > MAX_CONTENT_PARTS) {
+      throw new ConfigurationError("Responses 입력 content 수가 너무 많습니다.");
+    }
+  }
 }
 
 function systemInstructions(messages: readonly ConversationMessage[]): string {
@@ -152,10 +170,16 @@ function responsesInput(messages: readonly ConversationMessage[]): JsonObject[] 
     throw new ConfigurationError("Responses 입력 message 수가 너무 많습니다.");
   }
   const input: JsonObject[] = [];
+  const append = (item: JsonObject): void => {
+    if (input.length >= MAX_INPUT_ITEMS) {
+      throw new ConfigurationError("Responses 입력 item 수가 너무 많습니다.");
+    }
+    input.push(item);
+  };
   for (const message of messages) {
     if (message.role === "system") continue;
     if (message.role === "user") {
-      input.push({
+      append({
         type: "message",
         role: "user",
         content: [{ type: "input_text", text: messageText(message) }],
@@ -167,11 +191,11 @@ function responsesInput(messages: readonly ConversationMessage[]): JsonObject[] 
         .filter((part) => part.type === "text")
         .map((part) => ({ type: "output_text", text: part.text }));
       if (texts.length > 0) {
-        input.push({ type: "message", role: "assistant", content: texts });
+        append({ type: "message", role: "assistant", content: texts });
       }
       for (const part of message.content) {
         if (part.type !== "tool_call") continue;
-        input.push({
+        append({
           type: "function_call",
           call_id: requestString(part.callId, "Responses call ID", 512),
           name: requestString(part.name, "Responses tool 이름", 128),
@@ -180,7 +204,7 @@ function responsesInput(messages: readonly ConversationMessage[]): JsonObject[] 
       }
       continue;
     }
-    input.push({
+    append({
       type: "function_call_output",
       call_id: requestString(message.callId, "Responses call ID", 512),
       output: toolResultText(message),
@@ -211,6 +235,7 @@ function requestBody(
   capabilities: ProviderCapabilities,
 ): string {
   const model = requestString(request.model, "Responses model ID", 256);
+  assertContentLimit(request.messages);
   const tools = responsesTools(request.tools, capabilities);
   const instructions = systemInstructions(request.messages);
   const reasoningEffort = configurationReasoningEffort(request.reasoningEffort);
@@ -248,10 +273,6 @@ function requestBody(
   } catch {
     throw new ConfigurationError("Responses 요청을 JSON으로 직렬화하지 못했습니다.");
   }
-}
-
-function eventKey(event: Record<string, unknown>): string | undefined {
-  return eventKeys(event)[0];
 }
 
 function eventKeys(event: Record<string, unknown>): string[] {
@@ -368,7 +389,7 @@ class ResponsesToolCollector {
 
   mergeItem(
     item: Record<string, unknown>,
-    fallbackKey?: string,
+    fallbackKeys: readonly string[] = [],
     complete = false,
   ): PendingToolCall | undefined {
     if (item.type !== "function_call") return undefined;
@@ -392,7 +413,7 @@ class ResponsesToolCollector {
       : undefined;
     const keys = [
       ...(itemId ? [`item:${itemId}`] : []),
-      ...(fallbackKey ? [fallbackKey] : []),
+      ...fallbackKeys,
       ...(callId ? [`call:${callId}`] : []),
     ];
     if (keys.length === 0) throw new ProtocolError("Responses tool call 식별자가 없습니다.");
@@ -468,8 +489,15 @@ class ResponsesToolCollector {
 }
 
 function usage(value: unknown): ProviderUsage | undefined {
+  if (value === undefined || value === null) return undefined;
   const raw = protocolRecord(value);
-  if (!raw) return undefined;
+  if (!raw) throw new ProtocolError("Responses usage가 객체가 아닙니다.");
+  const fields = ["input_tokens", "output_tokens", "total_tokens"] as const;
+  for (const field of fields) {
+    if (raw[field] !== undefined && protocolInteger(raw[field]) === undefined) {
+      throw new ProtocolError(`Responses usage ${field} 값이 올바르지 않습니다.`);
+    }
+  }
   const inputTokens = protocolInteger(raw.input_tokens);
   const outputTokens = protocolInteger(raw.output_tokens);
   const totalTokens = protocolInteger(raw.total_tokens);
@@ -630,7 +658,7 @@ export class ResponsesProviderAdapter implements ProviderAdapter {
         if (raw.type === "response.output_item.added") {
           const item = protocolRecord(raw.item);
           if (!item) throw new ProtocolError("Responses 추가 output item이 객체가 아닙니다.");
-          tools.mergeItem(item, eventKey(raw));
+          tools.mergeItem(item, eventKeys(raw));
           continue;
         }
         if (raw.type === "response.function_call_arguments.delta") {
@@ -644,7 +672,7 @@ export class ResponsesProviderAdapter implements ProviderAdapter {
         if (raw.type === "response.output_item.done") {
           const item = protocolRecord(raw.item);
           if (!item) throw new ProtocolError("Responses 완료 output item이 객체가 아닙니다.");
-          tools.mergeItem(item, eventKey(raw), true);
+          tools.mergeItem(item, eventKeys(raw), true);
           continue;
         }
         if (raw.type === "response.failed" || raw.type === "response.incomplete" || raw.type === "error") {
@@ -667,14 +695,14 @@ export class ResponsesProviderAdapter implements ProviderAdapter {
         }
         for (let index = 0; index < output.length; index += 1) {
           const item = output[index];
-          if (item) tools.mergeItem(item, `index:${index}`, true);
+          if (item) tools.mergeItem(item, [`index:${index}`], true);
         }
         for (const toolEvent of tools.finishAll()) yield toolEvent;
         const measured = usage(response.usage);
         if (measured) yield { type: "usage", usage: measured };
-        const responseId = typeof response.id === "string" && response.id
-          ? protocolString(response.id, "Responses response ID", 512)
-          : undefined;
+        const responseId = response.id === undefined || response.id === null
+          ? undefined
+          : protocolString(response.id, "Responses response ID", 512);
         yield {
           type: "completed",
           ...(responseId ? { responseId } : {}),

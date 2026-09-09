@@ -4,7 +4,10 @@ import {
   StorageError,
 } from "../core/errors.js";
 import type { ProviderProtocol } from "../core/provider.js";
-import { providerEnvironmentKeys } from "../providers/catalog.js";
+import {
+  providerEnvironmentKeys,
+  validateProviderProfileCatalog,
+} from "../providers/catalog.js";
 import type { ProviderCredentialAccess } from "../providers/credential-access.js";
 import { normalizeProviderBaseUrl } from "../security/endpoints.js";
 import {
@@ -147,6 +150,7 @@ export class AuthService {
           ? { allowInsecureHttp: input.allowInsecureHttp }
           : {}),
       });
+      validateProviderProfileCatalog(profile);
       const saved = await this.profiles.save(profile, input.activate !== false);
       profileSaved = true;
       if (

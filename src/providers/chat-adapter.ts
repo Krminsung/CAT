@@ -42,7 +42,8 @@ import {
 } from "./shared.js";
 
 const MAX_MESSAGES = 10_000;
-const MAX_CHOICES = 16;
+const MAX_CHOICES = 1;
+const MAX_CONTENT_PARTS = 100_000;
 const MAX_TOOL_CALLS = 128;
 const MAX_TOOL_CALL_INDEX = 10_000;
 const MAX_TOOL_ARGUMENT_BYTES = 2 * 1024 * 1024;
@@ -135,9 +136,25 @@ function endpointUrl(
 function messageText(message: ContentMessage): string {
   const text: string[] = [];
   for (const part of message.content) {
-    if (part.type === "text") text.push(part.text);
+    if (part.type === "text") {
+      if (typeof part.text !== "string") {
+        throw new ConfigurationError("Chat message text가 문자열이 아닙니다.");
+      }
+      text.push(part.text);
+    }
   }
   return text.join("\n");
+}
+
+function assertContentLimit(messages: readonly ConversationMessage[]): void {
+  let count = 0;
+  for (const message of messages) {
+    if (message.role === "tool") continue;
+    count += message.content.length;
+    if (count > MAX_CONTENT_PARTS) {
+      throw new ConfigurationError("Chat 입력 content 수가 너무 많습니다.");
+    }
+  }
 }
 
 function jsonText(value: unknown, label: string): string {
@@ -152,6 +169,7 @@ function chatMessages(messages: readonly ConversationMessage[]): JsonObject[] {
   if (messages.length > MAX_MESSAGES) {
     throw new ConfigurationError("Chat 입력 message 수가 너무 많습니다.");
   }
+  assertContentLimit(messages);
   const result: JsonObject[] = [];
   let historicalToolCalls = 0;
   for (const message of messages) {
