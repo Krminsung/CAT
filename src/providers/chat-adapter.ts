@@ -30,7 +30,9 @@ import {
 } from "./protocol-json.js";
 import {
   configurationJsonObject,
+  configurationReasoningEffort,
   configurationString,
+  configurationTemperature,
   isContextWindowFailure,
   providerDiagnostic,
   providerHttpFailure,
@@ -63,6 +65,7 @@ export interface ChatAdapterOptions {
   credential: ProviderCredentialAccess;
   transport: ModelHttpTransport;
   authentication?: ChatAuthenticationStyle;
+  allowInsecureHttp?: boolean;
   timeoutMs?: number;
   maxRetries?: number;
 }
@@ -107,8 +110,17 @@ function authenticationStyle(value: unknown): ChatAuthenticationStyle {
   return selected;
 }
 
-function endpointUrl(baseUrl: string, path: string, origin: string): URL {
-  const normalizedBase = normalizeProviderBaseUrl(baseUrl, "Chat base URL", true);
+function endpointUrl(
+  baseUrl: string,
+  path: string,
+  origin: string,
+  allowInsecureHttp: boolean,
+): URL {
+  const normalizedBase = normalizeProviderBaseUrl(
+    baseUrl,
+    "Chat base URL",
+    allowInsecureHttp,
+  );
   const normalizedPath = normalizeApiPath(path, "Chat generation 경로");
   if (normalizedBase.origin !== origin) {
     throw new ConfigurationError("Chat base URL과 credential origin이 일치하지 않습니다.");
@@ -205,6 +217,8 @@ function requestBody(
   capabilities: ProviderCapabilities,
 ): string {
   const tools = chatTools(request.tools, capabilities);
+  const reasoningEffort = configurationReasoningEffort(request.reasoningEffort);
+  const temperature = configurationTemperature(request.temperature);
   if (
     request.maxOutputTokens !== undefined &&
     (!Number.isSafeInteger(request.maxOutputTokens) ||
@@ -226,6 +240,12 @@ function requestBody(
       : {}),
     ...(request.maxOutputTokens !== undefined
       ? { max_tokens: request.maxOutputTokens }
+      : {}),
+    ...(reasoningEffort && capabilities.reasoningParameter
+      ? { reasoning_effort: reasoningEffort }
+      : {}),
+    ...(temperature !== undefined && capabilities.temperatureParameter
+      ? { temperature }
       : {}),
   };
   try {
@@ -505,7 +525,12 @@ export class ChatProviderAdapter implements ProviderAdapter {
     }
     this.id = id;
     this.#displayName = configurationString(options.displayName, "Provider 표시 이름", 128);
-    this.#endpoint = endpointUrl(options.baseUrl, options.generationPath, options.origin);
+    this.#endpoint = endpointUrl(
+      options.baseUrl,
+      options.generationPath,
+      options.origin,
+      options.allowInsecureHttp === true,
+    );
     this.capabilities = validateProviderCapabilities(
       options.capabilities,
       "Chat provider",

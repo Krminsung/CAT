@@ -10,7 +10,10 @@ import {
   StorageError,
 } from "../core/errors.js";
 import type { JsonObject } from "../core/json.js";
-import type { ProviderCapabilities } from "../core/provider.js";
+import type {
+  ProviderCapabilities,
+  ProviderReasoningEffort,
+} from "../core/provider.js";
 import type { Redactor } from "../security/redaction.js";
 import {
   readResponsePrefix,
@@ -52,6 +55,24 @@ export function configurationJsonObject(value: unknown, label: string): JsonObje
   } catch {
     throw new ConfigurationError(`${label}은 유한한 JSON 객체여야 합니다.`);
   }
+}
+
+export function configurationReasoningEffort(
+  value: unknown,
+): ProviderReasoningEffort | undefined {
+  if (value === undefined) return undefined;
+  if (value === "minimal" || value === "low" || value === "medium" || value === "high") {
+    return value;
+  }
+  throw new ConfigurationError("Provider reasoning effort 설정이 올바르지 않습니다.");
+}
+
+export function configurationTemperature(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 2) {
+    throw new ConfigurationError("Provider temperature는 0–2 범위의 숫자여야 합니다.");
+  }
+  return value;
 }
 
 export function validateProviderCapabilities(

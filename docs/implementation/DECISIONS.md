@@ -95,3 +95,13 @@
   응답이 성공적으로 완료된 뒤에만 공통 event로 내보낸다.
 - 결과: provider나 model을 바꿔도 이전 원격 상태를 잘못 이어 붙이지 않는다. 중단되거나
   JSON이 완성되지 않은 tool call은 실행 가능한 event가 되지 않는다.
+
+## D012 — provider capability와 model 선택
+
+- 상태: 승인됨
+- 결정: 압축본의 12개 기본 provider와 `custom`을 고정 catalog로 유지하되 기본
+  endpoint는 호환 초기값으로 취급한다. 선택 parameter는 protocol별 capability가
+  허용할 때만 보내며 오류 응답을 이용한 기능 탐색은 하지 않는다.
+- 결과: model 목록은 크기와 개수를 제한해 읽고 실패나 빈 결과를 그대로 오류로
+  전달한다. 수동 model ID 검증은 목록 조회와 독립적으로 제공하여 조회 실패를 빈 목록
+  성공으로 바꾸지 않고도 사용자가 직접 선택할 수 있게 한다.

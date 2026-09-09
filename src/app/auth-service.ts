@@ -3,8 +3,10 @@ import {
   MissingCredentialError,
   StorageError,
 } from "../core/errors.js";
-import { normalizeProviderBaseUrl } from "../security/endpoints.js";
+import type { ProviderProtocol } from "../core/provider.js";
+import { providerEnvironmentKeys } from "../providers/catalog.js";
 import type { ProviderCredentialAccess } from "../providers/credential-access.js";
+import { normalizeProviderBaseUrl } from "../security/endpoints.js";
 import {
   CredentialStore,
   validateApiKey,
@@ -17,7 +19,6 @@ import {
   type EndpointSource,
   type ProviderProfile,
 } from "../storage/profiles.js";
-import type { ProviderProtocol } from "../core/provider.js";
 
 export type ApiKeyAccess = ProviderCredentialAccess;
 
@@ -89,21 +90,6 @@ class StoredApiKeyAccess implements ProviderCredentialAccess {
 
 }
 
-const PROVIDER_API_KEY_ENVIRONMENT: Readonly<Record<string, readonly string[]>> = {
-  internal: ["SMILECODE_API_KEY", "SMILESERV_API_KEY"],
-  openai: ["OPENAI_API_KEY"],
-  anthropic: ["ANTHROPIC_API_KEY"],
-  google: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"],
-  openrouter: ["OPENROUTER_API_KEY"],
-  xai: ["XAI_API_KEY"],
-  groq: ["GROQ_API_KEY"],
-  deepseek: ["DEEPSEEK_API_KEY"],
-  mistral: ["MISTRAL_API_KEY"],
-  together: ["TOGETHER_API_KEY"],
-  cerebras: ["CEREBRAS_API_KEY"],
-  fireworks: ["FIREWORKS_API_KEY"],
-};
-
 function environmentApiKey(
   environment: NodeJS.ProcessEnv,
   provider: string,
@@ -111,7 +97,7 @@ function environmentApiKey(
   const current = environment.CAT_API_KEY?.trim();
   if (current) return validateApiKey(current);
 
-  const names = PROVIDER_API_KEY_ENVIRONMENT[provider] ?? [];
+  const names = providerEnvironmentKeys(provider);
   const configured = names.flatMap((name) => {
     const value = environment[name]?.trim();
     return value ? [{ name, value: validateApiKey(value) }] : [];

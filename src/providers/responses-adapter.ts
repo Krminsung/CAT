@@ -30,7 +30,9 @@ import {
 } from "./protocol-json.js";
 import {
   configurationJsonObject as requestJsonObject,
+  configurationReasoningEffort,
   configurationString as requestString,
+  configurationTemperature,
   isContextWindowFailure,
   providerDiagnostic,
   providerHttpFailure,
@@ -55,6 +57,7 @@ export interface ResponsesAdapterOptions {
   capabilities: ProviderCapabilities;
   credential: ProviderCredentialAccess;
   transport: ModelHttpTransport;
+  allowInsecureHttp?: boolean;
   timeoutMs?: number;
   maxRetries?: number;
 }
@@ -86,8 +89,17 @@ function validRetries(value: number | undefined): number {
   return selected;
 }
 
-function endpointUrl(baseUrl: string, path: string, origin: string): URL {
-  const normalizedBase = normalizeProviderBaseUrl(baseUrl, "Responses base URL", true);
+function endpointUrl(
+  baseUrl: string,
+  path: string,
+  origin: string,
+  allowInsecureHttp: boolean,
+): URL {
+  const normalizedBase = normalizeProviderBaseUrl(
+    baseUrl,
+    "Responses base URL",
+    allowInsecureHttp,
+  );
   const normalizedPath = normalizeApiPath(path, "Responses generation 경로");
   if (normalizedBase.origin !== origin) {
     throw new ConfigurationError("Responses base URL과 credential origin이 일치하지 않습니다.");
@@ -201,6 +213,8 @@ function requestBody(
   const model = requestString(request.model, "Responses model ID", 256);
   const tools = responsesTools(request.tools, capabilities);
   const instructions = systemInstructions(request.messages);
+  const reasoningEffort = configurationReasoningEffort(request.reasoningEffort);
+  const temperature = configurationTemperature(request.temperature);
   if (
     request.maxOutputTokens !== undefined &&
     (!Number.isSafeInteger(request.maxOutputTokens) ||
@@ -221,6 +235,12 @@ function requestBody(
       : {}),
     ...(request.maxOutputTokens !== undefined
       ? { max_output_tokens: request.maxOutputTokens }
+      : {}),
+    ...(reasoningEffort && capabilities.reasoningParameter
+      ? { reasoning: { effort: reasoningEffort } }
+      : {}),
+    ...(temperature !== undefined && capabilities.temperatureParameter
+      ? { temperature }
       : {}),
   };
   try {
@@ -524,7 +544,12 @@ export class ResponsesProviderAdapter implements ProviderAdapter {
     }
     this.id = id;
     this.#displayName = requestString(options.displayName, "Provider 표시 이름", 128);
-    this.#endpoint = endpointUrl(options.baseUrl, options.generationPath, options.origin);
+    this.#endpoint = endpointUrl(
+      options.baseUrl,
+      options.generationPath,
+      options.origin,
+      options.allowInsecureHttp === true,
+    );
     this.capabilities = validateProviderCapabilities(
       options.capabilities,
       "Responses provider",

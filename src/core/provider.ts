@@ -3,6 +3,7 @@ import type { RetryBudgetPort } from "./execution.js";
 import type { JsonObject } from "./json.js";
 
 export type ProviderProtocol = "openai-responses" | "openai-chat";
+export type ProviderReasoningEffort = "minimal" | "low" | "medium" | "high";
 
 export interface ProviderCapabilities {
   nativeToolCalls: boolean;
@@ -26,6 +27,8 @@ export interface ProviderRequest {
   messages: readonly ConversationMessage[];
   tools: readonly ProviderToolSpec[];
   maxOutputTokens?: number;
+  reasoningEffort?: ProviderReasoningEffort;
+  temperature?: number;
   retryBudget: RetryBudgetPort;
 }
 
