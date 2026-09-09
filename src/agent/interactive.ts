@@ -12,7 +12,7 @@ import type {
   ApprovalPromptPort,
   ApprovalRequest,
 } from "../security/permissions.js";
-import { ToolRegistry } from "../tools/runtime.js";
+import type { ToolRegistry } from "../tools/runtime.js";
 import type { AgentEventWriter } from "./events.js";
 
 export interface ApprovalDecisionPort {

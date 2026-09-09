@@ -1,4 +1,4 @@
-import { ConfigurationError } from "../core/errors.js";
+import { ConfigurationError, ProtocolError } from "../core/errors.js";
 import type { AgentEvent } from "../core/events.js";
 import type { RunIdentity, RunTermination } from "../core/execution.js";
 
@@ -15,6 +15,8 @@ export type AgentEventSink = (event: AgentEvent) => void;
 export interface AgentEventWriter {
   emit(payload: Exclude<AgentEventPayload, { type: "run_start" | "run_end" }>): AgentEvent;
 }
+
+const MAX_RECORDED_AGENT_EVENTS = 100_000;
 
 export class AgentEventJournal implements AgentEventWriter {
   readonly identity: RunIdentity;
@@ -58,6 +60,9 @@ export class AgentEventJournal implements AgentEventWriter {
   ): AgentEvent {
     if (!this.#started) throw new Error("run_start 전에 agent 이벤트를 생성할 수 없습니다.");
     if (this.#ended) throw new Error("run_end 뒤에 agent 이벤트를 생성할 수 없습니다.");
+    if (this.#sequence >= MAX_RECORDED_AGENT_EVENTS - 1) {
+      throw new ProtocolError("agent 이벤트 수가 허용 한도를 초과했습니다.");
+    }
     return this.#append(payload);
   }
 

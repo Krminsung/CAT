@@ -45,14 +45,14 @@ import {
   type ToolCallExecutionRecord,
 } from "./execution-records.js";
 import type { TextToolFallbackMode } from "./fallback-parser.js";
-import {
+import type {
   AgentInteractionHub,
-  type AgentInteractionLease,
+  AgentInteractionLease,
 } from "./interactive.js";
 import {
   RunStateMachine,
-  SessionRunCoordinator,
   sharedSessionRunCoordinator,
+  type SessionRunCoordinator,
 } from "./run-state.js";
 import { RepeatedToolExecutionGuard } from "./progress.js";
 import {
@@ -129,7 +129,13 @@ interface OwnedRunContext {
 const MAX_INITIAL_MESSAGES = 1_000;
 const MAX_INITIAL_MESSAGES_BYTES = 8 * 1024 * 1024;
 const MAX_ASSISTANT_TEXT_BYTES = 2 * 1024 * 1024;
+const MAX_PROVIDER_EVENTS_PER_TURN = 100_000;
+const MAX_NATIVE_TOOL_CALL_BYTES = 1024 * 1024;
+const MAX_NATIVE_TOOL_CALLS_BYTES = 8 * 1024 * 1024;
+const MAX_PROVIDER_RESPONSE_ID_BYTES = 1_024;
+const MAX_PROVIDER_REASON_BYTES = 4_096;
 const MODEL_TOOL_RESULTS_PER_TURN_BYTES = 512 * 1024;
+const TEXT_TOOL_FALLBACK_PREFIX = "call:";
 
 function cloneMessages(
   messages: readonly ConversationMessage[],
@@ -224,14 +230,49 @@ function resultForModel(
 
 function mergeUsage(target: ProviderUsage, usage: ProviderUsage): void {
   if (usage.inputTokens !== undefined) {
-    target.inputTokens = (target.inputTokens ?? 0) + usage.inputTokens;
+    const total = (target.inputTokens ?? 0) + usage.inputTokens;
+    if (!Number.isSafeInteger(total)) {
+      throw new ProtocolError("provider usage 합계가 안전한 정수 범위를 벗어났습니다.");
+    }
+    target.inputTokens = total;
   }
   if (usage.outputTokens !== undefined) {
-    target.outputTokens = (target.outputTokens ?? 0) + usage.outputTokens;
+    const total = (target.outputTokens ?? 0) + usage.outputTokens;
+    if (!Number.isSafeInteger(total)) {
+      throw new ProtocolError("provider usage 합계가 안전한 정수 범위를 벗어났습니다.");
+    }
+    target.outputTokens = total;
   }
   if (usage.totalTokens !== undefined) {
-    target.totalTokens = (target.totalTokens ?? 0) + usage.totalTokens;
+    const total = (target.totalTokens ?? 0) + usage.totalTokens;
+    if (!Number.isSafeInteger(total)) {
+      throw new ProtocolError("provider usage 합계가 안전한 정수 범위를 벗어났습니다.");
+    }
+    target.totalTokens = total;
   }
+}
+
+function stableProviderUsage(usage: ProviderUsage): ProviderUsage {
+  if (!usage || typeof usage !== "object" || Array.isArray(usage)) {
+    throw new ProtocolError("provider usage 값이 올바르지 않습니다.");
+  }
+  const values = [usage.inputTokens, usage.outputTokens, usage.totalTokens];
+  for (const value of values) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+      throw new ProtocolError("provider usage 값이 올바르지 않습니다.");
+    }
+  }
+  return Object.freeze({
+    ...(usage.inputTokens === undefined
+      ? {}
+      : { inputTokens: usage.inputTokens }),
+    ...(usage.outputTokens === undefined
+      ? {}
+      : { outputTokens: usage.outputTokens }),
+    ...(usage.totalTokens === undefined
+      ? {}
+      : { totalTokens: usage.totalTokens }),
+  });
 }
 
 function normalizationFeedback(
@@ -310,8 +351,11 @@ function outcomeForError(
 
 class TextDeltaGate {
   readonly #journal: AgentEventJournal;
-  #buffer = "";
+  readonly #heldParts: string[] = [];
   #released = false;
+  #sawNonWhitespace = false;
+  #prefixIndex = 0;
+  #prefixConfirmed = false;
 
   constructor(journal: AgentEventJournal, fallbackEnabled: boolean) {
     this.#journal = journal;
@@ -323,13 +367,27 @@ class TextDeltaGate {
       this.#journal.emit({ type: "text_delta", text });
       return;
     }
-    this.#buffer += text;
-    const candidate = this.#buffer.trimStart();
-    if (!"call:".startsWith(candidate) && !candidate.startsWith("call:")) {
+    this.#heldParts.push(text);
+    if (this.#prefixConfirmed) return;
+
+    for (const character of text) {
+      if (!this.#sawNonWhitespace) {
+        if (character.trim().length === 0) continue;
+        this.#sawNonWhitespace = true;
+      }
+      if (character === TEXT_TOOL_FALLBACK_PREFIX[this.#prefixIndex]) {
+        this.#prefixIndex += 1;
+        if (this.#prefixIndex === TEXT_TOOL_FALLBACK_PREFIX.length) {
+          this.#prefixConfirmed = true;
+          return;
+        }
+        continue;
+      }
       this.#released = true;
-      const buffered = this.#buffer;
-      this.#buffer = "";
+      const buffered = this.#heldParts.join("");
+      this.#heldParts.length = 0;
       if (buffered) this.#journal.emit({ type: "text_delta", text: buffered });
+      return;
     }
   }
 
@@ -337,7 +395,7 @@ class TextDeltaGate {
     if (!this.#released && visibleText) {
       this.#journal.emit({ type: "text_delta", text: visibleText });
     }
-    this.#buffer = "";
+    this.#heldParts.length = 0;
     this.#released = true;
   }
 }
@@ -388,10 +446,10 @@ export class AgentRunner {
       sessionId: request.sessionId,
       runId: request.runId,
     });
-    const journal = new AgentEventJournal(identity, request.onEvent, this.#now);
-    journal.start();
     const ownership = this.#coordinator.acquire(identity);
+    const journal = new AgentEventJournal(identity, request.onEvent, this.#now);
     if (!ownership.acquired) {
+      journal.start();
       const message = `이 session에서는 run ${ownership.activeRunId}이 이미 실행 중입니다.`;
       journal.emit({
         type: "notice",
@@ -413,14 +471,20 @@ export class AgentRunner {
       };
     }
 
-    const budget = new RunBudgetController({
-      limits: this.#limits,
-      ...(request.signal ? { signal: request.signal } : {}),
-      now: this.#now,
-    });
     const state = new RunStateMachine();
     const ledger = new ToolCallExecutionLedger(identity.runId, this.#now);
     const normalizer = new ToolCallNormalizer({ fallbackMode: this.#fallbackMode });
+    let budget: RunBudgetController;
+    try {
+      budget = new RunBudgetController({
+        limits: this.#limits,
+        ...(request.signal ? { signal: request.signal } : {}),
+        now: this.#now,
+      });
+    } catch (error) {
+      ownership.lease.release();
+      throw error;
+    }
     const context: OwnedRunContext = {
       identity,
       messages,
@@ -438,6 +502,7 @@ export class AgentRunner {
     let outcome: LoopOutcome | undefined;
     let interactionLease: AgentInteractionLease | undefined;
     try {
+      journal.start();
       interactionLease = this.#interactions.attach(
         identity.sessionId,
         identity.runId,
@@ -449,36 +514,42 @@ export class AgentRunner {
     } catch (error) {
       outcome = outcomeForError(error, budget, latestText);
     } finally {
+      const rememberBoundaryFailure = (error: unknown): void => {
+        if (!outcome || outcome.termination === "completed") {
+          outcome = outcomeForError(error, budget, latestText);
+        }
+      };
       try {
-        try {
-          for (const record of ledger.interruptUnfinished(
-            "run이 종료되어 도구 결과의 실행 여부를 더 확인할 수 없습니다.",
-          )) {
-            this.#emitAndAppendResult(context, record);
-          }
-        } catch (error) {
-          if (!outcome || outcome.termination === "completed") {
-            outcome = outcomeForError(error, budget, latestText);
-          }
+        for (const record of ledger.interruptUnfinished(
+          "run이 종료되어 도구 결과의 실행 여부를 더 확인할 수 없습니다.",
+        )) {
+          this.#emitAndAppendResult(context, record);
         }
-        outcome ??= outcomeForError(
-          new ProtocolError("agent loop가 종료 결과 없이 끝났습니다."),
-          budget,
-          latestText,
-        );
-        state.finish(outcome.termination);
-        journal.end(outcome.termination, outcome.message);
-      } finally {
-        try {
-          interactionLease?.release();
-        } finally {
-          try {
-            budget.cleanup();
-          } finally {
-            ownership.lease.release();
-          }
-        }
+      } catch (error) {
+        rememberBoundaryFailure(error);
       }
+      try {
+        interactionLease?.release();
+      } catch (error) {
+        rememberBoundaryFailure(error);
+      }
+      try {
+        budget.cleanup();
+      } catch (error) {
+        rememberBoundaryFailure(error);
+      }
+      try {
+        ownership.lease.release();
+      } catch (error) {
+        rememberBoundaryFailure(error);
+      }
+      outcome ??= outcomeForError(
+        new ProtocolError("agent loop가 종료 결과 없이 끝났습니다."),
+        budget,
+        latestText,
+      );
+      state.finish(outcome.termination);
+      journal.end(outcome.termination, outcome.message);
     }
 
     if (!outcome) throw new Error("agent loop 종료 결과가 유실되었습니다.");
@@ -707,6 +778,8 @@ export class AgentRunner {
     const nativeCalls: NativeToolCall[] = [];
     const textParts: string[] = [];
     let textBytes = 0;
+    let providerEventCount = 0;
+    let nativeCallBytes = 0;
     let completed = false;
     let cancelledReason: string | undefined;
     let responseId: string | undefined;
@@ -732,6 +805,11 @@ export class AgentRunner {
     };
 
     for await (const event of this.#provider.stream(request, context.budget.signal)) {
+      context.budget.assertActive();
+      providerEventCount += 1;
+      if (providerEventCount > MAX_PROVIDER_EVENTS_PER_TURN) {
+        throw new ProtocolError("한 모델 turn의 provider 이벤트 수가 허용 한도를 초과했습니다.");
+      }
       if (completed || cancelledReason !== undefined) {
         throw new ProtocolError("provider가 terminal event 뒤에 추가 event를 보냈습니다.");
       }
@@ -745,24 +823,85 @@ export class AgentRunner {
           gate.push(event.text);
           break;
         }
-        case "tool_call":
+        case "tool_call": {
+          if (nativeCalls.length >= context.normalizer.maximumCallsPerResponse) {
+            throw new ProtocolError(
+              "한 응답의 native 도구 호출 수가 허용 한도를 초과했습니다.",
+            );
+          }
+          let serializedCall: string;
+          try {
+            const serialized = JSON.stringify({
+              callId: event.callId,
+              name: event.name,
+              input: event.input,
+            });
+            if (serialized === undefined) throw new Error("undefined_json");
+            serializedCall = serialized;
+          } catch {
+            throw new ProtocolError("native 도구 호출을 JSON으로 읽지 못했습니다.");
+          }
+          const callBytes = Buffer.byteLength(serializedCall, "utf8");
+          if (callBytes > MAX_NATIVE_TOOL_CALL_BYTES) {
+            throw new ProtocolError("native 도구 호출 하나가 크기 제한을 초과했습니다.");
+          }
+          nativeCallBytes += callBytes;
+          if (nativeCallBytes > MAX_NATIVE_TOOL_CALLS_BYTES) {
+            throw new ProtocolError("native 도구 호출 전체가 크기 제한을 초과했습니다.");
+          }
+          const parsedCall = JSON.parse(serializedCall) as unknown;
+          if (
+            typeof parsedCall !== "object" ||
+            parsedCall === null ||
+            Array.isArray(parsedCall)
+          ) {
+            throw new ProtocolError("native 도구 호출 형식이 올바르지 않습니다.");
+          }
+          const snapshot = parsedCall as Record<string, unknown>;
+          if (
+            typeof snapshot.callId !== "string" ||
+            typeof snapshot.name !== "string" ||
+            typeof snapshot.input !== "object" ||
+            snapshot.input === null ||
+            Array.isArray(snapshot.input)
+          ) {
+            throw new ProtocolError("native 도구 호출 형식이 올바르지 않습니다.");
+          }
           nativeCalls.push({
-            callId: event.callId,
-            name: event.name,
-            input: event.input,
+            callId: snapshot.callId,
+            name: snapshot.name,
+            input: snapshot.input as JsonObject,
           });
           break;
-        case "usage":
-          mergeUsage(context.usage, event.usage);
-          context.journal.emit({ type: "usage", usage: event.usage });
+        }
+        case "usage": {
+          const usage = stableProviderUsage(event.usage);
+          mergeUsage(context.usage, usage);
+          context.journal.emit({ type: "usage", usage });
           break;
+        }
         case "completed":
+          if (
+            event.responseId !== undefined &&
+            (typeof event.responseId !== "string" ||
+              !event.responseId ||
+              Buffer.byteLength(event.responseId, "utf8") >
+                MAX_PROVIDER_RESPONSE_ID_BYTES ||
+              /[\u0000-\u001f\u007f]/u.test(event.responseId))
+          ) {
+            throw new ProtocolError("provider 응답 ID가 올바르지 않습니다.");
+          }
           completed = true;
           responseId = event.responseId;
           break;
-        case "cancelled":
-          cancelledReason = event.reason ?? "모델 요청이 취소됐습니다.";
+        case "cancelled": {
+          const reason = event.reason ?? "모델 요청이 취소됐습니다.";
+          if (typeof reason !== "string") {
+            throw new ProtocolError("provider 취소 사유가 올바르지 않습니다.");
+          }
+          cancelledReason = boundedString(reason, MAX_PROVIDER_REASON_BYTES).text;
           break;
+        }
       }
     }
     if (!completed && cancelledReason === undefined) {

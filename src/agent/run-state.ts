@@ -17,10 +17,10 @@ type TransitionState = Exclude<AgentRunState, "PREPARE" | "FINISH">;
 const ALLOWED_TRANSITIONS: Readonly<
   Record<ActiveRunState, readonly TransitionState[]>
 > = Object.freeze({
-  PREPARE: Object.freeze(["MODEL"]),
-  MODEL: Object.freeze(["NORMALIZE"]),
-  NORMALIZE: Object.freeze(["AUTHORIZE_TOOLS"]),
-  AUTHORIZE_TOOLS: Object.freeze(["MODEL"]),
+  PREPARE: Object.freeze(["MODEL"] as const),
+  MODEL: Object.freeze(["NORMALIZE"] as const),
+  NORMALIZE: Object.freeze(["AUTHORIZE_TOOLS"] as const),
+  AUTHORIZE_TOOLS: Object.freeze(["MODEL"] as const),
 });
 
 function assertIdentity(identity: RunIdentity): void {
