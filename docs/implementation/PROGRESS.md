@@ -9,7 +9,7 @@ P05 기준 main은 `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`이다. 구현은 �
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
-| P05 bounded agent loop | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
+| P05 bounded agent loop | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -64,4 +64,10 @@ stdin 타입과 선택 속성 구성에서 엄격 타입 오류 2개를 보고�
 P04는 검토 head `dec139826157fa12b2b6aeb0a001c80469392c3f`를 PR #4에서 merge
 commit `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`로 병합했다. merge의 두 부모,
 tree, phase head의 조상 관계와 `origin/main`을 대조했다. P05는 이 merge commit을
-기준으로 단일 소유 실행 상태와 공통 예산 구현을 시작했다.
+기준으로 단일 소유 실행 상태와 공통 예산을 `1019420`으로, 호출 정규화와 실행 원장을
+`e6f13bb`로 구현했다. 제어 도구·상호작용 event와 실제 provider→executor 흐름은
+`16bd113`에 연결했고, 무진전 반복과 무제한 malformed-call 교정 차단은 `88591bf`로
+완료했다. 전체 정적 검토에서 확인한 provider·agent event 상한, native 호출 고정,
+fallback prefix의 선형 처리와 종료 전 자원 정리는
+`552d8ae8bd0788f87c5f5c27438fdf16c3a01363`에 묶었다. 원격 main이 기준 SHA와
+같음을 확인했고 유일한 `npm run check` 1회를 예약했으며 아직 실행하지 않았다.

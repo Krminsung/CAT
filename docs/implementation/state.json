@@ -3,12 +3,12 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P05",
-  "currentStep": "P05.4",
-  "status": "IMPLEMENTING",
+  "currentStep": "P05.VERIFY",
+  "status": "VERIFYING",
   "baseMainSha": "b2c3bdb562c1a67d4191fec17bfd04a5f0e41663",
-  "lastCommitSha": "16bd113bbbe58bf2bf053fa748706c540e14e38c",
+  "lastCommitSha": "552d8ae8bd0788f87c5f5c27438fdf16c3a01363",
   "verification": {
-    "attemptsUsed": 0,
+    "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
     "targetCommitSha": null,
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Complete P05.4 no-progress and bounded malformed-call recovery controls",
+  "nextAction": "Run the reserved npm run check exactly once",
   "blocker": null
 }

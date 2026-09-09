@@ -168,7 +168,7 @@
   run/call ID를 approval·사용자 입력 event에 결합한 뒤 UI decision port로 전달한다.
 - 결과: `update_plan`과 연결된 경우의 `request_user_input`만 registry에 등록한다. event sink의
   render 실패는 내부 원장 기록을 없애거나 모델을 재호출하지 않는다. 모든 정상·오류·취소 경로는
-  `run_end`를 한 번 기록한 뒤 interaction, timer와 session lease를 멱등적으로 정리한다.
+  interaction, timer와 session lease를 멱등적으로 정리한 뒤 `run_end`를 한 번 기록한다.
 
 ## D019 — 무진전 실행과 교정 복구
 
