@@ -1,0 +1,29 @@
+# 출처와 재구현 범위
+
+## 사용자 제공 기준 자료
+
+- 파일: `code-agent-cli-typescript.tar.gz`
+- SHA-256: `03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855`
+- 내부 package/version: `smilecode-typescript` 0.14.6
+- 확인 수치: `src/*.ts` 28개, 10,554줄; `test/*.test.ts` 16개
+- package metadata의 license 표기: MIT
+
+압축 항목 976개와 총 비압축 크기 45,665,574 bytes를 검사했다. 절대 경로,
+`..` 경로, 밖으로 나가는 link, 장치/FIFO, 20MiB 초과 단일 항목은 없었다.
+`.reference/smilecode/`에는 필요한 `src`, 설정, README, docs, scripts, tests와
+wrapper만 전개했다. 원본의 `node_modules`, `dist`, `.git`은 가져오지 않았으며
+참조 영역과 archive는 Git에 포함하지 않는다.
+
+## 외부 설계 참고
+
+`tanbiralam/claude-code`의 문서에 기록된 고정 commit
+`6f6f12b37f529488b10e53928dd5508bb93535c7`은 도구 계약, 명시적 loop state,
+budget과 compaction 분리라는 설계 원칙에만 참고한다. 해당 코드를 dependency,
+배포 payload 또는 장문의 복제 소스로 사용하지 않는다. 공개 저장소라는 사실을
+재배포 권리로 해석하지 않는다.
+
+## 새 구현
+
+cat 소스는 기능 계약을 토대로 새 디렉터리 경계와 새 코드를 작성한다. 제공 archive의
+license metadata만으로 모든 참조 자료의 권리가 확인됐다고 주장하지 않는다. 공개
+배포 전 권리 확인은 별도이며, P14 완료도 공개 배포 승인을 의미하지 않는다.

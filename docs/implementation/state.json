@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "project": "cat",
+  "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
+  "currentPhase": "P01",
+  "currentStep": "P01.PUBLISH",
+  "status": "VERIFIED",
+  "baseMainSha": "a4f894d0d7aba7135969b7bb9a08a10fe4dbf8d1",
+  "lastCommitSha": "55692b2035a4c0585c7b2cb15a1df35df9e3acd0",
+  "verification": {
+    "attemptsUsed": 1,
+    "maximumAttempts": 1,
+    "command": "npm run check",
+    "targetCommitSha": "55692b2035a4c0585c7b2cb15a1df35df9e3acd0",
+    "result": "PASS",
+    "exitCode": 0
+  },
+  "publication": {
+    "branch": "cat/p01-foundation",
+    "pullRequestNumber": null,
+    "reviewedHeadSha": null,
+    "mergeCommitSha": null,
+    "result": "NOT_PUBLISHED"
+  },
+  "nextAction": "Create and publish cat/p01-foundation, then review and merge its PR",
+  "blocker": null
+}

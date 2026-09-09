@@ -1,0 +1,32 @@
+{
+  "name": "cat-agent-cli",
+  "version": "0.1.0",
+  "description": "A bounded terminal coding agent with explicit trust and permission boundaries",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cat-tui": "dist/cli/main.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "assets",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@earendil-works/pi-tui": "0.85.1",
+    "undici": "7.29.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  },
+  "license": "UNLICENSED"
+}
