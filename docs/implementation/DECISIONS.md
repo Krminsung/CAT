@@ -159,3 +159,13 @@
 - 결과: 코드 펜스, 인용문, 설명 속 `call:`과 임의 표현식은 실행하지 않는다. 모든 call ID는
   run 전체에서 중복 확인하고 입력 schema를 먼저 검증한다. 중앙 executor가 handler를 실제로
   시작하는 지점에서 기록을 `started`로 바꾸며 완료·실패·실행 여부 불명 상태를 덮어쓰지 않는다.
+
+## D018 — agent 상호작용과 event 전달
+
+- 상태: 승인됨
+- 결정: agent owner는 provider stream, 중앙 executor와 control tool을 순차 loop에서 직접
+  연결한다. permission policy와 runner는 동일한 interaction hub를 사용하고, hub가 현재
+  run/call ID를 approval·사용자 입력 event에 결합한 뒤 UI decision port로 전달한다.
+- 결과: `update_plan`과 연결된 경우의 `request_user_input`만 registry에 등록한다. event sink의
+  render 실패는 내부 원장 기록을 없애거나 모델을 재호출하지 않는다. 모든 정상·오류·취소 경로는
+  `run_end`를 한 번 기록한 뒤 interaction, timer와 session lease를 멱등적으로 정리한다.

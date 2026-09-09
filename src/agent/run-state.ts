@@ -103,24 +103,27 @@ export type RunOwnershipResult =
 
 export class SessionRunCoordinator {
   readonly #active = new Map<string, ActiveRun>();
+  readonly #activeRunIds = new Set<string>();
 
   acquire(identity: RunIdentity): RunOwnershipResult {
     assertIdentity(identity);
     const existing = this.#active.get(identity.sessionId);
-    if (existing) {
+    if (existing || this.#activeRunIds.has(identity.runId)) {
       return Object.freeze({
         acquired: false,
-        activeRunId: existing.runId,
+        activeRunId: existing?.runId ?? identity.runId,
         termination: "concurrent_run",
       });
     }
 
     const token = Symbol(identity.runId);
     this.#active.set(identity.sessionId, { runId: identity.runId, token });
+    this.#activeRunIds.add(identity.runId);
     const lease = new RunOwnershipLease(identity, () => {
       const current = this.#active.get(identity.sessionId);
       if (!current || current.token !== token) return false;
       this.#active.delete(identity.sessionId);
+      this.#activeRunIds.delete(identity.runId);
       return true;
     });
     return Object.freeze({ acquired: true, lease });
