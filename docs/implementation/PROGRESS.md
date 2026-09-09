@@ -9,7 +9,7 @@ P05 기준 main은 `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`이다. 구현은 �
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
-| P05 bounded agent loop | BLOCKED_VERIFY | FAIL (1/1) | NOT_PUBLISHED |
+| P05 bounded agent loop | VERIFYING | 1차 FAIL, 2차 NOT_RUN (2/2 예약) | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -73,5 +73,6 @@ fallback prefix의 선형 처리와 종료 전 자원 정리는
 같음을 확인한 뒤 `23f8443c06274da36012d31a0d7222d844d5e3dc`를 대상으로 예약한
 유일한 `npm run check`를 실행했다. 검사는 `src/agent/runner.ts:319`에서 catch 변수
 `error`가 `unknown`인 엄격 타입 오류 TS18046을 보고하고 종료 코드 2로 실패했다.
-재검사, push, PR과 merge는 진행하지 않았으며 오류 수정과 P05 추가 검증에는 사용자의
-명시적 승인이 필요하다.
+사용자가 P05 오류 수정과 `npm run check` 추가 1회를 명시적으로 승인해, 보고된 타입
+오류만 `ed1ecf73bb18cbd618bda2574d6b1daeeec5e16e`에서 수정했다. 첫 실패 기록을
+보존한 채 두 번째이자 마지막 승인 검사를 2/2로 예약했다.

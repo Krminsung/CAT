@@ -4,16 +4,16 @@
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P05",
   "currentStep": "P05.VERIFY",
-  "status": "BLOCKED_VERIFY",
+  "status": "VERIFYING",
   "baseMainSha": "b2c3bdb562c1a67d4191fec17bfd04a5f0e41663",
-  "lastCommitSha": "23f8443c06274da36012d31a0d7222d844d5e3dc",
+  "lastCommitSha": "ed1ecf73bb18cbd618bda2574d6b1daeeec5e16e",
   "verification": {
-    "attemptsUsed": 1,
-    "maximumAttempts": 1,
+    "attemptsUsed": 2,
+    "maximumAttempts": 2,
     "command": "npm run check",
-    "targetCommitSha": "23f8443c06274da36012d31a0d7222d844d5e3dc",
-    "result": "FAIL",
-    "exitCode": 2
+    "targetCommitSha": null,
+    "result": "NOT_RUN",
+    "exitCode": null
   },
   "publication": {
     "branch": "cat/p05-agent-loop",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Wait for explicit approval to fix P05 and run one additional npm run check",
-  "blocker": "The only reserved P05 check found one strict TypeScript error in src/agent/runner.ts"
+  "nextAction": "Run the explicitly approved additional npm run check exactly once",
+  "blocker": null
 }
