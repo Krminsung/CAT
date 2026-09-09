@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P05 기준 main은 `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`이다. 구현은 이 커밋에서
+P06 기준 main은 `e5f082a0b8ccb5fdc70233837762941e63f7233b`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -9,8 +9,8 @@ P05 기준 main은 `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`이다. 구현은 �
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
-| P05 bounded agent loop | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
+| P06 세션·컨텍스트 | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -77,4 +77,8 @@ fallback prefix의 선형 처리와 종료 전 자원 정리는
 오류만 `ed1ecf73bb18cbd618bda2574d6b1daeeec5e16e`에서 수정했다. 첫 실패 기록을
 보존한 채 `1e99d7a99ec3a96042eec2de186953e99add33bd`를 대상으로 두 번째이자
 마지막 승인 검사를 실행했고 통과했다. 결과는 정적 검사 통과이며 실제 provider,
-agent loop, 도구와 앱 런타임은 검증하지 않았다.
+agent loop, 도구와 앱 런타임은 검증하지 않았다. P05는 검토 head
+`d9f9a87195fe9507f50f1f5989958cab9d3983d5`를 PR #5에서 merge commit
+`e5f082a0b8ccb5fdc70233837762941e63f7233b`로 병합했다. merge의 두 부모, tree,
+phase head의 조상 관계와 `origin/main`을 대조했다. P06은 이 merge commit을 기준으로
+bounded JSONL 세션 저장 구현을 시작했다.

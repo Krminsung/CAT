@@ -10,6 +10,7 @@ export interface StoragePaths {
   userSettings: string;
   credentialStore: string;
   profileStore: string;
+  sessionStore: string;
   trustStore: string;
   projectSettings: string;
   projectLocalSettings: string;
@@ -99,6 +100,7 @@ export async function resolveStoragePaths(
     userSettings: join(catHome, "settings.json"),
     credentialStore: join(catHome, "credentials.json"),
     profileStore: join(catHome, "profiles.json"),
+    sessionStore: join(catHome, "sessions"),
     trustStore: join(catHome, "trusted-workspaces.json"),
     projectSettings: join(projectCat, "settings.json"),
     projectLocalSettings: join(projectCat, "settings.local.json"),

@@ -180,3 +180,14 @@
   부작용을 소비하지 않는다. 모든 permission denial은 즉시 run을 끝내므로 대체 도구 우회가
   없다. transport 외부에는 HTTP retry loop를 두지 않고 compaction, Stop hook과 web 복구는
   P05의 공통 extension budget port를 사용해야 한다.
+
+## D020 — append-only 세션 저장과 writer 소유권
+
+- 상태: 승인됨
+- 결정: session index와 transcript는 versioned JSONL record로 append하고, reader는
+  record·line·page byte와 JSON tree를 모두 제한한 cursor page만 반환한다. session별
+  transcript writer는 배타 lock의 무작위 token과 file identity를 수명 동안 보유한다.
+- 결과: 손상된 중간 line과 잘린 마지막 line은 원본을 지우지 않고 구분된 경고가 된다.
+  stale lock은 PID만으로 제거하지 않으며 metadata update도 같은 transcript writer 소유권을
+  요구한다. 저장 전 알려진 secret과 credential field를 redaction하고 trust·credential·승인
+  상태는 session schema에 넣지 않는다.
