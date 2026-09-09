@@ -98,7 +98,7 @@ interface InternalRegistration {
 
 const registryContents = new WeakMap<ToolRegistry, Map<string, InternalRegistration>>();
 const BUILTIN_ORDER = new Map<string, number>(
-  BUILTIN_TOOL_NAMES.map((name, index) => [name, index]),
+  BUILTIN_TOOL_NAMES.map((name, index) => [name, index] as const),
 );
 const TOOL_NAME_PATTERN = /^[a-z][a-z0-9_]{0,127}$/u;
 const MIN_OUTPUT_BYTES = 1_024;

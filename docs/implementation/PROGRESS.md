@@ -44,4 +44,6 @@ provider 기본값과 protocol별 capability, adapter factory, bounded model 목
 유일한 `npm run check`가 통과했다. PR #3의 검토 head `e013994`를 merge commit
 `3581145`로 병합했고 tree·부모·`origin/main` 정합성을 확인했다. P04는 이 병합
 커밋을 기준으로 중앙 tool registry, schema 검증, scope별 permission과 단일 executor
-경계를 구현 중이다.
+경계를 `79b7d09`로 구현했다. P04.2에서는 canonical path와 민감 alias를 확인하는 guard,
+bounded file walk와 UTF-8 구간 읽기, 안전하게 선별한 후보만 처리하는 `rg` 검색 및
+별도 process의 bounded fallback을 구현 중이다.
