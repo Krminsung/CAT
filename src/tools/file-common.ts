@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
-import { constants as fsConstants } from "node:fs";
-import { lstat, open, opendir } from "node:fs/promises";
-import type { FileHandle } from "node:fs/promises";
+import { lstat, opendir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { ConfigurationError, PermissionDeniedError } from "../core/errors.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
@@ -10,8 +8,9 @@ import type {
   WorkspacePathGuard,
   WorkspacePathResolution,
 } from "../security/workspace-path.js";
+import { readWorkspaceFileBytes } from "../storage/workspace-file.js";
 
-export const MAX_WORKSPACE_FILE_BYTES = 1_000_000;
+export { MAX_WORKSPACE_FILE_BYTES } from "../storage/workspace-file.js";
 export const MAX_READ_CONTENT_BYTES = 8_000;
 export const DEFAULT_TOOL_OUTPUT_BYTES = 64_000;
 const MAX_WALK_ENTRIES = 50_000;
@@ -97,45 +96,9 @@ export class FileObservationStore {
 export async function readWorkspaceUtf8File(
   resolution: WorkspacePathResolution,
 ): Promise<WorkspaceFileContent> {
-  if (!resolution.exists || resolution.kind !== "file") {
-    throw new ConfigurationError("읽기 대상이 일반 파일이 아닙니다.");
-  }
-  const noFollow = process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0);
-  const nonBlocking = fsConstants.O_NONBLOCK ?? 0;
-  let handle: FileHandle | undefined;
   try {
-    handle = await open(resolution.absolutePath, fsConstants.O_RDONLY | noFollow | nonBlocking);
-    const initial = await handle.stat();
-    if (
-      !initial.isFile() ||
-      initial.dev !== resolution.device ||
-      (process.platform !== "win32" && initial.ino !== resolution.inode)
-    ) {
-      throw new PermissionDeniedError("검사 뒤 읽기 대상 파일이 변경되었습니다.");
-    }
-    if (initial.size > MAX_WORKSPACE_FILE_BYTES) {
-      throw new ConfigurationError(`파일이 ${MAX_WORKSPACE_FILE_BYTES} bytes 제한을 초과했습니다.`);
-    }
-    const buffer = Buffer.alloc(MAX_WORKSPACE_FILE_BYTES + 1);
-    let total = 0;
-    while (total < buffer.length) {
-      const read = await handle.read(buffer, total, buffer.length - total, total);
-      if (read.bytesRead === 0) break;
-      total += read.bytesRead;
-    }
-    if (total > MAX_WORKSPACE_FILE_BYTES) {
-      throw new ConfigurationError(`파일이 ${MAX_WORKSPACE_FILE_BYTES} bytes 제한을 초과했습니다.`);
-    }
-    const completed = await handle.stat();
-    if (
-      completed.size !== initial.size ||
-      completed.mtimeMs !== initial.mtimeMs ||
-      completed.ctimeMs !== initial.ctimeMs ||
-      total !== initial.size
-    ) {
-      throw new PermissionDeniedError("파일을 읽는 동안 내용이 변경되었습니다.");
-    }
-    const bytes = Buffer.from(buffer.subarray(0, total));
+    const snapshot = await readWorkspaceFileBytes(resolution);
+    const bytes = snapshot.bytes;
     if (bytes.includes(0)) throw new ConfigurationError("바이너리 파일은 읽을 수 없습니다.");
     let text: string;
     try {
@@ -151,8 +114,6 @@ export async function readWorkspaceUtf8File(
       code ? `파일을 읽지 못했습니다(${code}).` : "파일을 읽지 못했습니다.",
       { cause: error },
     );
-  } finally {
-    await handle?.close().catch(() => undefined);
   }
 }
 

@@ -1,6 +1,6 @@
 import type { JsonObject, JsonValue } from "../core/json.js";
 
-const MAX_INPUT_BYTES = 256 * 1024;
+const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_INPUT_DEPTH = 32;
 const MAX_INPUT_NODES = 20_000;
 const MAX_SCHEMA_BYTES = 128 * 1024;

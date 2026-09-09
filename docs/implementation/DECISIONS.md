@@ -117,3 +117,14 @@
 - 결과: UI와 모델은 handler reference를 얻지 못한다. 한 파일이나 command 승인이 다른
   대상에 확대되지 않으며 deny는 자동 모드와 기존 allow보다 우선한다. P09 전 no-op
   hook은 `implementation: none`으로 드러내어 hook 완성을 가장하지 않는다.
+
+## D014 — 파일 변경 checkpoint와 부분 실패
+
+- 상태: 승인됨
+- 결정: 각 mutation은 파일을 전부 staging한 뒤 변경 전 내용과 mode, 존재 여부, digest,
+  session/run/tool 소유자를 하나의 checkpoint에 기록한다. 파일별 원자 교체는 사용하되
+  다중 파일 전체를 OS transaction이라고 표현하지 않는다. 완료 결과를 다시 확인한 뒤에만
+  checkpoint를 commit한다.
+- 결과: 적용 중 오류나 취소는 역순 rollback을 시도하고, 현재 파일이 예상 변경 결과와
+  다르면 외부 변경으로 보고 덮어쓰지 않는다. 복구가 일부라도 실패하면 해당 기록과 관리
+  임시 파일 정보를 보존해 성공으로 오인하거나 다음 rewind 기록을 먼저 제거하지 않는다.
