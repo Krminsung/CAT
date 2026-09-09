@@ -3,8 +3,13 @@ import {
   MissingCredentialError,
   StorageError,
 } from "../core/errors.js";
+import type { ProviderProtocol } from "../core/provider.js";
+import {
+  providerEnvironmentKeys,
+  validateProviderProfileCatalog,
+} from "../providers/catalog.js";
+import type { ProviderCredentialAccess } from "../providers/credential-access.js";
 import { normalizeProviderBaseUrl } from "../security/endpoints.js";
-import { Redactor } from "../security/redaction.js";
 import {
   CredentialStore,
   validateApiKey,
@@ -17,15 +22,8 @@ import {
   type EndpointSource,
   type ProviderProfile,
 } from "../storage/profiles.js";
-import type { ProviderProtocol } from "../core/provider.js";
 
-export interface ApiKeyAccess {
-  readonly provider: string;
-  readonly origin: string;
-  readonly source: "environment" | "stored";
-  withValue<T>(use: (apiKey: string) => Promise<T>): Promise<T>;
-  redactor(): Promise<Redactor>;
-}
+export type ApiKeyAccess = ProviderCredentialAccess;
 
 export interface ResolvedProviderAuth {
   profile: ProviderProfile;
@@ -52,7 +50,7 @@ export interface ConfigureProfileInput {
   activate?: boolean;
 }
 
-class EnvironmentApiKeyAccess implements ApiKeyAccess {
+class EnvironmentApiKeyAccess implements ProviderCredentialAccess {
   readonly source = "environment" as const;
   readonly #apiKey: string;
 
@@ -68,12 +66,9 @@ class EnvironmentApiKeyAccess implements ApiKeyAccess {
     return await use(this.#apiKey);
   }
 
-  async redactor(): Promise<Redactor> {
-    return new Redactor([this.#apiKey]);
-  }
 }
 
-class StoredApiKeyAccess implements ApiKeyAccess {
+class StoredApiKeyAccess implements ProviderCredentialAccess {
   readonly source = "stored" as const;
   readonly #reference: SecretReference;
   readonly #store: CredentialStore;
@@ -96,25 +91,7 @@ class StoredApiKeyAccess implements ApiKeyAccess {
     );
   }
 
-  async redactor(): Promise<Redactor> {
-    return await this.#store.redactor();
-  }
 }
-
-const PROVIDER_API_KEY_ENVIRONMENT: Readonly<Record<string, readonly string[]>> = {
-  internal: ["SMILECODE_API_KEY", "SMILESERV_API_KEY"],
-  openai: ["OPENAI_API_KEY"],
-  anthropic: ["ANTHROPIC_API_KEY"],
-  google: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"],
-  openrouter: ["OPENROUTER_API_KEY"],
-  xai: ["XAI_API_KEY"],
-  groq: ["GROQ_API_KEY"],
-  deepseek: ["DEEPSEEK_API_KEY"],
-  mistral: ["MISTRAL_API_KEY"],
-  together: ["TOGETHER_API_KEY"],
-  cerebras: ["CEREBRAS_API_KEY"],
-  fireworks: ["FIREWORKS_API_KEY"],
-};
 
 function environmentApiKey(
   environment: NodeJS.ProcessEnv,
@@ -123,7 +100,7 @@ function environmentApiKey(
   const current = environment.CAT_API_KEY?.trim();
   if (current) return validateApiKey(current);
 
-  const names = PROVIDER_API_KEY_ENVIRONMENT[provider] ?? [];
+  const names = providerEnvironmentKeys(provider);
   const configured = names.flatMap((name) => {
     const value = environment[name]?.trim();
     return value ? [{ name, value: validateApiKey(value) }] : [];
@@ -173,6 +150,7 @@ export class AuthService {
           ? { allowInsecureHttp: input.allowInsecureHttp }
           : {}),
       });
+      validateProviderProfileCatalog(profile);
       const saved = await this.profiles.save(profile, input.activate !== false);
       profileSaved = true;
       if (

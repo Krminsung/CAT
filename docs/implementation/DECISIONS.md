@@ -76,3 +76,32 @@
 - 결과: 기존 `~/.smileserv`는 알려진 항목의 존재만 탐지한다. 일반 파일 도구는
   `.cat`과 `.smileserv`의 credential/profile secret 및 이를 가리키는 symbolic
   link나 hard-link alias에 접근할 수 없다.
+
+## D010 — 인증된 모델 transport의 재시도와 proxy
+
+- 상태: 승인됨
+- 결정: 모델 HTTP transport만 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY`를 읽고
+  소유한 dispatcher를 종료한다. transport가 재시도 판단의 유일한 소유자이며
+  호출자가 전달한 공통 retry budget port의 승인을 얻은 최대 2회만 재시도한다.
+- 결과: 응답 body를 읽기 시작한 뒤에는 재시도하지 않는다. 인증 요청 redirect는
+  같은 origin에서 method를 보존하는 경우만 제한적으로 따르며 public web transport와
+  dispatcher를 공유하지 않는다.
+
+## D011 — provider 전환과 streaming tool call
+
+- 상태: 승인됨
+- 결정: 각 provider 요청은 원격 response ID 대신 로컬 대화 기록 전체에서 protocol별
+  입력을 다시 만든다. streaming tool call은 ID·이름·인자가 모두 완성되고 전체 모델
+  응답이 성공적으로 완료된 뒤에만 공통 event로 내보낸다.
+- 결과: provider나 model을 바꿔도 이전 원격 상태를 잘못 이어 붙이지 않는다. 중단되거나
+  JSON이 완성되지 않은 tool call은 실행 가능한 event가 되지 않는다.
+
+## D012 — provider capability와 model 선택
+
+- 상태: 승인됨
+- 결정: 압축본의 12개 기본 provider와 `custom`을 고정 catalog로 유지하되 기본
+  endpoint는 호환 초기값으로 취급한다. 선택 parameter는 protocol별 capability가
+  허용할 때만 보내며 오류 응답을 이용한 기능 탐색은 하지 않는다.
+- 결과: model 목록은 크기와 개수를 제한해 읽고 실패나 빈 결과를 그대로 오류로
+  전달한다. 수동 model ID 검증은 목록 조회와 독립적으로 제공하여 조회 실패를 빈 목록
+  성공으로 바꾸지 않고도 사용자가 직접 선택할 수 있게 한다.

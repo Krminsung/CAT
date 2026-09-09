@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P02",
-  "currentStep": "P02.PUBLISH",
+  "currentPhase": "P03",
+  "currentStep": "P03.PUBLISH",
   "status": "VERIFIED",
-  "baseMainSha": "85c68d133a89ebf5578ab8a9a79618d1daba6d16",
-  "lastCommitSha": "0c36e853b21ffee3af2cf5560f418d9e508e5cc2",
+  "baseMainSha": "2429b419dc403132a69c4c9883b8dd374c284996",
+  "lastCommitSha": "c88374f7db3598c750e15bbaa51e98fec4820a3d",
   "verification": {
     "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": "0c36e853b21ffee3af2cf5560f418d9e508e5cc2",
+    "targetCommitSha": "c88374f7db3598c750e15bbaa51e98fec4820a3d",
     "result": "PASS",
     "exitCode": 0
   },
   "publication": {
-    "branch": "cat/p02-config-auth",
+    "branch": "cat/p03-providers",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Create and publish cat/p02-config-auth, then review and merge its PR",
+  "nextAction": "Create and publish cat/p03-providers, then review and merge its PR",
   "blocker": null
 }

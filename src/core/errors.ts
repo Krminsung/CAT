@@ -53,6 +53,10 @@ export class ProviderError extends CatError {
   }
 }
 
+export class ContextWindowError extends ProviderError {
+  override name = "ContextWindowError";
+}
+
 export class ProtocolError extends CatError {
   override name = "ProtocolError";
 

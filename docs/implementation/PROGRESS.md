@@ -1,13 +1,13 @@
 # cat 구현 진행 상태
 
-기준 main은 `a4f894d0d7aba7135969b7bb9a08a10fe4dbf8d1`이다. 구현은 이 커밋에서
+P03 기준 main은 `2429b419dc403132a69c4c9883b8dd374c284996`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
 |---|---|---|---|
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
-| P02 설정·인증·trust | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
-| P03 provider·transport | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
+| P03 provider·transport | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
 | P04 권한·기본 도구 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -30,4 +30,15 @@ P02.1은 `5359cfab201cf4dbe3e811167933f82e38614d16`, P02.2는
 `c44fa0c640dbc80960e5ca8d27526f90b1073760`으로 완료했다. 전체 정적 검토에서
 확인한 보완은 `60378f41e5dac63a7f6132b38110a3958eb3bbb6`에 묶었다. 기준 main이
 변하지 않았음을 확인했다. `0c36e853b21ffee3af2cf5560f418d9e508e5cc2`를
-대상으로 한 유일한 `npm run check`가 통과했으며 다음은 단계 branch와 PR 게시다.
+대상으로 한 유일한 `npm run check`가 통과했다.
+P02는 PR #2의 검토 head `1416ef4`를 merge commit `2429b41`로 병합했고 tree와
+부모 정합성을 확인했다. P03.1 인증된 모델용 bounded HTTP/SSE transport는
+`b8b8631c7d520aa1e33d58e38dcfc88c30fcfe0b`로 완료했다. P03.2 Responses adapter는
+`ae4e5fe6d311cf570819adfd87a2cbc64b2fa363`로 완료했다. P03.3 Chat-compatible
+adapter는 `dd4583343e6c31da05432dc221cec441a5a92c3d`로 완료했다. P03.4의 13개
+provider 기본값과 protocol별 capability, adapter factory, bounded model 목록과
+독립적인 수동 model ID 검증은 `ba9e9f31696a768efff890745491a7b7d1c42801`로
+완료했다. 전체 정적 검토에서 확인한 경계 보완은
+`22e77eb5ca0b4e8b054a6737de2c41619f4f077f`에 묶었고, 원격 main이 기준 SHA와
+같음을 확인했다. `c88374f7db3598c750e15bbaa51e98fec4820a3d`를 대상으로 한
+유일한 `npm run check`가 통과했으며 다음은 단계 branch와 PR 게시다.

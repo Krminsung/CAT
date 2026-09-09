@@ -19,6 +19,19 @@ export interface RunIdentity {
   runId: string;
 }
 
+export type TransportRetryReason = "network_error" | "http_status";
+
+export interface TransportRetryRequest {
+  owner: "model_transport";
+  attempt: number;
+  reason: TransportRetryReason;
+  statusCode?: number;
+}
+
+export interface RetryBudgetPort {
+  tryConsumeRetry(request: TransportRetryRequest): boolean;
+}
+
 export interface ToolExecutionContext extends RunIdentity {
   workspace: string;
   signal: AbortSignal;
