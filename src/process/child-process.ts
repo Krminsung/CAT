@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import type { ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 
 const MAX_CAPTURE_TIMEOUT_MS = 300_000;
@@ -84,7 +84,7 @@ export async function captureChildProcess(
     };
   }
   return await new Promise<ChildCaptureResult>((resolve) => {
-    let child: ChildProcessWithoutNullStreams;
+    let child: ChildProcessByStdio<null, Readable, Readable>;
     try {
       child = spawn(executable, [...args], {
         cwd: options.cwd,
@@ -95,6 +95,7 @@ export async function captureChildProcess(
       });
     } catch (error) {
       const failure = error instanceof Error ? error : new Error("자식 프로세스를 시작하지 못했습니다.");
+      const code = errorCode(failure);
       resolve({
         started: false,
         stdout: "",
@@ -104,7 +105,7 @@ export async function captureChildProcess(
         timedOut: false,
         cancelled: false,
         outputLimitReached: false,
-        ...(errorCode(failure) ? { spawnErrorCode: errorCode(failure) } : {}),
+        ...(code === undefined ? {} : { spawnErrorCode: code }),
         spawnErrorMessage: failure.message,
       });
       return;
