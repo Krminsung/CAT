@@ -1,12 +1,13 @@
 import { basename } from "node:path";
 import { ConfigurationError } from "../core/errors.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
+import type { PermissionMode } from "../security/permissions.js";
 import { readJsonObject, writeJsonObjectAtomic } from "./json-file.js";
 import type { StoragePaths } from "./paths.js";
 
-export const SETTINGS_SCHEMA_VERSION = 1;
+export type { PermissionMode } from "../security/permissions.js";
 
-export type PermissionMode = "ask" | "auto-edit" | "full-auto" | "plan";
+export const SETTINGS_SCHEMA_VERSION = 1;
 
 export interface SettingsValues {
   permissionMode: PermissionMode;

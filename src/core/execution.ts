@@ -34,5 +34,6 @@ export interface RetryBudgetPort {
 
 export interface ToolExecutionContext extends RunIdentity {
   workspace: string;
+  workspaceTrusted: boolean;
   signal: AbortSignal;
 }

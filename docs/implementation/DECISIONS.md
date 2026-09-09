@@ -105,3 +105,15 @@
 - 결과: model 목록은 크기와 개수를 제한해 읽고 실패나 빈 결과를 그대로 오류로
   전달한다. 수동 model ID 검증은 목록 조회와 독립적으로 제공하여 조회 실패를 빈 목록
   성공으로 바꾸지 않고도 사용자가 직접 선택할 수 있게 한다.
+
+## D013 — 중앙 도구 실행과 승인 범위
+
+- 상태: 승인됨
+- 결정: 등록 handler는 module-private registry에 보관하고 모델에는 이름·설명·복제한
+  schema만 제공한다. 모든 호출은 schema, trust와 hard deny, hook, permission,
+  재확인, handler, 후처리 순서를 강제하는 중앙 executor를 통한다. session/project
+  승인은 tool·canonical workspace·실제 path/command/server 대상을 함께 해시한 규칙에
+  묶는다.
+- 결과: UI와 모델은 handler reference를 얻지 못한다. 한 파일이나 command 승인이 다른
+  대상에 확대되지 않으며 deny는 자동 모드와 기존 allow보다 우선한다. P09 전 no-op
+  hook은 `implementation: none`으로 드러내어 hook 완성을 가장하지 않는다.
