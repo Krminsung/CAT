@@ -29,6 +29,9 @@ export function resolveCatHome(
   environment: NodeJS.ProcessEnv = process.env,
   userHome: string = homedir(),
 ): string {
+  if (!isAbsolute(userHome) || userHome.includes("\0")) {
+    throw new ConfigurationError("사용자 홈 경로는 유효한 절대 경로여야 합니다.");
+  }
   const configured = environment.CAT_HOME?.trim();
   if (!configured) return join(userHome, ".cat");
   if (configured.includes("\0")) {

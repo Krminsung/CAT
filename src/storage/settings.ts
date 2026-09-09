@@ -81,8 +81,17 @@ function optionalString(
 ): string | undefined {
   const value = raw[key];
   if (value === undefined) return undefined;
-  if (typeof value !== "string" || !value.trim() || [...value.trim()].length > maxLength) {
-    return fail(source, key, `1–${maxLength}자의 비어 있지 않은 문자열이어야 합니다`);
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    /\p{Cc}/u.test(value) ||
+    [...value.trim()].length > maxLength
+  ) {
+    return fail(
+      source,
+      key,
+      `제어 문자가 없는 1–${maxLength}자의 문자열이어야 합니다`,
+    );
   }
   return value.trim();
 }
@@ -98,10 +107,14 @@ function stringList(raw: JsonObject, key: string, source: string): string[] | un
         typeof item !== "string" ||
         !item.trim() ||
         [...item].length > 256 ||
-        item.includes("\0"),
+        /\p{Cc}/u.test(item),
     )
   ) {
-    return fail(source, key, "최대 256개의 비어 있지 않은 문자열 배열이어야 합니다");
+    return fail(
+      source,
+      key,
+      "제어 문자가 없는 문자열을 최대 256개 담은 배열이어야 합니다",
+    );
   }
   return value.map((item) => String(item).trim());
 }
@@ -179,8 +192,13 @@ export function parseSettingsValues(
   const disallowedTools = stringList(raw, "disallowedTools", source);
   if (disallowedTools !== undefined) result.disallowedTools = disallowedTools;
   if (raw.tools !== undefined) {
-    if (typeof raw.tools !== "string" || !raw.tools.trim() || [...raw.tools].length > 2_048) {
-      fail(source, "tools", "1–2048자의 비어 있지 않은 문자열이어야 합니다");
+    if (
+      typeof raw.tools !== "string" ||
+      !raw.tools.trim() ||
+      /\p{Cc}/u.test(raw.tools) ||
+      [...raw.tools].length > 2_048
+    ) {
+      fail(source, "tools", "제어 문자가 없는 1–2048자의 문자열이어야 합니다");
     }
     result.tools = raw.tools.trim();
   }
@@ -188,7 +206,16 @@ export function parseSettingsValues(
   if (documentBytes !== undefined) result.projectDocMaxBytes = documentBytes;
   const fallbackNames = stringList(raw, "projectDocFallbackFilenames", source);
   if (fallbackNames !== undefined) {
-    if (fallbackNames.some((name) => basename(name) !== name)) {
+    if (
+      fallbackNames.some(
+        (name) =>
+          basename(name) !== name ||
+          name === "." ||
+          name === ".." ||
+          name.includes("/") ||
+          name.includes("\\"),
+      )
+    ) {
       fail(source, "projectDocFallbackFilenames", "경로가 아닌 파일 이름만 포함해야 합니다");
     }
     result.projectDocFallbackFilenames = fallbackNames;
@@ -248,17 +275,18 @@ export async function loadSettings(
 ): Promise<LoadedSettings> {
   let values = mergeSettings(DEFAULT_SETTINGS, {});
   const sources: string[] = ["defaults"];
-  const applyFile = async (path: string): Promise<void> => {
+  const applyFile = async (path: string, requireOwner = false): Promise<void> => {
     const document = await readJsonObject(path, {
       label: `설정 파일 ${path}`,
       maxBytes: 1024 * 1024,
+      requireOwner,
     });
     if (!document) return;
     values = mergeSettings(values, parseSettingsValues(document, path, true));
     sources.push(path);
   };
 
-  await applyFile(paths.userSettings);
+  await applyFile(paths.userSettings, true);
   if (options.projectTrusted) {
     await applyFile(paths.projectSettings);
     await applyFile(paths.projectLocalSettings);

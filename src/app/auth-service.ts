@@ -20,6 +20,7 @@ import {
 import type { ProviderProtocol } from "../core/provider.js";
 
 export interface ApiKeyAccess {
+  readonly provider: string;
   readonly origin: string;
   readonly source: "environment" | "stored";
   withValue<T>(use: (apiKey: string) => Promise<T>): Promise<T>;
@@ -55,7 +56,11 @@ class EnvironmentApiKeyAccess implements ApiKeyAccess {
   readonly source = "environment" as const;
   readonly #apiKey: string;
 
-  constructor(readonly origin: string, apiKey: string) {
+  constructor(
+    readonly provider: string,
+    readonly origin: string,
+    apiKey: string,
+  ) {
     this.#apiKey = validateApiKey(apiKey);
   }
 
@@ -74,6 +79,7 @@ class StoredApiKeyAccess implements ApiKeyAccess {
   readonly #store: CredentialStore;
 
   constructor(
+    readonly provider: string,
     readonly origin: string,
     reference: SecretReference,
     store: CredentialStore,
@@ -83,13 +89,32 @@ class StoredApiKeyAccess implements ApiKeyAccess {
   }
 
   async withValue<T>(use: (apiKey: string) => Promise<T>): Promise<T> {
-    return await this.#store.withApiKey(this.#reference, this.origin, use);
+    return await this.#store.withApiKey(
+      this.#reference,
+      { origin: this.origin, provider: this.provider },
+      use,
+    );
   }
 
   async redactor(): Promise<Redactor> {
     return await this.#store.redactor();
   }
 }
+
+const PROVIDER_API_KEY_ENVIRONMENT: Readonly<Record<string, readonly string[]>> = {
+  internal: ["SMILECODE_API_KEY", "SMILESERV_API_KEY"],
+  openai: ["OPENAI_API_KEY"],
+  anthropic: ["ANTHROPIC_API_KEY"],
+  google: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"],
+  openrouter: ["OPENROUTER_API_KEY"],
+  xai: ["XAI_API_KEY"],
+  groq: ["GROQ_API_KEY"],
+  deepseek: ["DEEPSEEK_API_KEY"],
+  mistral: ["MISTRAL_API_KEY"],
+  together: ["TOGETHER_API_KEY"],
+  cerebras: ["CEREBRAS_API_KEY"],
+  fireworks: ["FIREWORKS_API_KEY"],
+};
 
 function environmentApiKey(
   environment: NodeJS.ProcessEnv,
@@ -98,16 +123,18 @@ function environmentApiKey(
   const current = environment.CAT_API_KEY?.trim();
   if (current) return validateApiKey(current);
 
-  if (provider !== "internal") return undefined;
-  const smileCode = environment.SMILECODE_API_KEY?.trim();
-  const smileServ = environment.SMILESERV_API_KEY?.trim();
-  if (smileCode && smileServ && smileCode !== smileServ) {
+  const names = PROVIDER_API_KEY_ENVIRONMENT[provider] ?? [];
+  const configured = names.flatMap((name) => {
+    const value = environment[name]?.trim();
+    return value ? [{ name, value: validateApiKey(value) }] : [];
+  });
+  const distinctValues = new Set(configured.map((entry) => entry.value));
+  if (distinctValues.size > 1) {
     throw new ConfigurationError(
-      "SMILECODE_API_KEY와 SMILESERV_API_KEY 값이 충돌합니다. CAT_API_KEY를 명시하세요.",
+      `${configured.map((entry) => entry.name).join(", ")} 값이 충돌합니다. CAT_API_KEY를 명시하세요.`,
     );
   }
-  const legacy = smileCode || smileServ;
-  return legacy ? validateApiKey(legacy) : undefined;
+  return configured[0]?.value;
 }
 
 export class AuthService {
@@ -189,7 +216,7 @@ export class AuthService {
     const collection = await this.profiles.load();
     const available = new Set(
       (await this.credentials.list()).map(
-        (item) => `${item.reference.id}\0${item.reference.origin}`,
+        (item) => `${item.provider}\0${item.reference.id}\0${item.reference.origin}`,
       ),
     );
     const result: AuthStatus[] = [];
@@ -198,7 +225,7 @@ export class AuthService {
         profile,
         active: collection.activeProfile === profile.name,
         credentialAvailable: available.has(
-          `${profile.secretRef.id}\0${profile.secretRef.origin}`,
+          `${profile.provider}\0${profile.secretRef.id}\0${profile.secretRef.origin}`,
         ),
       });
     }
@@ -264,15 +291,20 @@ export class AuthService {
     if (environmentKey) {
       return {
         profile,
-        credential: new EnvironmentApiKeyAccess(profile.origin, environmentKey),
+        credential: new EnvironmentApiKeyAccess(
+          profile.provider,
+          profile.origin,
+          environmentKey,
+        ),
       };
     }
-    if (!(await this.credentials.has(profile.secretRef))) {
+    if (!(await this.credentials.has(profile.secretRef, profile.provider))) {
       throw new MissingCredentialError("Provider profile에 연결된 API key가 없습니다.");
     }
     return {
       profile,
       credential: new StoredApiKeyAccess(
+        profile.provider,
         profile.origin,
         profile.secretRef,
         this.credentials,

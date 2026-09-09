@@ -1,5 +1,5 @@
 import { lstat, stat } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { ConfigurationError, PermissionDeniedError } from "../core/errors.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
 import { readJsonObject, writeJsonObjectAtomic } from "../storage/json-file.js";
@@ -77,6 +77,14 @@ async function exists(path: string): Promise<boolean> {
 export async function workspaceIdentity(path: string): Promise<WorkspaceIdentity> {
   const canonicalPath = await canonicalWorkspace(path);
   const info = await stat(canonicalPath);
+  if (
+    !Number.isSafeInteger(info.dev) ||
+    !Number.isSafeInteger(info.ino) ||
+    info.dev < 0 ||
+    info.ino < 0
+  ) {
+    throw new ConfigurationError("Workspace filesystem identity를 안전하게 표현할 수 없습니다.");
+  }
   return {
     canonicalPath,
     device: info.dev,
@@ -113,6 +121,9 @@ export class ExplicitTrustGrant {
     path: string,
     source: "interactive" | "cli",
   ): Promise<ExplicitTrustGrant> {
+    if (source !== "interactive" && source !== "cli") {
+      throw new ConfigurationError("Workspace trust 확인 출처가 올바르지 않습니다.");
+    }
     return new ExplicitTrustGrant(
       await workspaceIdentity(path),
       source,
@@ -149,13 +160,24 @@ export class TrustStore {
     if (document.entries.length > MAX_TRUST_ENTRIES) {
       throw new ConfigurationError("Workspace trust 항목 수가 너무 많습니다.");
     }
+    const seenPaths = new Set<string>();
     return document.entries.map((value, index) => {
       const raw = object(value, `Workspace trust entry ${index}`);
       const source = text(raw.source, `Workspace trust entry ${index} source`);
       const canonicalPath = text(raw.canonicalPath, `Workspace trust entry ${index} path`);
-      if (!isAbsolute(canonicalPath)) {
-        throw new ConfigurationError(`Workspace trust entry ${index} path는 절대 경로여야 합니다.`);
+      if (
+        canonicalPath.includes("\0") ||
+        !isAbsolute(canonicalPath) ||
+        resolve(canonicalPath) !== canonicalPath
+      ) {
+        throw new ConfigurationError(
+          `Workspace trust entry ${index} path는 정규화된 절대 경로여야 합니다.`,
+        );
       }
+      if (seenPaths.has(canonicalPath)) {
+        throw new ConfigurationError(`Workspace trust entry ${index} path가 중복됐습니다.`);
+      }
+      seenPaths.add(canonicalPath);
       if (source !== "interactive" && source !== "cli") {
         throw new ConfigurationError(`Workspace trust entry ${index} source가 올바르지 않습니다.`);
       }

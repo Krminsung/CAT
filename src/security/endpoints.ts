@@ -12,7 +12,12 @@ export function normalizeProviderBaseUrl(
   allowInsecureHttp = false,
 ): NormalizedEndpoint {
   const selected = value.trim();
-  if (!selected || selected.includes("\0") || selected.length > 2_048) {
+  if (
+    !selected ||
+    /[\u0000-\u001f\u007f]/u.test(selected) ||
+    selected.includes("\\") ||
+    selected.length > 2_048
+  ) {
     throw new ConfigurationError(`${label}이 올바르지 않습니다.`);
   }
   let parsed: URL;
@@ -50,7 +55,8 @@ export function normalizeApiPath(value: string, label: string): string {
   const selected = value.trim();
   if (
     !selected.startsWith("/") ||
-    selected.includes("\0") ||
+    selected.startsWith("//") ||
+    /[\\\u0000-\u0020\u007f]/u.test(selected) ||
     selected.includes("?") ||
     selected.includes("#") ||
     selected.length > 1_024

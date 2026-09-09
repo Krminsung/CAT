@@ -88,6 +88,22 @@ function boolean(value: JsonValue | undefined, label: string): boolean {
   return value;
 }
 
+function protocol(value: JsonValue | undefined, label: string): ProviderProtocol {
+  const selected = text(value, label, 32);
+  if (selected !== "openai-responses" && selected !== "openai-chat") {
+    throw new ConfigurationError(`${label}이 올바르지 않습니다.`);
+  }
+  return selected;
+}
+
+function endpointSource(value: JsonValue | undefined, label: string): EndpointSource {
+  const selected = text(value, label, 32);
+  if (selected !== "provider_default" && selected !== "user") {
+    throw new ConfigurationError(`${label}가 올바르지 않습니다.`);
+  }
+  return selected;
+}
+
 export function normalizeProfileName(value: string): string {
   const selected = value.trim().toLowerCase();
   if (!PROFILE_PATTERN.test(selected)) {
@@ -132,8 +148,8 @@ export function createProviderProfile(input: ProviderProfileInput): ProviderProf
     );
   }
   const model = input.model?.trim();
-  if (model && [...model].length > 256) {
-    throw new ConfigurationError("Model ID는 256자를 초과할 수 없습니다.");
+  if (model && (/\p{Cc}/u.test(model) || [...model].length > 256)) {
+    throw new ConfigurationError("Model ID에는 제어 문자를 포함할 수 없고 256자 이하여야 합니다.");
   }
   return {
     name,
@@ -156,20 +172,13 @@ function parseProfile(name: string, value: JsonValue): ProviderProfile {
   if (secret.kind !== "api_key") {
     throw new ConfigurationError(`Profile ${name} secretRef kind가 올바르지 않습니다.`);
   }
-  const protocol = text(raw.protocol, `Profile ${name} protocol`, 32);
-  const source = text(raw.endpointSource, `Profile ${name} endpointSource`, 32);
   if (raw.model !== undefined && typeof raw.model !== "string") {
     throw new ConfigurationError(`Profile ${name} model은 문자열이어야 합니다.`);
   }
   return createProviderProfile({
     name,
     provider: text(raw.provider, `Profile ${name} provider`, 64),
-    protocol:
-      protocol === "openai-responses" || protocol === "openai-chat"
-        ? protocol
-        : (() => {
-            throw new ConfigurationError(`Profile ${name} protocol이 올바르지 않습니다.`);
-          })(),
+    protocol: protocol(raw.protocol, `Profile ${name} protocol`),
     baseUrl: text(raw.baseUrl, `Profile ${name} baseUrl`),
     modelsPath: text(raw.modelsPath, `Profile ${name} modelsPath`, 1_024),
     generationPath: text(raw.generationPath, `Profile ${name} generationPath`, 1_024),
@@ -179,12 +188,10 @@ function parseProfile(name: string, value: JsonValue): ProviderProfile {
       id: text(secret.id, `Profile ${name} secretRef id`, 64),
       origin: text(secret.origin, `Profile ${name} secretRef origin`),
     },
-    endpointSource:
-      source === "provider_default" || source === "user"
-        ? source
-        : (() => {
-            throw new ConfigurationError(`Profile ${name} endpointSource가 올바르지 않습니다.`);
-          })(),
+    endpointSource: endpointSource(
+      raw.endpointSource,
+      `Profile ${name} endpointSource`,
+    ),
     allowInsecureHttp: boolean(raw.insecureHttp, `Profile ${name} insecureHttp`),
   });
 }

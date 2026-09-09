@@ -17,6 +17,7 @@ import type { JsonObject, JsonValue } from "../core/json.js";
 const DEFAULT_MAX_BYTES = 1024 * 1024;
 const DEFAULT_MAX_DEPTH = 32;
 const DEFAULT_MAX_NODES = 20_000;
+const MAX_CONFIGURED_BYTES = 64 * 1024 * 1024;
 
 export interface JsonReadOptions {
   label?: string;
@@ -53,6 +54,24 @@ function assertOwned(uid: number, label: string): void {
   const expected = currentUserId();
   if (expected !== undefined && uid !== expected) {
     throw new StorageError(`${label}이 현재 사용자 소유가 아닙니다.`);
+  }
+}
+
+function assertByteLimit(maxBytes: number): void {
+  if (
+    !Number.isSafeInteger(maxBytes) ||
+    maxBytes < 1 ||
+    maxBytes > MAX_CONFIGURED_BYTES
+  ) {
+    throw new ConfigurationError(
+      `JSON 크기 제한은 1–${MAX_CONFIGURED_BYTES} bytes 범위의 정수여야 합니다.`,
+    );
+  }
+}
+
+function assertPrivateMode(info: Stats, label: string): void {
+  if (process.platform !== "win32" && (info.mode & 0o077) !== 0) {
+    throw new StorageError(`${label}의 권한은 현재 사용자에게만 허용되어야 합니다.`);
   }
 }
 
@@ -138,6 +157,21 @@ export async function readJsonObject(
 ): Promise<JsonObject | undefined> {
   const label = options.label ?? path;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+  assertByteLimit(maxBytes);
+  let parent: Stats;
+  try {
+    parent = await lstat(dirname(path));
+  } catch (error) {
+    const code = errnoCode(error);
+    if (code === "ENOENT" || code === "ENOTDIR") return undefined;
+    throw new StorageError(`${label}의 상위 경로를 확인할 수 없습니다.`, { cause: error });
+  }
+  if (parent.isSymbolicLink() || !parent.isDirectory()) {
+    throw new StorageError(`${label}의 상위 경로는 실제 디렉터리여야 합니다.`);
+  }
+  if (options.requireOwner) assertOwned(parent.uid, `${label}의 상위 경로`);
+  if (options.requirePrivateMode) assertPrivateMode(parent, `${label}의 상위 경로`);
+
   let initial: Stats;
   try {
     initial = await lstat(path);
@@ -150,13 +184,7 @@ export async function readJsonObject(
     throw new StorageError(`${label}은 실제 일반 파일이어야 합니다.`);
   }
   if (options.requireOwner) assertOwned(initial.uid, label);
-  if (
-    options.requirePrivateMode &&
-    process.platform !== "win32" &&
-    (initial.mode & 0o077) !== 0
-  ) {
-    throw new StorageError(`${label}의 권한은 현재 사용자에게만 허용되어야 합니다.`);
-  }
+  if (options.requirePrivateMode) assertPrivateMode(initial, label);
   if (initial.size > maxBytes) {
     throw new StorageError(`${label}이 허용 크기 ${maxBytes} bytes를 초과했습니다.`);
   }
@@ -169,15 +197,41 @@ export async function readJsonObject(
     if (opened.dev !== initial.dev || opened.ino !== initial.ino || !opened.isFile()) {
       throw new StorageError(`${label}이 읽는 동안 변경되었습니다.`);
     }
-    const buffer = Buffer.alloc(maxBytes + 1);
-    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-    if (bytesRead > maxBytes) {
+    if (options.requireOwner) assertOwned(opened.uid, label);
+    if (options.requirePrivateMode) assertPrivateMode(opened, label);
+    if (opened.size > maxBytes) {
       throw new StorageError(`${label}이 허용 크기 ${maxBytes} bytes를 초과했습니다.`);
+    }
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let totalRead = 0;
+    while (totalRead < buffer.length) {
+      const chunk = await handle.read(
+        buffer,
+        totalRead,
+        buffer.length - totalRead,
+        totalRead,
+      );
+      if (chunk.bytesRead === 0) break;
+      totalRead += chunk.bytesRead;
+    }
+    if (totalRead > maxBytes) {
+      throw new StorageError(`${label}이 허용 크기 ${maxBytes} bytes를 초과했습니다.`);
+    }
+    const completed = await handle.stat();
+    if (
+      completed.size !== opened.size ||
+      completed.mtimeMs !== opened.mtimeMs ||
+      completed.ctimeMs !== opened.ctimeMs
+    ) {
+      throw new StorageError(`${label}이 읽는 동안 변경되었습니다.`);
+    }
+    if (totalRead !== opened.size) {
+      throw new StorageError(`${label}을 완전하게 읽지 못했습니다.`);
     }
     let text: string;
     try {
       text = new TextDecoder("utf-8", { fatal: true }).decode(
-        buffer.subarray(0, bytesRead),
+        buffer.subarray(0, totalRead),
       );
     } catch (error) {
       throw new ConfigurationError(`${label}은 UTF-8이어야 합니다.`, { cause: error });
@@ -199,6 +253,8 @@ export async function writeJsonObjectAtomic(
   options: JsonWriteOptions = {},
 ): Promise<void> {
   const label = options.label ?? path;
+  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+  assertByteLimit(maxBytes);
   const parent = dirname(path);
   const directoryMode = options.directoryMode ?? 0o700;
   const fileMode = options.fileMode ?? 0o600;
@@ -233,7 +289,6 @@ export async function writeJsonObjectAtomic(
   } catch (error) {
     throw new StorageError(`${label}의 JSON을 직렬화하지 못했습니다.`, { cause: error });
   }
-  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   if (Buffer.byteLength(serialized, "utf8") > maxBytes) {
     throw new StorageError(`${label}이 허용 크기 ${maxBytes} bytes를 초과했습니다.`);
   }

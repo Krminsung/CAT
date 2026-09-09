@@ -50,6 +50,14 @@ function normalizeOrigin(value: string, label: string): string {
   return endpoint.origin;
 }
 
+function normalizeProvider(value: string): string {
+  const provider = value.trim().toLowerCase();
+  if (!PROVIDER_PATTERN.test(provider)) {
+    throw new ConfigurationError("Credential provider 형식이 올바르지 않습니다.");
+  }
+  return provider;
+}
+
 export function validateApiKey(value: string): string {
   const selected = value.trim();
   if (!selected || /[\r\n\0]/u.test(selected)) {
@@ -113,10 +121,9 @@ export class CredentialStore {
         throw new ConfigurationError("API key 저장소에 잘못된 reference가 있습니다.");
       }
       const raw = object(rawValue, `Credential ${id}`);
-      const provider = text(raw.provider, `Credential ${id} provider`, 64);
-      if (!PROVIDER_PATTERN.test(provider)) {
-        throw new ConfigurationError(`Credential ${id} provider 형식이 올바르지 않습니다.`);
-      }
+      const provider = normalizeProvider(
+        text(raw.provider, `Credential ${id} provider`, 64),
+      );
       const origin = normalizeOrigin(
         text(raw.origin, `Credential ${id} origin`, 2_048),
         `Credential ${id} origin`,
@@ -164,10 +171,7 @@ export class CredentialStore {
     origin: string;
     apiKey: string;
   }): Promise<CredentialMetadata> {
-    const provider = input.provider.trim().toLowerCase();
-    if (!PROVIDER_PATTERN.test(provider)) {
-      throw new ConfigurationError("Credential provider 형식이 올바르지 않습니다.");
-    }
+    const provider = normalizeProvider(input.provider);
     const origin = normalizeOrigin(input.origin, "Credential origin");
     const apiKey = validateApiKey(input.apiKey);
     const records = await this.#read();
@@ -192,24 +196,31 @@ export class CredentialStore {
     return [...(await this.#read()).values()].map(metadataOf);
   }
 
-  async has(reference: SecretReference): Promise<boolean> {
+  async has(reference: SecretReference, expectedProvider: string): Promise<boolean> {
     const selected = validateSecretReference(reference);
+    const provider = normalizeProvider(expectedProvider);
     const record = (await this.#read()).get(selected.id);
-    return record?.reference.origin === selected.origin;
+    return record?.reference.origin === selected.origin &&
+      record.provider === provider;
   }
 
   async withApiKey<T>(
     reference: SecretReference,
-    expectedOrigin: string,
+    expected: { origin: string; provider: string },
     use: (apiKey: string) => Promise<T>,
   ): Promise<T> {
     const selected = validateSecretReference(reference);
-    const origin = normalizeOrigin(expectedOrigin, "요청 endpoint origin");
+    const origin = normalizeOrigin(expected.origin, "요청 endpoint origin");
+    const provider = normalizeProvider(expected.provider);
     if (selected.origin !== origin) {
       throw new MissingCredentialError("API key가 요청 endpoint origin과 일치하지 않습니다.");
     }
     const record = (await this.#read()).get(selected.id);
-    if (!record || record.reference.origin !== origin) {
+    if (
+      !record ||
+      record.reference.origin !== origin ||
+      record.provider !== provider
+    ) {
       throw new MissingCredentialError("저장된 API key reference를 찾을 수 없습니다.");
     }
     return await use(record.apiKey);

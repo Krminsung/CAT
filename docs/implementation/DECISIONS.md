@@ -60,8 +60,11 @@
 - 결정: profile에는 API key 대신 endpoint origin에 묶인 불투명 `secretRef`만
   저장한다. `CAT_API_KEY`가 우선하고, 기존 `SMILECODE_API_KEY`와
   `SMILESERV_API_KEY`는 internal provider에서 서로 충돌하지 않을 때만 읽는다.
+  외부 provider의 기존 API key 환경변수도 유지하되 여러 후보 값이 충돌하면
+  명시적인 `CAT_API_KEY`를 요구한다.
 - 결과: base URL의 origin이 달라지면 기존 key를 재사용하지 않는다. 기존
-  `~/.smileserv` credential 파일은 P02에서 읽거나 자동 이관하지 않는다.
+  `~/.smileserv` credential 파일은 P02에서 읽거나 자동 이관하지 않는다. 저장된
+  key를 사용할 때는 secret reference, endpoint origin과 provider를 함께 확인한다.
 
 ## D009 — workspace trust와 자식 프로세스 경계
 

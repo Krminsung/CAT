@@ -61,11 +61,12 @@ export async function resolvePotentialPath(
   if (
     !requestedPath ||
     requestedPath.includes("\0") ||
-    Buffer.byteLength(requestedPath, "utf8") > MAX_PATH_BYTES
+    Buffer.byteLength(requestedPath, "utf8") > MAX_PATH_BYTES ||
+    requestedPath.split(sep).length > MAX_PATH_COMPONENTS
   ) {
     throw new ConfigurationError("검사할 파일 경로가 올바르지 않습니다.");
   }
-  if (!isAbsolute(basePath)) {
+  if (!isAbsolute(basePath) || basePath.includes("\0")) {
     throw new ConfigurationError("민감 경로 검사 기준은 절대 경로여야 합니다.");
   }
   const joined = isAbsolute(requestedPath)
@@ -116,6 +117,7 @@ async function fileIdentity(path: string): Promise<FileIdentity | undefined> {
 
 function sameFile(left: FileIdentity | undefined, right: FileIdentity | undefined): boolean {
   return left !== undefined && right !== undefined &&
+    !(left.inode === 0 && right.inode === 0) &&
     left.device === right.device && left.inode === right.inode;
 }
 
@@ -129,7 +131,7 @@ export class SensitivePathPolicy {
     files: readonly ProtectedPath[],
     directories: readonly ProtectedPath[],
   ) {
-    if (!isAbsolute(basePath)) {
+    if (!isAbsolute(basePath) || basePath.includes("\0")) {
       throw new ConfigurationError("민감 경로 검사 기준은 절대 경로여야 합니다.");
     }
     for (const entry of [...files, ...directories]) {

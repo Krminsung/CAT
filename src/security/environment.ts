@@ -43,6 +43,9 @@ const EXACT_SENSITIVE_NAMES = new Set([
   "GH_TOKEN",
   "NPM_TOKEN",
   "SSH_AUTH_SOCK",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
 ]);
 
 const INJECTION_ENVIRONMENT_NAMES = new Set([
@@ -90,11 +93,12 @@ const INJECTION_ENVIRONMENT_NAMES = new Set([
   "DYLD_LIBRARY_PATH",
 ]);
 
-const SENSITIVE_NAME_PATTERN = /(?:API.?KEY|ACCESS.?TOKEN|AUTH.?TOKEN|PASSWORD|PASSWD|SECRET|PRIVATE.?KEY|COOKIE|CREDENTIAL)/u;
+const SENSITIVE_NAME_PATTERN = /(?:API.?KEY|ACCESS.?TOKEN|AUTH.?TOKEN|(?:^|_)TOKEN(?:$|_)|PASSWORD|PASSWD|SECRET|PRIVATE.?KEY|COOKIE|CREDENTIAL|(?:DATABASE|DB|REDIS|MONGO|POSTGRES).*URL)/u;
 const INJECTION_NAME_PATTERN = /^(?:BASH_FUNC_.+%%|GIT_CONFIG_(?:COUNT|KEY_\d+|VALUE_\d+|PARAMETERS|SYSTEM|GLOBAL)|LD_.+|DYLD_.+)$/u;
 const VALID_ENVIRONMENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 const MAX_ENVIRONMENT_VALUE_BYTES = 32 * 1024;
 const MAX_ENVIRONMENT_TOTAL_BYTES = 128 * 1024;
+const MAX_ENVIRONMENT_ENTRIES = 256;
 
 export interface ChildEnvironmentOptions {
   source?: NodeJS.ProcessEnv;
@@ -138,13 +142,19 @@ export function buildChildEnvironment(
   options: ChildEnvironmentOptions = {},
 ): NodeJS.ProcessEnv {
   const source = options.source ?? process.env;
+  if ((options.passThrough?.length ?? 0) > MAX_ENVIRONMENT_ENTRIES) {
+    throw new ConfigurationError("Child environment pass-through 항목 수가 너무 많습니다.");
+  }
+  if (Object.keys(options.additions ?? {}).length > MAX_ENVIRONMENT_ENTRIES) {
+    throw new ConfigurationError("Child environment 추가 항목 수가 너무 많습니다.");
+  }
   const selectedNames = new Map<string, string>();
   for (const name of [...DEFAULT_CHILD_ENVIRONMENT, ...(options.passThrough ?? [])]) {
     assertEnvironmentName(name);
     selectedNames.set(canonicalName(name), name);
   }
 
-  const result: NodeJS.ProcessEnv = {};
+  const result = Object.create(null) as NodeJS.ProcessEnv;
   let totalBytes = 0;
   const append = (name: string, value: string): void => {
     assertEnvironmentName(name);
