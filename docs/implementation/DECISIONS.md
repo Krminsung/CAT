@@ -139,3 +139,13 @@
   `not_started`, 종료 코드가 확인된 실패는 `failed`, 시작 뒤 강제 종료·상태 유실은
   `unknown`으로 보존하고 부분 stdout/stderr를 제한된 오류 상세로 돌려준다. 이 경계가 임의
   셸 프로그램의 외부 파일·네트워크 접근을 완전히 격리한다고 주장하지 않는다.
+
+## D016 — 단일 실행 소유권과 공통 예산
+
+- 상태: 승인됨
+- 결정: process 안의 session별 coordinator가 동시에 하나의 run만 소유한다. owner loop는
+  명시적인 상태 전이를 따르고 모델 첫 요청과 transport 재시도가 같은 모델 시도 예산을
+  소비한다. wall-clock timer와 caller 취소는 하나의 signal로 하위 경계에 전달한다.
+- 결과: provider, 도구, 복구, compaction과 Stop hook은 새 agent run을 만들지 않는다.
+  future 기능은 현재 run의 복구·모델·도구 예산 port를 받아야 하며 종료 시 timer와 session
+  lease는 각각 한 번만 정리한다.

@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P04 기준 main은 `3581145239fb622b647cb1d54fbe64c292ae8d7c`이다. 구현은 이 커밋에서
+P05 기준 main은 `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -8,8 +8,8 @@ P04 기준 main은 `3581145239fb622b647cb1d54fbe64c292ae8d7c`이다. 구현은 �
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
-| P04 권한·기본 도구 | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
+| P05 bounded agent loop | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -61,3 +61,7 @@ stdin 타입과 선택 속성 구성에서 엄격 타입 오류 2개를 보고�
 첫 실패 기록을 보존한 채 `cc7ac1ea55fc9370537b6b944988add2ccfb1834`를 대상으로
 두 번째이자 마지막 승인 검사를 실행했고 통과했다. 결과는 정적 검사 통과이며 실제
 파일 작업, child process와 앱 런타임은 검증하지 않았다.
+P04는 검토 head `dec139826157fa12b2b6aeb0a001c80469392c3f`를 PR #4에서 merge
+commit `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`로 병합했다. merge의 두 부모,
+tree, phase head의 조상 관계와 `origin/main`을 대조했다. P05는 이 merge commit을
+기준으로 단일 소유 실행 상태와 공통 예산 구현을 시작했다.
