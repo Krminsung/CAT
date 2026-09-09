@@ -1,0 +1,21 @@
+# Read-only source material and uploaded inputs
+.reference/
+code-agent-cli-typescript.tar.gz
+
+# Dependency and compiler output
+node_modules/
+dist/
+artifacts/
+
+# Local process output
+*.log
+*.pid
+
+# Environment and secret-bearing local configuration
+.env
+.env.*
+!.env.example
+.cat/settings.local.json
+.cat/credentials.json
+.cat/credentials/
+.cat/secrets/
