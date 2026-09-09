@@ -39,7 +39,8 @@ export type ProviderStreamEvent =
   | { type: "text_delta"; text: string }
   | { type: "tool_call"; callId: string; name: string; input: JsonObject }
   | { type: "usage"; usage: ProviderUsage }
-  | { type: "completed"; responseId?: string };
+  | { type: "completed"; responseId?: string }
+  | { type: "cancelled"; reason?: string };
 
 export interface ProviderAdapter {
   readonly id: string;

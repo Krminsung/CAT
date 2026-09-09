@@ -86,3 +86,12 @@
 - 결과: 응답 body를 읽기 시작한 뒤에는 재시도하지 않는다. 인증 요청 redirect는
   같은 origin에서 method를 보존하는 경우만 제한적으로 따르며 public web transport와
   dispatcher를 공유하지 않는다.
+
+## D011 — provider 전환과 streaming tool call
+
+- 상태: 승인됨
+- 결정: 각 provider 요청은 원격 response ID 대신 로컬 대화 기록 전체에서 protocol별
+  입력을 다시 만든다. streaming tool call은 ID·이름·인자가 모두 완성되고 전체 모델
+  응답이 성공적으로 완료된 뒤에만 공통 event로 내보낸다.
+- 결과: provider나 model을 바꿔도 이전 원격 상태를 잘못 이어 붙이지 않는다. 중단되거나
+  JSON이 완성되지 않은 tool call은 실행 가능한 event가 되지 않는다.

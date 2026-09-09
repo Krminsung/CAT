@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-기준 main은 `a4f894d0d7aba7135969b7bb9a08a10fe4dbf8d1`이다. 구현은 이 커밋에서
+P03 기준 main은 `2429b419dc403132a69c4c9883b8dd374c284996`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -30,7 +30,9 @@ P02.1은 `5359cfab201cf4dbe3e811167933f82e38614d16`, P02.2는
 `c44fa0c640dbc80960e5ca8d27526f90b1073760`으로 완료했다. 전체 정적 검토에서
 확인한 보완은 `60378f41e5dac63a7f6132b38110a3958eb3bbb6`에 묶었다. 기준 main이
 변하지 않았음을 확인했다. `0c36e853b21ffee3af2cf5560f418d9e508e5cc2`를
-대상으로 한 유일한 `npm run check`가 통과했으며 다음은 단계 branch와 PR 게시다.
+대상으로 한 유일한 `npm run check`가 통과했다.
 P02는 PR #2의 검토 head `1416ef4`를 merge commit `2429b41`로 병합했고 tree와
-부모 정합성을 확인했다. 현재 작업은 P03.1 인증된 모델용 bounded HTTP/SSE
-transport이며 다음은 Responses adapter 구현이다.
+부모 정합성을 확인했다. P03.1 인증된 모델용 bounded HTTP/SSE transport는
+`b8b8631c7d520aa1e33d58e38dcfc88c30fcfe0b`로 완료했다. 현재 P03.2는 로컬 대화
+기록에서 요청을 재구성하고 완결된 도구 호출만 내보내는 Responses adapter를
+구현했으며 다음은 Chat-compatible adapter다.

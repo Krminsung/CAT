@@ -4,7 +4,7 @@ import {
   StorageError,
 } from "../core/errors.js";
 import { normalizeProviderBaseUrl } from "../security/endpoints.js";
-import { Redactor } from "../security/redaction.js";
+import type { ProviderCredentialAccess } from "../providers/credential-access.js";
 import {
   CredentialStore,
   validateApiKey,
@@ -19,13 +19,7 @@ import {
 } from "../storage/profiles.js";
 import type { ProviderProtocol } from "../core/provider.js";
 
-export interface ApiKeyAccess {
-  readonly provider: string;
-  readonly origin: string;
-  readonly source: "environment" | "stored";
-  withValue<T>(use: (apiKey: string) => Promise<T>): Promise<T>;
-  redactor(): Promise<Redactor>;
-}
+export type ApiKeyAccess = ProviderCredentialAccess;
 
 export interface ResolvedProviderAuth {
   profile: ProviderProfile;
@@ -52,7 +46,7 @@ export interface ConfigureProfileInput {
   activate?: boolean;
 }
 
-class EnvironmentApiKeyAccess implements ApiKeyAccess {
+class EnvironmentApiKeyAccess implements ProviderCredentialAccess {
   readonly source = "environment" as const;
   readonly #apiKey: string;
 
@@ -68,12 +62,9 @@ class EnvironmentApiKeyAccess implements ApiKeyAccess {
     return await use(this.#apiKey);
   }
 
-  async redactor(): Promise<Redactor> {
-    return new Redactor([this.#apiKey]);
-  }
 }
 
-class StoredApiKeyAccess implements ApiKeyAccess {
+class StoredApiKeyAccess implements ProviderCredentialAccess {
   readonly source = "stored" as const;
   readonly #reference: SecretReference;
   readonly #store: CredentialStore;
@@ -96,9 +87,6 @@ class StoredApiKeyAccess implements ApiKeyAccess {
     );
   }
 
-  async redactor(): Promise<Redactor> {
-    return await this.#store.redactor();
-  }
 }
 
 const PROVIDER_API_KEY_ENVIRONMENT: Readonly<Record<string, readonly string[]>> = {
