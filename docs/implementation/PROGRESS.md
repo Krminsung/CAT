@@ -7,7 +7,7 @@ P03 기준 main은 `2429b419dc403132a69c4c9883b8dd374c284996`이다. 구현은 �
 |---|---|---|---|
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
-| P03 provider·transport | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
+| P03 provider·transport | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
 | P04 권한·기본 도구 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -40,4 +40,5 @@ provider 기본값과 protocol별 capability, adapter factory, bounded model 목
 독립적인 수동 model ID 검증은 `ba9e9f31696a768efff890745491a7b7d1c42801`로
 완료했다. 전체 정적 검토에서 확인한 경계 보완은
 `22e77eb5ca0b4e8b054a6737de2c41619f4f077f`에 묶었고, 원격 main이 기준 SHA와
-같음을 확인했다. 다음은 예약된 P03 검증을 정확히 한 번 실행하는 일이다.
+같음을 확인했다. `c88374f7db3598c750e15bbaa51e98fec4820a3d`를 대상으로 한
+유일한 `npm run check`가 통과했으며 다음은 단계 branch와 PR 게시다.

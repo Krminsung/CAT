@@ -3,17 +3,17 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P03",
-  "currentStep": "P03.VERIFY",
-  "status": "VERIFYING",
+  "currentStep": "P03.PUBLISH",
+  "status": "VERIFIED",
   "baseMainSha": "2429b419dc403132a69c4c9883b8dd374c284996",
-  "lastCommitSha": "22e77eb5ca0b4e8b054a6737de2c41619f4f077f",
+  "lastCommitSha": "c88374f7db3598c750e15bbaa51e98fec4820a3d",
   "verification": {
     "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": null,
-    "result": "NOT_RUN",
-    "exitCode": null
+    "targetCommitSha": "c88374f7db3598c750e15bbaa51e98fec4820a3d",
+    "result": "PASS",
+    "exitCode": 0
   },
   "publication": {
     "branch": "cat/p03-providers",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Run the reserved npm run check exactly once",
+  "nextAction": "Create and publish cat/p03-providers, then review and merge its PR",
   "blocker": null
 }
