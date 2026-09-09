@@ -48,4 +48,6 @@ provider 기본값과 protocol별 capability, adapter factory, bounded model 목
 bounded file walk와 UTF-8 구간 읽기, 안전하게 선별한 후보만 처리하는 `rg` 검색 및
 별도 process의 bounded fallback을 `652345f`로 구현했다. P04.3에서는 관찰 digest를
 확인하는 제한된 파일 변경, 전체 staging을 거치는 patch, 변경 전 상태와 실패를 보존하는
-checkpoint·rollback을 구현 중이다.
+checkpoint·rollback을 `1dffd2d`로 구현했다. P04.4에서는 정확한 command/cwd 승인 범위,
+최소 child environment, 명백한 파괴·민감 경로 접근 차단, 소유 process group의 제한된
+foreground 실행을 구현 중이다.

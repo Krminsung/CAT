@@ -261,15 +261,32 @@ function addWarning(result: ToolExecutionResult, warning: ToolFailure): ToolExec
   return { ...result, warnings: [...(result.warnings ?? []), warning] };
 }
 
+function sanitizeFailure(
+  failureValue: ToolFailure,
+  redactor: Redactor,
+  maximumDetailsBytes: number,
+): ToolFailure {
+  const details = failureValue.details === undefined
+    ? undefined
+    : boundedOutput(
+        redactJson(failureValue.details, redactor),
+        Math.max(256, maximumDetailsBytes),
+      ).content;
+  return {
+    ...failureValue,
+    message: safeMessage(failureValue.message, redactor),
+    ...(details === undefined ? {} : { details }),
+  };
+}
+
 function sanitizeResult(
   result: ToolExecutionResult,
   definition: ToolDefinition,
   redactor: Redactor,
 ): ToolExecutionResult {
-  const warnings = result.warnings?.map((warning) => ({
-    ...warning,
-    message: safeMessage(warning.message, redactor),
-  }));
+  const warnings = result.warnings?.map((warning) =>
+    sanitizeFailure(warning, redactor, 4_096)
+  );
   if (result.status === "success") {
     const bounded = boundedOutput(redactJson(result.output.content, redactor), definition.outputLimitBytes);
     const output = {
@@ -284,7 +301,11 @@ function sanitizeResult(
   if (result.status === "failure") {
     return {
       ...result,
-      error: { ...result.error, message: safeMessage(result.error.message, redactor) },
+      error: sanitizeFailure(
+        result.error,
+        redactor,
+        definition.outputLimitBytes - 16_384,
+      ),
       ...(warnings ? { warnings } : {}),
     };
   }

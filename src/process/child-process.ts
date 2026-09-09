@@ -11,6 +11,7 @@ export interface ChildCaptureOptions {
 }
 
 export interface ChildCaptureResult {
+  started: boolean;
   stdout: string;
   stderr: string;
   exitCode: number | null;
@@ -38,6 +39,7 @@ export async function captureChildProcess(
 ): Promise<ChildCaptureResult> {
   if (options.signal.aborted) {
     return {
+      started: false,
       stdout: "",
       stderr: "",
       exitCode: null,
@@ -60,6 +62,7 @@ export async function captureChildProcess(
     } catch (error) {
       const failure = error instanceof Error ? error : new Error("자식 프로세스를 시작하지 못했습니다.");
       resolve({
+        started: false,
         stdout: "",
         stderr: "",
         exitCode: null,
@@ -150,6 +153,7 @@ export async function captureChildProcess(
       options.signal.removeEventListener("abort", abort);
       const codeValue = spawnError ? errorCode(spawnError) : undefined;
       resolve({
+        started: child.pid !== undefined,
         stdout: decode(stdout),
         stderr: decode(stderr),
         exitCode: code,

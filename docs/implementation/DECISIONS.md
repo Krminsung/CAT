@@ -128,3 +128,14 @@
 - 결과: 적용 중 오류나 취소는 역순 rollback을 시도하고, 현재 파일이 예상 변경 결과와
   다르면 외부 변경으로 보고 덮어쓰지 않는다. 복구가 일부라도 실패하면 해당 기록과 관리
   임시 파일 정보를 보존해 성공으로 오인하거나 다음 rewind 기록을 먼저 제거하지 않는다.
+
+## D015 — foreground 셸의 실행 결과와 보호 경계
+
+- 상태: 승인됨
+- 결정: `run_command` 승인은 정확한 command, canonical cwd, timeout과 foreground 여부에
+  묶는다. `/bin/sh -c` child에는 최소 allowlist environment만 전달하고 명백한 파괴 명령과
+  공통 민감 저장 경로 접근은 승인보다 먼저 막는다. background는 P12 전에는 시작하지 않는다.
+- 결과: 소유 process group을 취소·timeout·합산 출력 상한에서 종료한다. 시작 실패는
+  `not_started`, 종료 코드가 확인된 실패는 `failed`, 시작 뒤 강제 종료·상태 유실은
+  `unknown`으로 보존하고 부분 stdout/stderr를 제한된 오류 상세로 돌려준다. 이 경계가 임의
+  셸 프로그램의 외부 파일·네트워크 접근을 완전히 격리한다고 주장하지 않는다.

@@ -1,3 +1,4 @@
+export * from "./command-policy.js";
 export * from "./endpoints.js";
 export * from "./environment.js";
 export * from "./permissions.js";

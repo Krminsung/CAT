@@ -1,3 +1,4 @@
+export * from "./command-tool.js";
 export * from "./file-common.js";
 export * from "./mutation-tools.js";
 export * from "./patch.js";
