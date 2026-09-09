@@ -7,7 +7,7 @@
 |---|---|---|---|---|
 | 제품명·`cat-tui` 실행 정책 | `package.json`, `src/version.ts` | `package.json`, `src/core/version.ts`, `bin/cat` | P01/P14 | IN_PROGRESS |
 | provider 중립 JSON/message/tool/event | `src/types.ts` | `src/core/*` | P01 | IMPLEMENTED |
-| 설정·API key·profile·trust | `src/settings.ts`, `src/auth.ts`, `src/trust.ts` | `src/storage/*`, `src/security/*` | P02 | PLANNED |
+| 설정·API key·profile·trust | `src/settings.ts`, `src/auth.ts`, `src/trust.ts` | `src/storage/*`, `src/security/*` | P02 | IN_PROGRESS |
 | 13개 provider와 SSE transport | `src/providers.ts`, `src/api.ts`, `src/http.ts` | `src/providers/*`, `src/transport/*` | P03 | PLANNED |
 | 권한과 기본 파일·foreground shell 도구 | `src/tools.ts`, `src/permissions.ts` | `src/security/*`, `src/tools/*` | P04 | PLANNED |
 | 단일 소유 bounded agent loop | `src/agent.ts` | `src/agent/*` | P05 | PLANNED |

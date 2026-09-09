@@ -76,3 +76,11 @@ export class StorageError extends CatError {
     super("storage_failure", message, options);
   }
 }
+
+export class MissingCredentialError extends CatError {
+  override name = "MissingCredentialError";
+
+  constructor(message = "사용 가능한 API key가 없습니다.", options?: ErrorOptions) {
+    super("missing_credential", message, options);
+  }
+}

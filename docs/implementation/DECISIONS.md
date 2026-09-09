@@ -53,3 +53,12 @@
   `.cat/settings.local.json`은 workspace가 명시적으로 신뢰된 뒤에만 읽는다.
 - 결과: 신뢰 전 프로젝트 설정에 포함될 수 있는 hook/MCP 값이 실행 경로로 유입되지
   않는다. 환경변수와 CLI overlay는 파일 layer 뒤에 적용한다.
+
+## D008 — API key와 profile 분리
+
+- 상태: 승인됨
+- 결정: profile에는 API key 대신 endpoint origin에 묶인 불투명 `secretRef`만
+  저장한다. `CAT_API_KEY`가 우선하고, 기존 `SMILECODE_API_KEY`와
+  `SMILESERV_API_KEY`는 internal provider에서 서로 충돌하지 않을 때만 읽는다.
+- 결과: base URL의 origin이 달라지면 기존 key를 재사용하지 않는다. 기존
+  `~/.smileserv` credential 파일은 P02에서 읽거나 자동 이관하지 않는다.
