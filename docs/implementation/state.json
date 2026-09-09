@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "project": "cat",
+  "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
+  "currentPhase": "P01",
+  "currentStep": "P01.2",
+  "status": "IMPLEMENTING",
+  "baseMainSha": "a4f894d0d7aba7135969b7bb9a08a10fe4dbf8d1",
+  "lastCommitSha": "a4f894d0d7aba7135969b7bb9a08a10fe4dbf8d1",
+  "verification": {
+    "attemptsUsed": 0,
+    "maximumAttempts": 1,
+    "command": "npm run check",
+    "targetCommitSha": null,
+    "result": "NOT_RUN",
+    "exitCode": null
+  },
+  "publication": {
+    "branch": "cat/p01-foundation",
+    "pullRequestNumber": null,
+    "reviewedHeadSha": null,
+    "mergeCommitSha": null,
+    "result": "NOT_PUBLISHED"
+  },
+  "nextAction": "Implement P01.2 and commit it",
+  "blocker": null
+}
