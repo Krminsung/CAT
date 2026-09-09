@@ -4,6 +4,15 @@ import type { JsonObject, JsonValue } from "../core/json.js";
 const MAX_JSON_DEPTH = 64;
 const MAX_JSON_NODES = 20_000;
 
+function exceedsCodePoints(value: string, maximum: number): boolean {
+  let count = 0;
+  for (const _character of value) {
+    count += 1;
+    if (count > maximum) return true;
+  }
+  return false;
+}
+
 export function protocolRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -70,7 +79,7 @@ export function protocolString(
     typeof value !== "string" ||
     !value.trim() ||
     /\p{Cc}/u.test(value) ||
-    [...value].length > maximum
+    exceedsCodePoints(value, maximum)
   ) {
     throw new ProtocolError(`${label} 형식이 올바르지 않습니다.`);
   }

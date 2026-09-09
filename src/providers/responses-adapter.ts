@@ -1,12 +1,9 @@
 import {
   CancelledError,
-  CatError,
   ConfigurationError,
   ContextWindowError,
-  MissingCredentialError,
   ProviderError,
   ProtocolError,
-  StorageError,
 } from "../core/errors.js";
 import type { JsonObject } from "../core/json.js";
 import type { ConversationMessage } from "../core/messages.js";
@@ -21,11 +18,7 @@ import type {
 import { PRODUCT_NAME, VERSION } from "../core/version.js";
 import { normalizeApiPath, normalizeProviderBaseUrl } from "../security/endpoints.js";
 import { Redactor } from "../security/redaction.js";
-import {
-  ModelHttpTransport,
-  readResponsePrefix,
-  type ModelHttpResponse,
-} from "../transport/model-http.js";
+import { ModelHttpTransport } from "../transport/model-http.js";
 import { readServerSentEvents } from "../transport/sse.js";
 import type { ProviderCredentialAccess } from "./credential-access.js";
 import {
@@ -35,12 +28,21 @@ import {
   protocolRecord,
   protocolString,
 } from "./protocol-json.js";
+import {
+  configurationJsonObject as requestJsonObject,
+  configurationString as requestString,
+  isContextWindowFailure,
+  providerDiagnostic,
+  providerHttpFailure,
+  safeProviderDiagnostic,
+  sanitizedProviderError,
+  validateProviderCapabilities,
+} from "./shared.js";
 
 const MAX_TOOL_CALLS = 128;
 const MAX_TOOL_ARGUMENT_BYTES = 2 * 1024 * 1024;
 const MAX_ALL_TOOL_ARGUMENT_BYTES = 8 * 1024 * 1024;
 const MAX_TOOL_ARGUMENT_CHUNKS = 65_536;
-const MAX_ERROR_BYTES = 20_000;
 const MAX_MESSAGES = 10_000;
 const PROVIDER_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 
@@ -66,49 +68,6 @@ interface PendingToolCall {
   argumentBytes: number;
   complete: boolean;
   emitted: boolean;
-}
-
-function requestString(
-  value: unknown,
-  label: string,
-  maximum: number,
-  allowEmpty = false,
-): string {
-  const selected = typeof value === "string" ? value.trim() : "";
-  if (
-    (!allowEmpty && !selected) ||
-    /\p{Cc}/u.test(selected) ||
-    [...selected].length > maximum
-  ) {
-    throw new ConfigurationError(`${label} 형식이 올바르지 않습니다.`);
-  }
-  return selected;
-}
-
-function requestJsonObject(value: unknown, label: string): JsonObject {
-  try {
-    return protocolJsonObject(value, label);
-  } catch {
-    throw new ConfigurationError(`${label}은 유한한 JSON 객체여야 합니다.`);
-  }
-}
-
-function validatedCapabilities(value: ProviderCapabilities): ProviderCapabilities {
-  const entries = Object.entries(value);
-  if (
-    entries.length !== 6 ||
-    entries.some(([, enabled]) => typeof enabled !== "boolean")
-  ) {
-    throw new ConfigurationError("Responses provider capability 설정이 올바르지 않습니다.");
-  }
-  return {
-    nativeToolCalls: value.nativeToolCalls,
-    strictToolSchemas: value.strictToolSchemas,
-    parallelToolCalls: value.parallelToolCalls,
-    reasoningParameter: value.reasoningParameter,
-    temperatureParameter: value.temperatureParameter,
-    streamUsage: value.streamUsage,
-  };
 }
 
 function validTimeout(value: number | undefined): number {
@@ -504,58 +463,6 @@ function usage(value: unknown): ProviderUsage | undefined {
   };
 }
 
-function diagnosticText(value: unknown, depth = 0): string | undefined {
-  if (depth > 8) return undefined;
-  if (typeof value === "string" && value) return value;
-  const raw = protocolRecord(value);
-  if (!raw) return undefined;
-  if (typeof raw.message === "string" && raw.message) return raw.message;
-  if (typeof raw.detail === "string" && raw.detail) return raw.detail;
-  if (typeof raw.reason === "string" && raw.reason) return raw.reason;
-  return diagnosticText(raw.error, depth + 1) ??
-    diagnosticText(raw.incomplete_details, depth + 1) ??
-    diagnosticText(raw.cause, depth + 1);
-}
-
-function safeDiagnostic(value: string): string {
-  return value
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, "�")
-    .slice(0, 4_096);
-}
-
-function isContextWindowFailure(value: string): boolean {
-  return /(?:contextwindowexceeded|context[_ -]?(?:length|window)[_ -]?exceeded|maximum\s+context\s+length|(?:context|token)\s+(?:window|limit).{0,80}exceed|(?:input|prompt|request|messages?).{0,80}(?:too\s+long|too\s+large)|too\s+many\s+(?:input\s+)?tokens|(?:컨텍스트|문맥|입력\s*토큰).{0,40}(?:한도|길이).{0,20}초과|(?:컨텍스트|문맥).{0,40}초과)/isu.test(value);
-}
-
-async function httpFailure(
-  response: ModelHttpResponse,
-  providerName: string,
-  redactor: Redactor,
-): Promise<ProviderError> {
-  let detail = "응답 세부 정보가 없습니다.";
-  try {
-    const bytes = await readResponsePrefix(response, MAX_ERROR_BYTES);
-    const text = new TextDecoder("utf-8").decode(bytes);
-    if (text) {
-      try {
-        const parsed = JSON.parse(text) as unknown;
-        detail = diagnosticText(
-          protocolJsonObject(parsed, "모델 오류 응답"),
-        ) ?? text;
-      } catch {
-        detail = text;
-      }
-    }
-  } catch {
-    detail = "오류 응답 본문을 읽지 못했습니다.";
-  }
-  const cleaned = safeDiagnostic(redactor.redact(detail));
-  const message = `${providerName} API 오류 (${response.status}): ${cleaned}`;
-  return isContextWindowFailure(cleaned)
-    ? new ContextWindowError(message)
-    : new ProviderError(message);
-}
-
 function completedResponse(event: Record<string, unknown>): Record<string, unknown> {
   const response = protocolRecord(event.response);
   if (!response) throw new ProtocolError("Responses 완료 event에 response 객체가 없습니다.");
@@ -618,7 +525,10 @@ export class ResponsesProviderAdapter implements ProviderAdapter {
     this.id = id;
     this.#displayName = requestString(options.displayName, "Provider 표시 이름", 128);
     this.#endpoint = endpointUrl(options.baseUrl, options.generationPath, options.origin);
-    this.capabilities = validatedCapabilities(options.capabilities);
+    this.capabilities = validateProviderCapabilities(
+      options.capabilities,
+      "Responses provider",
+    );
     this.#credential = options.credential;
     this.#transport = options.transport;
     this.#timeoutMs = validTimeout(options.timeoutMs);
@@ -652,7 +562,7 @@ export class ResponsesProviderAdapter implements ProviderAdapter {
         });
       });
       if (!response.ok) {
-        throw await httpFailure(response, this.#displayName, redactor);
+        throw await providerHttpFailure(response, this.#displayName, redactor);
       }
 
       const tools = new ResponsesToolCollector();
@@ -713,8 +623,8 @@ export class ResponsesProviderAdapter implements ProviderAdapter {
           continue;
         }
         if (raw.type === "response.failed" || raw.type === "response.incomplete" || raw.type === "error") {
-          const detail = safeDiagnostic(
-            redactor.redact(diagnosticText(raw.error) ?? diagnosticText(raw.response) ?? "모델 응답에 실패했습니다."),
+          const detail = safeProviderDiagnostic(
+            redactor.redact(providerDiagnostic(raw.error) ?? providerDiagnostic(raw.response) ?? "모델 응답에 실패했습니다."),
           );
           throw isContextWindowFailure(detail)
             ? new ContextWindowError(detail)
@@ -752,17 +662,7 @@ export class ResponsesProviderAdapter implements ProviderAdapter {
         yield { type: "cancelled", reason: "모델 요청이 취소됐습니다." };
         return;
       }
-      const detail = safeDiagnostic(
-        redactor.redact(error instanceof Error ? error.message : "알 수 없는 provider 오류"),
-      );
-      if (error instanceof ContextWindowError) throw new ContextWindowError(detail);
-      if (error instanceof ProtocolError) throw new ProtocolError(detail);
-      if (error instanceof ProviderError) throw new ProviderError(detail);
-      if (error instanceof ConfigurationError) throw new ConfigurationError(detail);
-      if (error instanceof MissingCredentialError) throw new MissingCredentialError(detail);
-      if (error instanceof StorageError) throw new StorageError(detail);
-      if (error instanceof CatError) throw new CatError(error.code, detail);
-      throw new ProviderError(detail);
+      throw sanitizedProviderError(error, redactor);
     }
   }
 }

@@ -33,6 +33,7 @@ P02.1은 `5359cfab201cf4dbe3e811167933f82e38614d16`, P02.2는
 대상으로 한 유일한 `npm run check`가 통과했다.
 P02는 PR #2의 검토 head `1416ef4`를 merge commit `2429b41`로 병합했고 tree와
 부모 정합성을 확인했다. P03.1 인증된 모델용 bounded HTTP/SSE transport는
-`b8b8631c7d520aa1e33d58e38dcfc88c30fcfe0b`로 완료했다. 현재 P03.2는 로컬 대화
-기록에서 요청을 재구성하고 완결된 도구 호출만 내보내는 Responses adapter를
-구현했으며 다음은 Chat-compatible adapter다.
+`b8b8631c7d520aa1e33d58e38dcfc88c30fcfe0b`로 완료했다. P03.2 Responses adapter는
+`ae4e5fe6d311cf570819adfd87a2cbc64b2fa363`로 완료했다. 현재 P03.3은 여러 choice와
+tool index, usage-only frame을 구분하고 `[DONE]`에서만 완결된 호출을 내보내는
+Chat-compatible adapter를 구현했으며 다음은 provider catalog와 model 목록이다.
