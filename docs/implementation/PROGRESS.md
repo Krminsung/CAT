@@ -6,7 +6,7 @@
 | 단계 | 상태 | 검증 | 게시 |
 |---|---|---|---|
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
-| P02 설정·인증·trust | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
+| P02 설정·인증·trust | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
 | P03 provider·transport | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P04 권한·기본 도구 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -29,4 +29,5 @@ P02.1은 `5359cfab201cf4dbe3e811167933f82e38614d16`, P02.2는
 `3e3326faf8d06499735074d2b231a12d676a3f2a`, P02.3은
 `c44fa0c640dbc80960e5ca8d27526f90b1073760`으로 완료했다. 전체 정적 검토에서
 확인한 보완은 `60378f41e5dac63a7f6132b38110a3958eb3bbb6`에 묶었다. 기준 main이
-변하지 않았음을 확인했으며 다음은 예약된 P02 검증을 정확히 한 번 실행하는 일이다.
+변하지 않았음을 확인했다. `0c36e853b21ffee3af2cf5560f418d9e508e5cc2`를
+대상으로 한 유일한 `npm run check`가 통과했으며 다음은 단계 branch와 PR 게시다.

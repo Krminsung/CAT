@@ -3,17 +3,17 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P02",
-  "currentStep": "P02.VERIFY",
-  "status": "VERIFYING",
+  "currentStep": "P02.PUBLISH",
+  "status": "VERIFIED",
   "baseMainSha": "85c68d133a89ebf5578ab8a9a79618d1daba6d16",
-  "lastCommitSha": "60378f41e5dac63a7f6132b38110a3958eb3bbb6",
+  "lastCommitSha": "0c36e853b21ffee3af2cf5560f418d9e508e5cc2",
   "verification": {
     "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": null,
-    "result": "NOT_RUN",
-    "exitCode": null
+    "targetCommitSha": "0c36e853b21ffee3af2cf5560f418d9e508e5cc2",
+    "result": "PASS",
+    "exitCode": 0
   },
   "publication": {
     "branch": "cat/p02-config-auth",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Run the reserved npm run check exactly once",
+  "nextAction": "Create and publish cat/p02-config-auth, then review and merge its PR",
   "blocker": null
 }
