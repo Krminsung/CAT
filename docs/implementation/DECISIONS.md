@@ -105,3 +105,37 @@
 - 결과: model 목록은 크기와 개수를 제한해 읽고 실패나 빈 결과를 그대로 오류로
   전달한다. 수동 model ID 검증은 목록 조회와 독립적으로 제공하여 조회 실패를 빈 목록
   성공으로 바꾸지 않고도 사용자가 직접 선택할 수 있게 한다.
+
+## D013 — 중앙 도구 실행과 승인 범위
+
+- 상태: 승인됨
+- 결정: 등록 handler는 module-private registry에 보관하고 모델에는 이름·설명·복제한
+  schema만 제공한다. 모든 호출은 schema, trust와 hard deny, hook, permission,
+  재확인, handler, 후처리 순서를 강제하는 중앙 executor를 통한다. session/project
+  승인은 tool·canonical workspace·실제 path/command/server 대상을 함께 해시한 규칙에
+  묶는다.
+- 결과: UI와 모델은 handler reference를 얻지 못한다. 한 파일이나 command 승인이 다른
+  대상에 확대되지 않으며 deny는 자동 모드와 기존 allow보다 우선한다. P09 전 no-op
+  hook은 `implementation: none`으로 드러내어 hook 완성을 가장하지 않는다.
+
+## D014 — 파일 변경 checkpoint와 부분 실패
+
+- 상태: 승인됨
+- 결정: 각 mutation은 파일을 전부 staging한 뒤 변경 전 내용과 mode, 존재 여부, digest,
+  session/run/tool 소유자를 하나의 checkpoint에 기록한다. 파일별 원자 교체는 사용하되
+  다중 파일 전체를 OS transaction이라고 표현하지 않는다. 완료 결과를 다시 확인한 뒤에만
+  checkpoint를 commit한다.
+- 결과: 적용 중 오류나 취소는 역순 rollback을 시도하고, 현재 파일이 예상 변경 결과와
+  다르면 외부 변경으로 보고 덮어쓰지 않는다. 복구가 일부라도 실패하면 해당 기록과 관리
+  임시 파일 정보를 보존해 성공으로 오인하거나 다음 rewind 기록을 먼저 제거하지 않는다.
+
+## D015 — foreground 셸의 실행 결과와 보호 경계
+
+- 상태: 승인됨
+- 결정: `run_command` 승인은 정확한 command, canonical cwd, timeout과 foreground 여부에
+  묶는다. `/bin/sh -c` child에는 최소 allowlist environment만 전달하고 명백한 파괴 명령과
+  공통 민감 저장 경로 접근은 승인보다 먼저 막는다. background는 P12 전에는 시작하지 않는다.
+- 결과: 소유 process group을 취소·timeout·합산 출력 상한에서 종료한다. 시작 실패는
+  `not_started`, 종료 코드가 확인된 실패는 `failed`, 시작 뒤 강제 종료·상태 유실은
+  `unknown`으로 보존하고 부분 stdout/stderr를 제한된 오류 상세로 돌려준다. 이 경계가 임의
+  셸 프로그램의 외부 파일·네트워크 접근을 완전히 격리한다고 주장하지 않는다.

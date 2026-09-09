@@ -20,9 +20,10 @@ export interface ToolFailure {
   code: string;
   message: string;
   retryable: boolean;
+  details?: JsonValue;
 }
 
-export type ToolExecutionResult =
+type ToolExecutionOutcome =
   | {
       status: "success";
       output: ToolOutput;
@@ -40,6 +41,11 @@ export type ToolExecutionResult =
       status: "cancelled";
       reason?: string;
     };
+
+export type ToolExecutionResult = ToolExecutionOutcome & {
+  /** 후처리 실패는 이미 끝난 handler를 다시 실행하지 않고 별도 경고로 보존한다. */
+  warnings?: readonly ToolFailure[];
+};
 
 export type ToolHandler = (
   input: JsonObject,

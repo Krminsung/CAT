@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P03",
-  "currentStep": "P03.PUBLISH",
+  "currentPhase": "P04",
+  "currentStep": "P04.PUBLISH",
   "status": "VERIFIED",
-  "baseMainSha": "2429b419dc403132a69c4c9883b8dd374c284996",
-  "lastCommitSha": "c88374f7db3598c750e15bbaa51e98fec4820a3d",
+  "baseMainSha": "3581145239fb622b647cb1d54fbe64c292ae8d7c",
+  "lastCommitSha": "cc7ac1ea55fc9370537b6b944988add2ccfb1834",
   "verification": {
-    "attemptsUsed": 1,
-    "maximumAttempts": 1,
+    "attemptsUsed": 2,
+    "maximumAttempts": 2,
     "command": "npm run check",
-    "targetCommitSha": "c88374f7db3598c750e15bbaa51e98fec4820a3d",
+    "targetCommitSha": "cc7ac1ea55fc9370537b6b944988add2ccfb1834",
     "result": "PASS",
     "exitCode": 0
   },
   "publication": {
-    "branch": "cat/p03-providers",
+    "branch": "cat/p04-tools-security",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Create and publish cat/p03-providers, then review and merge its PR",
+  "nextAction": "Create and publish cat/p04-tools-security, then review and merge its PR",
   "blocker": null
 }

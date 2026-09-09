@@ -1,14 +1,14 @@
 # cat 구현 진행 상태
 
-P03 기준 main은 `2429b419dc403132a69c4c9883b8dd374c284996`이다. 구현은 이 커밋에서
+P04 기준 main은 `3581145239fb622b647cb1d54fbe64c292ae8d7c`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
 |---|---|---|---|
 | P01 기반과 실행 계약 | DONE | PASS (1/1) | PR #1 / MERGED `85c68d1` |
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
-| P03 provider·transport | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
-| P04 권한·기본 도구 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
+| P04 권한·기본 도구 | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
 | P05 bounded agent loop | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -41,4 +41,23 @@ provider 기본값과 protocol별 capability, adapter factory, bounded model 목
 완료했다. 전체 정적 검토에서 확인한 경계 보완은
 `22e77eb5ca0b4e8b054a6737de2c41619f4f077f`에 묶었고, 원격 main이 기준 SHA와
 같음을 확인했다. `c88374f7db3598c750e15bbaa51e98fec4820a3d`를 대상으로 한
-유일한 `npm run check`가 통과했으며 다음은 단계 branch와 PR 게시다.
+유일한 `npm run check`가 통과했다. PR #3의 검토 head `e013994`를 merge commit
+`3581145`로 병합했고 tree·부모·`origin/main` 정합성을 확인했다. P04는 이 병합
+커밋을 기준으로 중앙 tool registry, schema 검증, scope별 permission과 단일 executor
+경계를 `79b7d09`로 구현했다. P04.2에서는 canonical path와 민감 alias를 확인하는 guard,
+bounded file walk와 UTF-8 구간 읽기, 안전하게 선별한 후보만 처리하는 `rg` 검색 및
+별도 process의 bounded fallback을 `652345f`로 구현했다. P04.3에서는 관찰 digest를
+확인하는 제한된 파일 변경, 전체 staging을 거치는 patch, 변경 전 상태와 실패를 보존하는
+checkpoint·rollback을 `1dffd2d`로 구현했다. P04.4의 정확한 command/cwd 승인 범위,
+최소 child environment, 명백한 파괴·민감 경로 접근 차단, 소유 process group의 제한된
+foreground 실행은 `009d134`로 완료했다. 전체 정적 검토에서 확인한 승인 객체 불변성,
+파일 identity·내용 재확인, 검색 worker와 자식 프로세스 상한, 파괴 명령 판정 보완은
+`e7bea7d9a5a52388fecf05b80821a8c8559a1f05`에 묶었다. 원격 main이 기준 SHA와
+같음을 확인한 뒤 `c31e862179516070f88738fa0004d7b5b75e277b`를 대상으로 예약한
+유일한 `npm run check`를 실행했다. 검사는 `src/process/child-process.ts`의 spawn
+stdin 타입과 선택 속성 구성에서 엄격 타입 오류 2개를 보고하고 종료 코드 2로
+실패했다. 사용자가 P04 오류 수정과 `npm run check` 추가 1회를 명시적으로 승인해,
+보고된 두 타입 오류만 `76917b48663f2cb90f78ad29012588820b69dffb`에서 수정했다.
+첫 실패 기록을 보존한 채 `cc7ac1ea55fc9370537b6b944988add2ccfb1834`를 대상으로
+두 번째이자 마지막 승인 검사를 실행했고 통과했다. 결과는 정적 검사 통과이며 실제
+파일 작업, child process와 앱 런타임은 검증하지 않았다.

@@ -33,6 +33,46 @@ interface ProtectedPath {
   label: string;
 }
 
+interface ProtectedStorageEntries {
+  files: readonly ProtectedPath[];
+  directories: readonly ProtectedPath[];
+}
+
+function protectedStorageEntries(
+  paths: StoragePaths,
+  userHome: string,
+): ProtectedStorageEntries {
+  if (!isAbsolute(userHome) || userHome.includes("\0")) {
+    throw new ConfigurationError("사용자 홈 경로는 유효한 절대 경로여야 합니다.");
+  }
+  const legacyRoot = join(userHome, ".smileserv");
+  return {
+    files: [
+      { path: paths.credentialStore, label: "cat 자격 증명 저장소" },
+      { path: paths.profileStore, label: "cat provider profile 저장소" },
+      { path: join(paths.catHome, "secrets.json"), label: "cat secret 저장소" },
+      { path: join(legacyRoot, "credentials.json"), label: "기존 자격 증명 저장소" },
+      { path: join(legacyRoot, "providers.json"), label: "기존 provider 저장소" },
+    ],
+    directories: [
+      { path: join(paths.catHome, "credentials"), label: "cat 자격 증명 디렉터리" },
+      { path: join(paths.catHome, "profiles"), label: "cat provider profile 디렉터리" },
+      { path: join(paths.catHome, "secrets"), label: "cat secret 디렉터리" },
+      { path: join(legacyRoot, "credentials"), label: "기존 자격 증명 디렉터리" },
+      { path: join(legacyRoot, "providers"), label: "기존 provider 디렉터리" },
+      { path: join(legacyRoot, "secrets"), label: "기존 secret 디렉터리" },
+    ],
+  };
+}
+
+export function listSensitiveStoragePaths(
+  paths: StoragePaths,
+  userHome: string = homedir(),
+): readonly string[] {
+  const protectedPaths = protectedStorageEntries(paths, userHome);
+  return [...protectedPaths.files, ...protectedPaths.directories].map((entry) => entry.path);
+}
+
 function errnoCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) {
     return undefined;
@@ -48,6 +88,12 @@ function pathInside(root: string, candidate: string): boolean {
     !child.startsWith(`..${sep}`) &&
     !isAbsolute(child)
   );
+}
+
+function samePath(left: string, right: string): boolean {
+  return process.platform === "win32"
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
 }
 
 /**
@@ -148,27 +194,11 @@ export class SensitivePathPolicy {
     paths: StoragePaths,
     userHome: string = homedir(),
   ): SensitivePathPolicy {
-    if (!isAbsolute(userHome)) {
-      throw new ConfigurationError("사용자 홈 경로는 절대 경로여야 합니다.");
-    }
-    const legacyRoot = join(userHome, ".smileserv");
+    const protectedPaths = protectedStorageEntries(paths, userHome);
     return new SensitivePathPolicy(
       paths.workspace,
-      [
-        { path: paths.credentialStore, label: "cat 자격 증명 저장소" },
-        { path: paths.profileStore, label: "cat provider profile 저장소" },
-        { path: join(paths.catHome, "secrets.json"), label: "cat secret 저장소" },
-        { path: join(legacyRoot, "credentials.json"), label: "기존 자격 증명 저장소" },
-        { path: join(legacyRoot, "providers.json"), label: "기존 provider 저장소" },
-      ],
-      [
-        { path: join(paths.catHome, "credentials"), label: "cat 자격 증명 디렉터리" },
-        { path: join(paths.catHome, "profiles"), label: "cat provider profile 디렉터리" },
-        { path: join(paths.catHome, "secrets"), label: "cat secret 디렉터리" },
-        { path: join(legacyRoot, "credentials"), label: "기존 자격 증명 디렉터리" },
-        { path: join(legacyRoot, "providers"), label: "기존 provider 디렉터리" },
-        { path: join(legacyRoot, "secrets"), label: "기존 secret 디렉터리" },
-      ],
+      protectedPaths.files,
+      protectedPaths.directories,
     );
   }
 
@@ -180,8 +210,8 @@ export class SensitivePathPolicy {
     for (const protectedFile of this.#files) {
       const resolvedProtected = await resolvePotentialPath(protectedFile.path, this.#basePath);
       if (
-        requestedAbsolute === protectedFile.path ||
-        resolvedPath === resolvedProtected ||
+        samePath(requestedAbsolute, protectedFile.path) ||
+        samePath(resolvedPath, resolvedProtected) ||
         sameFile(candidateIdentity, await fileIdentity(resolvedProtected))
       ) {
         return {
