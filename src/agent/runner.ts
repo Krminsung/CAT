@@ -54,6 +54,7 @@ import {
   SessionRunCoordinator,
   sharedSessionRunCoordinator,
 } from "./run-state.js";
+import { RepeatedToolExecutionGuard } from "./progress.js";
 import {
   ToolCallNormalizer,
   type NativeToolCall,
@@ -119,6 +120,7 @@ interface OwnedRunContext {
   readonly journal: AgentEventJournal;
   readonly ledger: ToolCallExecutionLedger;
   readonly normalizer: ToolCallNormalizer;
+  readonly progress: RepeatedToolExecutionGuard;
   readonly appendedResults: Set<string>;
   readonly usage: ProviderUsage;
   readonly allowTools: boolean;
@@ -427,6 +429,7 @@ export class AgentRunner {
       journal,
       ledger,
       normalizer,
+      progress: new RepeatedToolExecutionGuard(),
       appendedResults: new Set(),
       usage: {},
       allowTools: request.allowTools ?? true,
@@ -574,6 +577,27 @@ export class AgentRunner {
         const call = normalized.calls[index];
         if (!call) continue;
         context.budget.assertActive();
+        const repetition = context.progress.blockBefore(call);
+        if (repetition) {
+          context.journal.emit({
+            type: "notice",
+            level: "warning",
+            code: "no_progress",
+            message: repetition.message,
+          });
+          this.#closeReadyCalls(
+            context,
+            "no_progress",
+            repetition.message,
+            allowance,
+          );
+          return {
+            termination: "no_progress",
+            text: latestText,
+            message: repetition.message,
+            ...(responseId === undefined ? {} : { responseId }),
+          };
+        }
         context.budget.consumeToolCall();
         context.journal.emit({
           type: "tool_start",
@@ -611,6 +635,7 @@ export class AgentRunner {
         }
         const record = context.ledger.finish(call.callId, result);
         this.#emitAndAppendResult(context, record, allowance);
+        context.progress.observe(record);
 
         if (result.status === "denied") {
           this.#closeReadyCalls(
@@ -649,6 +674,25 @@ export class AgentRunner {
       }
 
       if (normalized.issues.length > 0) {
+        context.budget.assertActive();
+        if (!context.budget.tryConsumeRecovery("malformed_tool_call")) {
+          return {
+            termination: context.budget.exhaustion
+              ? "budget_exhausted"
+              : "cancelled",
+            text: latestText,
+            message: context.budget.exhaustion
+              ? "잘못된 도구 호출을 교정하는 복구 예산이 소진되었습니다."
+              : "잘못된 도구 호출을 교정하기 전에 run이 취소됐습니다.",
+            ...(responseId === undefined ? {} : { responseId }),
+          };
+        }
+        context.journal.emit({
+          type: "notice",
+          level: "warning",
+          code: "malformed_tool_call_recovery",
+          message: "잘못된 도구 호출에 대해 한 번의 제한된 교정 feedback을 전달합니다.",
+        });
         this.#appendUserFeedback(context, normalizationFeedback(normalized.issues));
       }
       context.state.transition("MODEL");
@@ -808,7 +852,7 @@ export class AgentRunner {
 
   #closeReadyCalls(
     context: OwnedRunContext,
-    status: "denied" | "cancelled",
+    status: "denied" | "cancelled" | "no_progress",
     reason: string,
     maximumBytes: number,
   ): void {
@@ -816,7 +860,17 @@ export class AgentRunner {
       if (record.status !== "ready") continue;
       const result: ToolExecutionResult = status === "denied"
         ? { status: "denied", reason }
-        : { status: "cancelled", reason };
+        : status === "cancelled"
+          ? { status: "cancelled", reason }
+          : {
+              status: "failure",
+              error: {
+                code: "repeated_tool_call",
+                message: reason,
+                retryable: false,
+              },
+              execution: "not_started",
+            };
       this.#emitAndAppendResult(
         context,
         context.ledger.finish(record.callId, result),

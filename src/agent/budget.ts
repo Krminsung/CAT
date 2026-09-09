@@ -107,6 +107,17 @@ export interface RunBudgetControllerOptions {
   readonly now?: () => number;
 }
 
+/** P06/P09/P11의 compaction, Stop hook과 web 복구가 공유해야 하는 run 소유 예산 port다. */
+export interface AgentExtensionBudgetPort extends RetryBudgetPort {
+  readonly signal: AbortSignal;
+  readonly deadlineAt: number;
+  consumeModelRequest(): void;
+  consumeToolCall(): void;
+  tryConsumeRecovery(kind: RecoveryKind): boolean;
+  tryConsumeCompaction(): boolean;
+  tryConsumeStopContinuation(): boolean;
+}
+
 interface MutableRunBudget {
   turns: number;
   modelRequests: number;
@@ -118,7 +129,7 @@ interface MutableRunBudget {
 
 const RECOVERY_KIND_PATTERN = /^[a-z][a-z0-9_]{0,63}$/u;
 
-export class RunBudgetController implements RetryBudgetPort {
+export class RunBudgetController implements AgentExtensionBudgetPort {
   readonly limits: AgentRunLimits;
   readonly #now: () => number;
   readonly #startedAt: number;

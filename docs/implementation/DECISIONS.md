@@ -169,3 +169,14 @@
 - 결과: `update_plan`과 연결된 경우의 `request_user_input`만 registry에 등록한다. event sink의
   render 실패는 내부 원장 기록을 없애거나 모델을 재호출하지 않는다. 모든 정상·오류·취소 경로는
   `run_end`를 한 번 기록한 뒤 interaction, timer와 session lease를 멱등적으로 정리한다.
+
+## D019 — 무진전 실행과 교정 복구
+
+- 상태: 승인됨
+- 결정: call ID가 달라도 도구 이름과 canonical 입력, canonical 결과가 연속 두 번 같으면
+  세 번째 동일 handler를 시작 전에 차단한다. malformed/unknown/schema 오류는 올바른 호출과
+  분리하되 같은 run에서 한 번의 교정 feedback만 허용한다.
+- 결과: 반복 차단은 `no_progress` terminal reason으로 드러나며 차단된 batch의 handler 예산과
+  부작용을 소비하지 않는다. 모든 permission denial은 즉시 run을 끝내므로 대체 도구 우회가
+  없다. transport 외부에는 HTTP retry loop를 두지 않고 compaction, Stop hook과 web 복구는
+  P05의 공통 extension budget port를 사용해야 한다.
