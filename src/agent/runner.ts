@@ -310,13 +310,19 @@ function outcomeForError(
   budget: RunBudgetController,
   text: string,
 ): LoopOutcome {
-  if (budget.exhaustion || error instanceof BudgetExhaustedError) {
+  const exhaustion = budget.exhaustion;
+  if (exhaustion) {
     return {
       termination: "budget_exhausted",
       text,
-      message: budget.exhaustion
-        ? `실행 예산이 소진되었습니다: ${budget.exhaustion}`
-        : error.message,
+      message: `실행 예산이 소진되었습니다: ${exhaustion}`,
+    };
+  }
+  if (error instanceof BudgetExhaustedError) {
+    return {
+      termination: "budget_exhausted",
+      text,
+      message: error.message,
     };
   }
   if (budget.callerCancelled || error instanceof CancelledError) {
