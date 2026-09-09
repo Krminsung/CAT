@@ -149,3 +149,13 @@
 - 결과: provider, 도구, 복구, compaction과 Stop hook은 새 agent run을 만들지 않는다.
   future 기능은 현재 run의 복구·모델·도구 예산 port를 받아야 하며 종료 시 timer와 session
   lease는 각각 한 번만 정리한다.
+
+## D017 — 전체 메시지 fallback과 실행 기록
+
+- 상태: 승인됨
+- 결정: native tool call이 하나라도 있으면 text fallback을 해석하지 않는다. text fallback은
+  완성된 assistant 메시지 전체가 `call:<등록 이름> <객체>` 문법일 때만 사용한다. 기본은
+  표준 JSON이고 relaxed는 profile의 명시적 선택에서만 제한된 비실행 parser를 사용한다.
+- 결과: 코드 펜스, 인용문, 설명 속 `call:`과 임의 표현식은 실행하지 않는다. 모든 call ID는
+  run 전체에서 중복 확인하고 입력 schema를 먼저 검증한다. 중앙 executor가 handler를 실제로
+  시작하는 지점에서 기록을 `started`로 바꾸며 완료·실패·실행 여부 불명 상태를 덮어쓰지 않는다.
