@@ -12,7 +12,7 @@ P08 기준 main은 `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`이다. 구현은 �
 | P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
 | P06 세션·컨텍스트 | DONE | PASS (1/1) | PR #6 / MERGED `c434311` |
 | P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
-| P08 CLI·명령 | BLOCKED_VERIFY | FAIL (1/1) | NOT_PUBLISHED |
+| P08 CLI·명령 | VERIFYING | 1차 FAIL, 2차 NOT_RUN (2/2 예약) | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P10 stdio MCP | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -132,6 +132,8 @@ run→transcript 저장→화면·session·transport 종료를 조립하고, `@f
 GitHub Actions workflow가 없음을 확인했다. `origin/main`이 P08 기준 SHA와 같음을 대조한 뒤
 `c76275d79568d75d7253b25a52e564168d7a06ef`을 대상으로 예약한 유일한 `npm run check`를
 실행했다. 검사는 `src/app/application.ts`에서 barrel export 누락 TS2305 2개, system message
-타입 불일치 TS2345 2개와 암시적 `any` TS7006 1개를 보고하고 종료 코드 2로 실패했다. 재검사,
-push, PR과 merge는 진행하지 않았으며 오류 수정과 P08 추가 검증에는 사용자의 명시적 승인이
-필요하다. 앱·TUI·provider·session·도구 런타임은 실행하지 않았다.
+타입 불일치 TS2345 2개와 암시적 `any` TS7006 1개를 보고하고 종료 코드 2로 실패했다. 사용자가
+P08 오류 수정과 `npm run check` 추가 1회를 명시적으로 승인해, 보고된 진단만
+`9c7eb3a5c228209c4f8c724ccc90360dca369648`에서 수정했다. 첫 실패 기록을 보존한 채
+두 번째이자 마지막 승인 검사를 2/2로 예약했다. 앱·TUI·provider·session·도구 런타임은
+실행하지 않았다.

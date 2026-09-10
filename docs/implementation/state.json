@@ -4,16 +4,16 @@
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P08",
   "currentStep": "P08.VERIFY",
-  "status": "BLOCKED_VERIFY",
+  "status": "VERIFYING",
   "baseMainSha": "4d91f4a4716831a488c3ebb4ed0d94e95cc06070",
-  "lastCommitSha": "c76275d79568d75d7253b25a52e564168d7a06ef",
+  "lastCommitSha": "9c7eb3a5c228209c4f8c724ccc90360dca369648",
   "verification": {
-    "attemptsUsed": 1,
-    "maximumAttempts": 1,
+    "attemptsUsed": 2,
+    "maximumAttempts": 2,
     "command": "npm run check",
-    "targetCommitSha": "c76275d79568d75d7253b25a52e564168d7a06ef",
-    "result": "FAIL",
-    "exitCode": 2
+    "targetCommitSha": null,
+    "result": "NOT_RUN",
+    "exitCode": null
   },
   "publication": {
     "branch": "cat/p08-cli-commands",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Wait for explicit approval to fix P08 and run one additional npm run check",
-  "blocker": "The only reserved P08 check found five TypeScript diagnostics in src/app/application.ts"
+  "nextAction": "Run the explicitly approved additional npm run check exactly once",
+  "blocker": null
 }
