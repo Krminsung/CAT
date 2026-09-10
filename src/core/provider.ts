@@ -19,6 +19,8 @@ export interface ProviderToolSpec {
   description: string;
   inputSchema: JsonObject;
   strict: boolean;
+  /** Host-only validator; provider adapters serialize only the fields above. */
+  validateInput?: (input: unknown) => JsonObject;
 }
 
 export interface ProviderRequest {

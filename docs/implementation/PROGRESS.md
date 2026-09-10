@@ -175,3 +175,8 @@ P10.1은 `0c713c2cd5d4415c678538202d21e29b3252b63a`에서 완료했다. P10.2에
 initialize lifecycle과 modern per-request metadata를 별도 adapter로 분리하고, page·entry·cursor·누적
 metadata 상한과 결정적 tool namespace를 구현하고 있다. 재연결 뒤 늦은 이전 child event가 새
 transport 상태를 덮지 않도록 process identity도 listener에서 다시 확인한다.
+P10.2는 `fbf6fcb2108e2653b9e03268d631bdefd3d22cb0`에서 완료했다. P10.3에서는
+JSON Schema 2020-12의 bounded subset과 문서 내부 참조만 허용하고, 정확히 고정한
+`ajv@8.20.0`으로 provider와 독립적인 입력 validator를 준비한다. 검증할 수 없는 schema는 해당
+동적 도구를 비활성화하며, MCP 도구 이름만으로 이전 승인을 재사용하지 않도록 server registry
+version이 든 external permission 계약과 원자적 registry 교체 경계를 구현하고 있다.

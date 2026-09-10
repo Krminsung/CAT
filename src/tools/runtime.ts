@@ -60,6 +60,12 @@ export interface ToolRegistration {
   ) => Promise<void>;
 }
 
+export interface McpToolRegistration extends ToolRegistration {
+  readonly serverName: string;
+  readonly registryVersion: string;
+  readonly validateInput: (input: unknown) => JsonObject;
+}
+
 export interface ToolBoundaryRequest {
   toolName: string;
   input: Readonly<JsonObject>;
@@ -98,6 +104,15 @@ interface InternalRegistration {
   definition: ToolDefinition;
   preflight: NonNullable<ToolRegistration["preflight"]>;
   revalidate: NonNullable<ToolRegistration["revalidate"]>;
+  validateInput: (input: unknown) => JsonObject;
+  strictProviderSchema: boolean;
+  source:
+    | { readonly kind: "builtin" }
+    | {
+        readonly kind: "mcp";
+        readonly serverName: string;
+        readonly registryVersion: string;
+      };
 }
 
 const registryContents = new WeakMap<ToolRegistry, Map<string, InternalRegistration>>();
@@ -108,6 +123,10 @@ const TOOL_NAME_PATTERN = /^[a-z][a-z0-9_]{0,127}$/u;
 const MIN_OUTPUT_BYTES = 1_024;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 const MAX_PREFLIGHT_SUMMARY_BYTES = 128 * 1024;
+const MAX_REGISTERED_MCP_TOOLS = 100;
+const MCP_TOOL_NAME_PATTERN = /^mcp__[a-z0-9_]+__[a-z0-9_]+(?:_[a-f0-9]{12})?$/u;
+const MCP_SERVER_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
+const MCP_REGISTRY_VERSION_PATTERN = /^[a-f0-9]{64}$/u;
 const TOOL_CATEGORIES = new Set<ToolDefinition["category"]>([
   "read",
   "edit",
@@ -199,6 +218,23 @@ function stableDefinition(definition: ToolDefinition): ToolDefinition {
   return stable;
 }
 
+function assertCommonDefinition(definition: ToolDefinition): void {
+  if (!TOOL_NAME_PATTERN.test(definition.name)) {
+    throw new Error("도구 이름 형식이 올바르지 않습니다.");
+  }
+  if (!definition.description.trim() || definition.description.length > 4_096) {
+    throw new Error(`${definition.name} 도구 설명이 올바르지 않습니다.`);
+  }
+  if (
+    !Number.isSafeInteger(definition.outputLimitBytes) ||
+    definition.outputLimitBytes < MIN_OUTPUT_BYTES ||
+    definition.outputLimitBytes > MAX_OUTPUT_BYTES
+  ) {
+    throw new Error(`${definition.name} 도구 출력 제한이 올바르지 않습니다.`);
+  }
+  assertPermissionDefinition(definition);
+}
+
 function stableContext(context: ToolExecutionContext): ToolExecutionContext {
   if (
     !context.sessionId ||
@@ -259,23 +295,10 @@ export class ToolRegistry {
 
   register(registration: ToolRegistration): void {
     const definition = registration.definition;
-    if (!TOOL_NAME_PATTERN.test(definition.name)) {
-      throw new Error("도구 이름 형식이 올바르지 않습니다.");
-    }
+    assertCommonDefinition(definition);
     if (!BUILTIN_ORDER.has(definition.name)) {
       throw new Error(`현재 단계의 built-in registry에는 ${definition.name} 도구를 등록할 수 없습니다.`);
     }
-    if (!definition.description.trim() || definition.description.length > 4_096) {
-      throw new Error(`${definition.name} 도구 설명이 올바르지 않습니다.`);
-    }
-    if (
-      !Number.isSafeInteger(definition.outputLimitBytes) ||
-      definition.outputLimitBytes < MIN_OUTPUT_BYTES ||
-      definition.outputLimitBytes > MAX_OUTPUT_BYTES
-    ) {
-      throw new Error(`${definition.name} 도구 출력 제한이 올바르지 않습니다.`);
-    }
-    assertPermissionDefinition(definition);
     assertSupportedToolSchema(definition.inputSchema, definition.name);
     const registered = contents(this);
     if (registered.has(definition.name)) {
@@ -286,14 +309,68 @@ export class ToolRegistry {
       definition: storedDefinition,
       preflight: registration.preflight ?? (async (input) => defaultPreflight(storedDefinition, input)),
       revalidate: registration.revalidate ?? (async () => undefined),
+      validateInput: (input) => validateToolInput(input, storedDefinition.inputSchema, storedDefinition.name),
+      strictProviderSchema: true,
+      source: Object.freeze({ kind: "builtin" }),
     });
   }
 
+  replaceMcpTools(registrations: readonly McpToolRegistration[]): void {
+    if (registrations.length > MAX_REGISTERED_MCP_TOOLS) {
+      throw new Error(`활성 MCP 도구는 최대 ${MAX_REGISTERED_MCP_TOOLS}개까지 등록할 수 있습니다.`);
+    }
+    const existing = contents(this);
+    const prepared = new Map<string, InternalRegistration>();
+    for (const registration of registrations) {
+      const { definition, serverName, registryVersion } = registration;
+      assertCommonDefinition(definition);
+      if (
+        BUILTIN_ORDER.has(definition.name) ||
+        !MCP_TOOL_NAME_PATTERN.test(definition.name) ||
+        !MCP_SERVER_NAME_PATTERN.test(serverName) ||
+        !MCP_REGISTRY_VERSION_PATTERN.test(registryVersion) ||
+        definition.category !== "external" ||
+        definition.permission.kind !== "external" ||
+        definition.permission.service !== `mcp:${serverName}:${registryVersion}`
+      ) {
+        throw new Error(`${definition.name} MCP 도구의 namespace·permission·version 계약이 올바르지 않습니다.`);
+      }
+      if (existing.has(definition.name) && existing.get(definition.name)?.source.kind !== "mcp") {
+        throw new Error(`${definition.name} MCP 도구가 기존 도구와 충돌합니다.`);
+      }
+      if (prepared.has(definition.name)) {
+        throw new Error(`${definition.name} MCP 도구가 중복 등록되었습니다.`);
+      }
+      const storedDefinition = stableDefinition(definition);
+      prepared.set(definition.name, {
+        definition: storedDefinition,
+        preflight: registration.preflight ?? (async (input) => defaultPreflight(storedDefinition, input)),
+        revalidate: registration.revalidate ?? (async () => undefined),
+        validateInput: registration.validateInput,
+        strictProviderSchema: false,
+        source: Object.freeze({ kind: "mcp", serverName, registryVersion }),
+      });
+    }
+    for (const [name, registration] of existing) {
+      if (registration.source.kind === "mcp") existing.delete(name);
+    }
+    for (const [name, registration] of prepared) existing.set(name, registration);
+  }
+
+  clearMcpTools(): void {
+    const registered = contents(this);
+    for (const [name, registration] of registered) {
+      if (registration.source.kind === "mcp") registered.delete(name);
+    }
+  }
+
   implementedNames(): readonly string[] {
-    return [...contents(this).keys()].sort(
-      (left, right) => (BUILTIN_ORDER.get(left) ?? Number.MAX_SAFE_INTEGER) -
-        (BUILTIN_ORDER.get(right) ?? Number.MAX_SAFE_INTEGER),
-    );
+    return [...contents(this).keys()].sort((left, right) => {
+      const order = (BUILTIN_ORDER.get(left) ?? Number.MAX_SAFE_INTEGER) -
+        (BUILTIN_ORDER.get(right) ?? Number.MAX_SAFE_INTEGER);
+      if (order !== 0) return order;
+      return left < right ? -1 : left > right ? 1 : 0;
+    });
   }
 }
 
@@ -302,7 +379,8 @@ function providerSpec(registration: InternalRegistration): ProviderToolSpec {
     name: registration.definition.name,
     description: registration.definition.description,
     inputSchema: cloneJsonObject(registration.definition.inputSchema),
-    strict: true,
+    strict: registration.strictProviderSchema,
+    validateInput: registration.validateInput,
   };
 }
 
@@ -464,11 +542,16 @@ export class CentralToolExecutor {
         registration.definition.name,
         registration.definition.category,
       ))
-      .sort(
-        (left, right) =>
-          (BUILTIN_ORDER.get(left.definition.name) ?? Number.MAX_SAFE_INTEGER) -
-          (BUILTIN_ORDER.get(right.definition.name) ?? Number.MAX_SAFE_INTEGER),
-      )
+      .sort((left, right) => {
+        const order = (BUILTIN_ORDER.get(left.definition.name) ?? Number.MAX_SAFE_INTEGER) -
+          (BUILTIN_ORDER.get(right.definition.name) ?? Number.MAX_SAFE_INTEGER);
+        if (order !== 0) return order;
+        return left.definition.name < right.definition.name
+          ? -1
+          : left.definition.name > right.definition.name
+            ? 1
+            : 0;
+      })
       .map(providerSpec);
   }
 
@@ -497,7 +580,7 @@ export class CentralToolExecutor {
     let executionContext: ToolExecutionContext;
     try {
       input = cloneJsonObject(
-        validateToolInput(rawInput, registration.definition.inputSchema, toolName),
+        registration.validateInput(rawInput),
       );
       freezeJson(input);
       executionContext = stableContext(context);

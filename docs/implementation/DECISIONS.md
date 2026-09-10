@@ -296,3 +296,13 @@
   configured secret, initial history와 executable PATH 탐색은 각각 개수·byte 상한을 가지며 clipboard
   탐색과 child는 화면 종료 signal을 따른다. redaction은 완전한 유출 방지로 주장하지 않고 실제 IME,
   terminal 복원과 desktop clipboard 동작은 실행하지 않은 상태로 남긴다.
+
+## D030 — MCP schema subset과 versioned 승인
+
+- 상태: 승인됨
+- 결정: MCP 입출력 schema는 JSON Schema 2020-12만 지원하고 크기·구조·분기 상한을 사전 검사한
+  뒤 exact-pinned Ajv로 host에서 검증한다. 문서 내부 JSON Pointer 외 참조와 정규식·비동기·동적
+  reference 등 제한 시간 안의 안전한 평가를 보장하기 어려운 keyword는 지원하지 않는다.
+- 결과: 검증할 수 없는 tool은 permissive schema로 바꾸지 않고 disabled 상태가 된다. 서버 annotations는
+  자동 승인에 사용하지 않으며 server 설정과 발견된 tool 계약의 version을 external permission과 승인
+  scope에 포함한다. 따라서 이름만 같은 재설정·schema 변경은 기존 이름 기반 허용을 상속하지 않는다.
