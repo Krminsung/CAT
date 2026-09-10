@@ -39,6 +39,8 @@ const DEFAULT_MAX_HISTORICAL_TEXT_BYTES = 128 * 1024;
 const DEFAULT_MAX_SYSTEM_MESSAGES = 32;
 const DEFAULT_MAX_SYSTEM_BYTES = 512 * 1024;
 const MAX_PROJECTION_WARNINGS = 128;
+const MAX_PROJECTION_WARNING_BYTES = 8 * 1024;
+const MAX_INCOMPLETE_TOOL_REFERENCES = 12;
 const MAX_COMPACTION_SUMMARY_BYTES = 256 * 1024;
 const MAX_COMPACTION_PRESERVED_MESSAGES = 64;
 const MAX_COMPACTION_PRESERVED_BYTES = 4 * 1024 * 1024;
@@ -475,14 +477,14 @@ function projectedNonToolMessage(
     }
     return {
       type: "tool_call" as const,
-      callId: part.callId,
-      name: part.name,
+      callId: redactor.redact(part.callId),
+      name: redactor.redact(part.name),
       input: redactObject(part.input, redactor),
     };
   });
   const projected = conversationMessageFromJson({
     role: message.role,
-    id: message.id,
+    id: redactor.redact(message.id),
     createdAt: message.createdAt,
     content,
   });
@@ -895,10 +897,10 @@ export class ModelContextProjector {
       const result = projectedToolResult(message.result, allowance, this.#redactor);
       messages.push(conversationMessageFromJson({
         role: "tool",
-        id: message.id,
+        id: this.#redactor.redact(message.id),
         createdAt: message.createdAt,
-        callId: message.callId,
-        toolName: message.toolName,
+        callId: this.#redactor.redact(message.callId),
+        toolName: this.#redactor.redact(message.toolName),
         result: toolExecutionResultToJson(result.result),
       }));
       observationBytes += result.bytes;
@@ -930,10 +932,22 @@ export class ModelContextProjector {
   }
 
   #discardPending(message: string): void {
-    if (!this.#pending) return;
+    const pending = this.#pending;
+    if (!pending) return;
     this.#pending = undefined;
     this.#droppedIncomplete += 1;
-    this.#warn("incomplete_tool_exchange", message);
+    const unresolved = [...pending.expected]
+      .filter(([callId]) => !pending.received.has(callId));
+    const references = unresolved
+      .slice(0, MAX_INCOMPLETE_TOOL_REFERENCES)
+      .map(([callId, toolName]) => `${toolName} (${callId})`);
+    const omitted = unresolved.length - references.length;
+    const detail = references.length === 0
+      ? ""
+      : ` 미완료 호출: ${references.join(", ")}${
+          omitted > 0 ? ` 외 ${omitted}개` : ""
+        }.`;
+    this.#warn("incomplete_tool_exchange", `${message}${detail}`);
   }
 
   #warn(code: ContextProjectionWarning["code"], message: string): void {
@@ -941,7 +955,11 @@ export class ModelContextProjector {
       this.#omittedWarnings += 1;
       return;
     }
-    this.#warnings.push(Object.freeze({ code, message }));
+    const bounded = boundedUtf8(
+      this.#redactor.redact(message),
+      MAX_PROJECTION_WARNING_BYTES,
+    );
+    this.#warnings.push(Object.freeze({ code, message: bounded.text }));
   }
 
   #assertMutable(): void {

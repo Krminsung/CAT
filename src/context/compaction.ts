@@ -973,6 +973,14 @@ export class ContextCompactionService {
         ...(continuityMessage === undefined ? [] : [continuityMessage]),
         ...preservedSelection.messages,
       ];
+      const sourceWasTruncated =
+        request.projection.truncated ||
+        source.history.truncated ||
+        continuity.truncated ||
+        inputHistory.omittedUnits > 0 ||
+        preservedSelection.omittedUnits > 0 ||
+        request.projection.droppedIncompleteToolExchanges > 0 ||
+        request.projection.droppedOrphanToolResults > 0;
       data = {
         compactionSchemaVersion: COMPACTION_RECORD_SCHEMA_VERSION,
         status: "completed",
@@ -986,14 +994,8 @@ export class ContextCompactionService {
           conversationMessageToJson(message)
         ),
         continuity: continuity.data,
-        lossy:
-          request.projection.truncated ||
-          source.history.truncated ||
-          continuity.truncated ||
-          inputHistory.omittedUnits > 0 ||
-          preservedSelection.omittedUnits > 0 ||
-          request.projection.droppedIncompleteToolExchanges > 0 ||
-          request.projection.droppedOrphanToolResults > 0,
+        lossy: true,
+        sourceWasTruncated,
         omittedInputUnits: inputHistory.omittedUnits,
         omittedPreservedUnits: preservedSelection.omittedUnits,
       };

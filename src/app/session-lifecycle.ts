@@ -808,7 +808,7 @@ export class SessionLifecycleService {
     return await this.#withMaintenance(managed.metadata.sessionId, async () => {
       return await managed.runExclusive(async () => {
         const current = managed.metadata;
-        const updatedAt = timestamp(this.#now, current.createdAt);
+        const updatedAt = timestamp(this.#now, current.updatedAt);
         const provider = update.provider === null
           ? undefined
           : update.provider ?? current.provider;
@@ -926,7 +926,7 @@ export class SessionLifecycleService {
         const current = managed.metadata;
         const closed = normalizeSessionMetadata({
           ...current,
-          updatedAt: timestamp(this.#now, current.createdAt),
+          updatedAt: timestamp(this.#now, current.updatedAt),
           revision: nextRevision(current),
           status: "closed",
         });
@@ -1064,46 +1064,48 @@ export class SessionLifecycleService {
       }
     }
     if (persistence === "none") {
-      const history = await this.#collectStoredHistory(stored.sessionId);
-      const sessionId = await this.#allocateSessionId();
-      await this.#clearIsolationState(sessionId, true);
-      const createdAt = timestamp(this.#now);
-      const metadata = normalizeSessionMetadata({
-        sessionId,
-        cwd,
-        model: stored.model,
-        createdAt,
-        updatedAt: createdAt,
-        revision: 1,
-        status: "active",
-        parentSessionId: stored.sessionId,
-        ...(stored.provider === undefined ? {} : { provider: stored.provider }),
-        ...(stored.profile === undefined ? {} : { profile: stored.profile }),
-        ...(stored.responseId === undefined ? {} : { responseId: stored.responseId }),
-        ...(stored.name === undefined ? {} : { name: stored.name }),
+      return await this.#withMaintenance(stored.sessionId, async () => {
+        const history = await this.#collectStoredHistory(stored.sessionId);
+        const sessionId = await this.#allocateSessionId();
+        await this.#clearIsolationState(sessionId, true);
+        const createdAt = timestamp(this.#now);
+        const metadata = normalizeSessionMetadata({
+          sessionId,
+          cwd,
+          model: stored.model,
+          createdAt,
+          updatedAt: createdAt,
+          revision: 1,
+          status: "active",
+          parentSessionId: stored.sessionId,
+          ...(stored.provider === undefined ? {} : { provider: stored.provider }),
+          ...(stored.profile === undefined ? {} : { profile: stored.profile }),
+          ...(stored.responseId === undefined ? {} : { responseId: stored.responseId }),
+          ...(stored.name === undefined ? {} : { name: stored.name }),
+        });
+        return await this.#initialize(
+          metadata,
+          "none",
+          history.candidates,
+          mergeNotices(notices, history.notices),
+          {
+            action: "session_started",
+            source,
+            resumedFromSessionId: stored.sessionId,
+            persistence: "none",
+            restoredTrust: false,
+            restoredCredentials: false,
+          },
+          true,
+        );
       });
-      return await this.#initialize(
-        metadata,
-        "none",
-        history.candidates,
-        mergeNotices(notices, history.notices),
-        {
-          action: "session_started",
-          source,
-          resumedFromSessionId: stored.sessionId,
-          persistence: "none",
-          restoredTrust: false,
-          restoredCredentials: false,
-        },
-        true,
-      );
     }
     return await this.#withMaintenance(stored.sessionId, async () => {
       if (this.#active.has(stored.sessionId)) {
         throw new StorageError("재개할 세션이 이 process에서 이미 활성 상태입니다.");
       }
       await this.#clearIsolationState(stored.sessionId, false);
-      const updatedAt = timestamp(this.#now, stored.createdAt);
+      const updatedAt = timestamp(this.#now, stored.updatedAt);
       const metadata = normalizeSessionMetadata({
         ...stored,
         cwd,

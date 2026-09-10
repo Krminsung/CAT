@@ -55,6 +55,7 @@ function protectedStorageEntries(
       { path: join(legacyRoot, "providers.json"), label: "기존 provider 저장소" },
     ],
     directories: [
+      { path: paths.sessionStore, label: "cat 세션 저장소" },
       { path: join(paths.catHome, "credentials"), label: "cat 자격 증명 디렉터리" },
       { path: join(paths.catHome, "profiles"), label: "cat provider profile 디렉터리" },
       { path: join(paths.catHome, "secrets"), label: "cat secret 디렉터리" },

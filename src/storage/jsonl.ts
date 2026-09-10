@@ -27,6 +27,7 @@ const MAX_CURSOR_BYTES = 1_024;
 const MAX_LOCK_BYTES = 4_096;
 const MAX_PATH_CHARACTERS = 4_096;
 const MAX_REDACTION_SECRETS = 256;
+const MIN_REDACTION_SECRET_BYTES = 8;
 const MAX_REDACTION_SECRET_BYTES = 64 * 1024;
 const MAX_REDACTION_TOTAL_BYTES = 1024 * 1024;
 const REDACTED = "[REDACTED]";
@@ -130,7 +131,7 @@ function boundedLabel(value: string | undefined): string {
 export function normalizeJsonlSecrets(
   values: readonly string[],
 ): readonly string[] {
-  if (values.length > MAX_REDACTION_SECRETS) {
+  if (!Array.isArray(values) || values.length > MAX_REDACTION_SECRETS) {
     throw new ConfigurationError("JSONL redaction secret 수가 너무 많습니다.");
   }
   const unique = new Set<string>();
@@ -141,6 +142,9 @@ export function normalizeJsonlSecrets(
     }
     if (!value || unique.has(value)) continue;
     const bytes = Buffer.byteLength(value, "utf8");
+    if (bytes < MIN_REDACTION_SECRET_BYTES || REDACTED.includes(value)) {
+      throw new ConfigurationError("JSONL redaction secret이 너무 짧거나 안전하지 않습니다.");
+    }
     if (bytes > MAX_REDACTION_SECRET_BYTES) {
       throw new ConfigurationError("JSONL redaction secret 하나가 너무 큽니다.");
     }
@@ -748,6 +752,26 @@ async function readSmallHandle(handle: FileHandle, maximum: number): Promise<str
   return bytesRead === data.length ? data.toString("utf8") : "";
 }
 
+async function removeFailedOwnedLock(
+  lockPath: string,
+  lockHandle: FileHandle,
+): Promise<void> {
+  let pathHandle: FileHandle | undefined;
+  try {
+    const originalInfo = await lockHandle.stat();
+    pathHandle = await open(lockPath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+    const pathInfo = await pathHandle.stat();
+    if (!sameIdentity(originalInfo, pathInfo)) return;
+    await pathHandle.close();
+    pathHandle = undefined;
+    await unlink(lockPath);
+  } catch {
+    // 초기화 오류를 가리지 않으며, 소유권을 확인할 수 없는 lock은 자동 제거하지 않는다.
+  } finally {
+    if (pathHandle) await pathHandle.close().catch(() => undefined);
+  }
+}
+
 export class JsonlWriterLease {
   readonly targetPath: string;
   readonly lockPath: string;
@@ -1011,8 +1035,8 @@ export async function acquireJsonlWriter(
       },
     );
   } catch (error) {
+    await removeFailedOwnedLock(lockPath, lockHandle);
     await lockHandle.close().catch(() => undefined);
-    await unlink(lockPath).catch(() => undefined);
     throw error;
   }
 }

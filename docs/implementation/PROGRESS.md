@@ -89,4 +89,8 @@ paging된 source transcript에서 대화 기록만 새 ID로 상속하는 new/re
 window과 자동 compact threshold, 활성 run과 교차하지 않는 transcript scanner를
 `23a4c410d5c409f38a9e181a300c2c9428aa2e94`에서 구현했다. 현재는 같은 run의 recovery,
 compaction, model request와 transport retry 예산을 받는 비재귀 manual/auto 압축, bounded
-continuity 보존과 append-only 완료 경계를 연결하고 있다. 단계 검증은 아직 실행하지 않았다.
+continuity 보존과 append-only 완료 경계를
+`fb238f43693e6237bc94db01403d6d97de4ba821`에서 연결했다. 전체 정적 검토에서 짧은 redaction
+secret, no-persistence resume의 maintenance 소유권, metadata 시각 단조성, sessionStore의 도구
+접근 차단, projection 식별자·경고 redaction과 compaction 손실성 표기를 보완하고 있다. 단계
+검증은 아직 실행하지 않았다.

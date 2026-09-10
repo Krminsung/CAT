@@ -227,3 +227,14 @@
   continuity는 historical data이며 system 권한을 얻지 않는다. 완료 후보가 실제로 context를 줄여
   안전한 projection을 만들 때만 append-only 완료 경계를 기록한다. 모든 실패는 원문을 삭제하지
   않는 명시적 stop이고, append 실패 뒤 경계 존재 여부를 확신할 수 없으면 `unknown`으로 드러낸다.
+
+## D024 — 세션 source of truth의 접근·전환 경계
+
+- 상태: 승인됨
+- 결정: sessionStore 전체를 일반 파일·foreground shell 도구의 sensitive 경로로 분류한다.
+  영구 기록을 메모리 세션으로 재개할 때도 source session maintenance lease를 소유하고,
+  metadata 시각은 기존 `updatedAt` 아래로 되돌리지 않는다. 저장·projection redaction은 지나치게
+  짧은 secret과 식별자·경고까지 같은 bounded 정책으로 다룬다.
+- 결과: 모델이 자기 transcript를 변조하거나 읽는 경로를 기본 도구로 얻지 않는다. 재개 snapshot과
+  활성 run이 교차하지 않고, 시계가 뒤로 가도 최신 revision의 시간 순서가 퇴행하지 않는다.
+  미완료 tool exchange는 실행 가능한 호출 대신 제한된 redacted notice로 보존한다.
