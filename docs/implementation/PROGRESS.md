@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P06 기준 main은 `e5f082a0b8ccb5fdc70233837762941e63f7233b`이다. 구현은 이 커밋에서
+P07 기준 main은 `c434311e79ac2c112ea8ac08e31b5a320dff3e2f`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -10,8 +10,8 @@ P06 기준 main은 `e5f082a0b8ccb5fdc70233837762941e63f7233b`이다. 구현은 �
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
 | P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
-| P06 세션·컨텍스트 | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
-| P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P06 세션·컨텍스트 | DONE | PASS (1/1) | PR #6 / MERGED `c434311` |
+| P07 TUI core | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P10 stdio MCP | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -98,3 +98,20 @@ secret, no-persistence resume의 maintenance 소유권, metadata 시각 단조�
 기준 SHA와 같음을 확인한 뒤 `13908a0e1743d632734b8673d097b3f5ab44662c`를 대상으로
 예약한 유일한 `npm run check`를 실행했고 통과했다. 실제 세션 I/O, rewind, 모델 압축, 도구와
 앱 런타임은 실행하지 않았다.
+P06는 검토 head `5a0b32ed50faf6d32cd064052999039e71d44135`를 PR #6에서 merge
+commit `c434311e79ac2c112ea8ac08e31b5a320dff3e2f`로 병합했다. merge의 두 부모,
+tree, phase head의 조상 관계와 `origin/main`을 대조했다. P07은 이 merge commit을 기준으로
+alternate-screen 화면 수명주기와 TTY·복원 경계를 구현하고 있다.
+P07.1의 alternate-screen layout, 독립 TTY 판정, 제어 문자열 정리와 멱등 복원 경계는
+`2e8aa99595b31db0cdcb97fd706e017afcc49d8c`에서 완료했다. P07.2의 bounded Unicode editor,
+paste·단축키·history controller와 일반 기록에서 분리된 masked secret overlay는
+`98528d984f6a999893c05b7d9dbd67328a10f809`에서 완료했다. P07.3의 항목별 stream projection,
+동일 ID tool·plan 갱신, 제한된 resume 표시와 사용자 scroll 보존은
+`b2219403e6d58901861a2186faf462af9cbf7d3b`에서 완료했다. P07.4의 native selection 유지,
+제한된 raw transcript 전환과 사용자 주도 로컬 clipboard abstraction은
+`996f1fb9e177163c12e763a607779d550b87e72c`에서 완료했다. 현재 P07 전체 정적 검토에서 확인한
+출력 redaction 순서, 최근 raw 기록, 입력·secret·clipboard 수명과 탐색 상한은
+`849ef8988b20707f58b27a68e76e43548d77c4a2`에서 보완했다. agent→TUI 역의존, 검사 우회,
+추적된 원본·산출물과 자동 clipboard 경로가 없음을 확인했다. 이후
+`d84c19edc683d5d64485aad650ad9eb1f9140d17`을 대상으로 예약한 유일한
+`npm run check` 1회를 실행했고 통과했다. 실제 terminal·clipboard 런타임은 실행하지 않았다.

@@ -238,3 +238,61 @@
 - 결과: 모델이 자기 transcript를 변조하거나 읽는 경로를 기본 도구로 얻지 않는다. 재개 snapshot과
   활성 run이 교차하지 않고, 시계가 뒤로 가도 최신 revision의 시간 순서가 퇴행하지 않는다.
   미완료 tool exchange는 실행 가능한 호출 대신 제한된 redacted notice로 보존한다.
+
+## D025 — alternate-screen 수명주기와 출력 경계
+
+- 상태: 승인됨
+- 결정: 대화형 화면은 stdin과 stdout이 각각 TTY일 때만 pi-tui alternate screen을 시작한다.
+  stderr의 TTY 여부는 별도로 보존하며 진단은 ANSI 없는 제한된 텍스트로 stderr에만 기록한다.
+  화면 구성 요소는 외부 escape와 제어 문자를 제거하는 경계로 감싸고, mouse reporting은 기본부터
+  끈다. 시작 일부 실패, render/input 오류와 앱 예외는 모두 하나의 멱등적인 화면 종료 경로를 쓴다.
+- 결과: 정상·오류 종료는 대화 내용을 main screen에 다시 출력하지 않고 raw mode, bracketed paste,
+  mouse mode, autowrap, cursor와 alternate screen을 복원한다. 화면 오류는 모델 재호출이나 새 agent
+  run을 만들지 않으며 실제 터미널별 복원 품질은 정적 검사만으로 확인했다고 주장하지 않는다.
+
+## D026 — 입력 소유권과 비밀 입력 분리
+
+- 상태: 승인됨
+- 결정: pi-tui Editor가 Unicode grapheme와 표시 폭, Enter 제출, Ctrl+J newline을 소유하고 cat의
+  input controller는 입력·paste·history 총량과 run 중 재제출을 제한한다. busy Ctrl+C는 현재 run의
+  cancel port를 한 번만 호출하며 permission/details/session 단축키는 명시적으로 연결된 callback만
+  사용한다. API key 등 비밀 입력은 별도 masked overlay component에서만 수집한다.
+- 결과: 여러 줄 paste 자체가 submit이나 command dispatch가 되지 않는다. 일반 prompt만 제한된
+  history에 들어가며 secret은 getter, transcript, history, clipboard로 노출하지 않고 제출 직후
+  화면 redaction 목록에 등록한다. 화면 또는 overlay 종료 시 listener와 secret 보유 상태를 정리한다.
+
+## D027 — 증분 transcript 상태와 scroll 소유권
+
+- 상태: 승인됨
+- 결정: transcript는 전체 문자열 대신 제한된 항목 component, assistant message ID, run/call ID와
+  단일 현재 plan의 상태로 투영한다. delta와 tool·plan event는 해당 component만 갱신하고, restore는
+  bounded 저장 decoder를 통과한 최근 record만 화면 상태로 만든다. 표시 전후와 raw snapshot 모두
+  같은 redaction·terminal escape 제거 경계를 사용한다.
+- 결과: 항목 수·전체 byte·개별 stream/detail·복원 record·추적 run에 각각 상한이 있다. 새 event는
+  사용자의 `ScrollView` follow 상태를 강제로 바꾸지 않아 위로 올린 위치를 유지한다. 완료 전 stream은
+  화면 종료 시 redaction된 정적 text로 확정한 뒤 동적 secret 목록을 폐기하며, `/raw` 전환과 사용자가
+  요청한 clipboard write는 다음 하위 작업에서만 연결한다.
+
+## D028 — 사용자 주도 복사와 raw terminal 전환
+
+- 상태: 승인됨
+- 결정: 기본 TUI는 mouse reporting과 자동 selection copy를 끄고 terminal native selection을 유지한다.
+  `/raw`는 TTY·idle 상태에서만 alternate screen을 잠시 벗어나 제한되고 정리된 transcript를 main screen에
+  쓰며 네 가지 명시적 복귀 키만 처리한다. 로컬 clipboard port는 user command/selection origin을 요구하고
+  write만 제공하며 SSH, OSC52와 tmux를 처리하지 않는다.
+- 결과: model text, tool output과 terminal content 자체는 clipboard process나 제어 sequence를 실행할 수
+  없다. 로컬 write는 크기·시간·환경·실행 파일과 argv가 제한된 owned child만 사용하고 clipboard read를
+  노출하지 않는다. raw 전환과 screen 종료가 겹치면 direct terminal을 먼저 멈춘 뒤 하나의 terminal 복원
+  경계로 합류하며, 실제 terminal·desktop별 selection과 clipboard 품질은 런타임 미검증으로 남긴다.
+
+## D029 — 출력 정리 순서와 사용자 표면 수명
+
+- 상태: 승인됨
+- 결정: 외부 terminal escape와 제어 문자를 제거해 표시 text를 정규화한 다음 secret redaction을
+  수행하고 redactor 출력도 다시 정리한다. 표시 byte 경계 뒤에는 허용한 최대 secret 길이의 문맥을
+  포함하며 source 절단 경계의 불완전한 secret prefix는 화면에 내보내지 않는다. raw는 제한 안의 최신
+  transcript를 우선하고 화면이 secret, raw와 clipboard 작업의 배타 수명과 abort를 소유한다.
+- 결과: escape를 secret 중간에 끼워 제거 후 값을 재조립하는 우회와 절단 경계의 부분 노출을 줄인다.
+  configured secret, initial history와 executable PATH 탐색은 각각 개수·byte 상한을 가지며 clipboard
+  탐색과 child는 화면 종료 signal을 따른다. redaction은 완전한 유출 방지로 주장하지 않고 실제 IME,
+  terminal 복원과 desktop clipboard 동작은 실행하지 않은 상태로 남긴다.

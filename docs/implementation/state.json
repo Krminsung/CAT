@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P06",
-  "currentStep": "P06.PUBLISH",
-  "status": "VERIFIED",
-  "baseMainSha": "e5f082a0b8ccb5fdc70233837762941e63f7233b",
-  "lastCommitSha": "13908a0e1743d632734b8673d097b3f5ab44662c",
+  "currentPhase": "P07",
+  "currentStep": "P07.PUBLISH",
+  "status": "PUBLISHING",
+  "baseMainSha": "c434311e79ac2c112ea8ac08e31b5a320dff3e2f",
+  "lastCommitSha": "d84c19edc683d5d64485aad650ad9eb1f9140d17",
   "verification": {
     "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": "13908a0e1743d632734b8673d097b3f5ab44662c",
+    "targetCommitSha": "d84c19edc683d5d64485aad650ad9eb1f9140d17",
     "result": "PASS",
     "exitCode": 0
   },
   "publication": {
-    "branch": "cat/p06-sessions-context",
+    "branch": "cat/p07-tui-core",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Create and publish cat/p06-sessions-context, then review and merge its PR",
+  "nextAction": "Record the P07 verification result and publish the reviewed branch",
   "blocker": null
 }
