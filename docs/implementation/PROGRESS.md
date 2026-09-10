@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P08 기준 main은 `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`이다. 구현은 이 커밋에서
+P09 기준 main은 `7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -12,8 +12,8 @@ P08 기준 main은 `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`이다. 구현은 �
 | P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
 | P06 세션·컨텍스트 | DONE | PASS (1/1) | PR #6 / MERGED `c434311` |
 | P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
-| P08 CLI·명령 | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
+| P09 확장·hooks | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
 | P10 stdio MCP | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -138,3 +138,30 @@ P08 오류 수정과 `npm run check` 추가 1회를 명시적으로 승인해, �
 `b3d39d85cf8790a7c6ae4d5290086e3a8f0cdf40`을 대상으로 두 번째이자 마지막 승인 검사를
 실행했고 통과했다. 결과는 정적 검사 통과이며 앱·TUI·provider·session·도구 런타임은
 실행하지 않았다.
+P08은 검토 head `ea3d36304e4144bce323a100680edb32df23d379`을 PR #8에서 merge
+commit `7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f`으로 병합했다. merge의 두 부모,
+tree, phase head 조상 관계와 `origin/main` 포함을 확인했다. P09는 이 merge commit을 기준으로
+전역 지침과 신뢰된 프로젝트의 root→cwd 지침을 우선순위대로 선택하고, `@path` include의
+canonical 경계·중복·순환·깊이·파일 수·전체 byte 상한을 강제하는 P09.1을 구현하고 있다.
+P09.1은 `a84e9ceb400927cc6d70bbd8199aa1067890b6e0`에서 완료했다. 이어서 확장 본문을
+지연 로드하는 skill·Markdown command catalog, built-in 충돌 차단, catalog 이름으로만 조회하는
+`load_skill`과 bounded positional argument 렌더링을 P09.2에서 구현하고 있다.
+P09.2는 `173ee09750350d30c238f89a1a09dd87e3eaa334`에서 완료했다. P09.3에서는 정확히
+8개 event, 세 blockable event의 exit code 2 의미, 최소 환경, bounded JSON stdin·통합 output·추가
+context, timeout·abort·process group 정리와 engine 재진입 차단을
+`dd4851e591e985295f48df2209fe14bbd3abcd00`에서 완료했다. P09.4에서는 지침·skill catalog와
+SessionStart/UserPromptSubmit context를 권한 없는 비신뢰 모델 입력으로 연결하고, 중앙 executor의
+Pre/Post hook, 공유 budget의 Stop continuation 1회, PreCompact와 세션 전환·종료 event를 조립하고 있다.
+`/init`과 `# instruction`은 canonical 파일 관찰·중앙 write 경계를 사용하며 `/reload`는 기존 인증과
+승인을 보존한 채 검증된 설정·지침·command·skill·hook만 교체한다. P09.4는
+`ff926674da37a39d7105298b8af37a6a26b6bde2`에서 완료했다. 전체 정적 검토에서는 기본 지침 선로딩과
+notice 수를 파일 32개·알림 256개 경계 안으로 제한하고, lazy extension을 catalog 시점과 같은
+device·inode·size·mtime·ctime의 파일로만 읽도록 보완하고 있다. 지침·extension read 전후의 canonical
+경로와 identity, `O_NOFOLLOW`를 재확인하며 긴 skill catalog는 완전한 이름 행만 모델에 제공한다.
+이 보완은 `1805cae3e60378311cb18694140b2a11bc924050`에서 확정했다. base부터 전체 diff, trust 이후
+process 순서, 중앙 permission과 추가 deny, 공유 Stop budget, 8개 event 연결, dependency 방향과 추적
+파일을 정적으로 대조했다. `origin/main`은 P09 기준 SHA와 같고 자동 검증은 아직 실행하지 않았다.
+`5a28f9e1bfbd54bfb2784ce7a06ccb9e3cf01618`을 검사 대상으로 예약한 뒤 P09에서 허용된 유일한
+`npm run check`를 실행했고, 2026-09-10T13:19:27+09:00부터 약 1.49초 뒤 exit 0으로 통과했다.
+검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 앱, TUI, provider, 도구, 실제 hook·extension
+runtime과 원본 script는 실행하지 않았다.

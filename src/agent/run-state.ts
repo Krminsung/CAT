@@ -19,7 +19,7 @@ const ALLOWED_TRANSITIONS: Readonly<
 > = Object.freeze({
   PREPARE: Object.freeze(["MODEL"] as const),
   MODEL: Object.freeze(["NORMALIZE"] as const),
-  NORMALIZE: Object.freeze(["AUTHORIZE_TOOLS"] as const),
+  NORMALIZE: Object.freeze(["AUTHORIZE_TOOLS", "MODEL"] as const),
   AUTHORIZE_TOOLS: Object.freeze(["MODEL"] as const),
 });
 

@@ -47,6 +47,13 @@ export interface PermissionPolicyOptions {
   projectStore?: ProjectApprovalPort;
 }
 
+export interface PermissionPolicyRuntimeConfiguration {
+  readonly mode: PermissionMode;
+  readonly enabledTools?: readonly string[];
+  readonly allowedTools?: readonly string[];
+  readonly deniedTools?: readonly string[];
+}
+
 export interface PermissionCheck {
   toolName: string;
   category: ToolCategory;
@@ -111,9 +118,9 @@ function safeSet(values: readonly string[] | undefined): Set<string> {
 export class PermissionPolicy {
   #mode: PermissionMode;
   readonly #interactive: boolean;
-  readonly #enabledTools: Set<string> | undefined;
-  readonly #allowedTools: Set<string>;
-  readonly #deniedTools: Set<string>;
+  #enabledTools: Set<string> | undefined;
+  #allowedTools: Set<string>;
+  #deniedTools: Set<string>;
   readonly #projectApprovals: Set<string>;
   readonly #projectDenials: Set<string>;
   readonly #sessionApprovals = new Map<string, Set<string>>();
@@ -141,6 +148,16 @@ export class PermissionPolicy {
 
   setMode(mode: PermissionMode): void {
     this.#mode = mode;
+  }
+
+  /** Reload mutable settings without discarding session/project approval decisions. */
+  reconfigure(configuration: PermissionPolicyRuntimeConfiguration): void {
+    this.#mode = configuration.mode;
+    this.#enabledTools = configuration.enabledTools
+      ? safeSet(configuration.enabledTools)
+      : undefined;
+    this.#allowedTools = safeSet(configuration.allowedTools);
+    this.#deniedTools = safeSet(configuration.deniedTools);
   }
 
   exposes(toolName: string, category: ToolCategory): boolean {

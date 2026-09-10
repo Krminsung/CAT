@@ -76,6 +76,21 @@ export interface AgentRunnerOptions {
   readonly reasoningEffort?: ProviderReasoningEffort;
   readonly temperature?: number;
   readonly now?: () => number;
+  readonly stopHook?: AgentStopHookPort;
+}
+
+export interface AgentStopHookRequest extends RunIdentity {
+  readonly text: string;
+  readonly stopHookActive: boolean;
+  readonly signal: AbortSignal;
+}
+
+export type AgentStopHookDecision =
+  | { readonly continue: false }
+  | { readonly continue: true; readonly reason: string };
+
+export interface AgentStopHookPort {
+  beforeStop(request: AgentStopHookRequest): Promise<AgentStopHookDecision>;
 }
 
 export interface AgentRunRequest extends RunIdentity {
@@ -433,6 +448,7 @@ export class AgentRunner {
   readonly #reasoningEffort: ProviderReasoningEffort | undefined;
   readonly #temperature: number | undefined;
   readonly #now: () => number;
+  readonly #stopHook: AgentStopHookPort | undefined;
 
   constructor(options: AgentRunnerOptions) {
     if (!options.model.trim() || options.model.length > 256) {
@@ -457,6 +473,7 @@ export class AgentRunner {
     this.#reasoningEffort = options.reasoningEffort;
     this.#temperature = options.temperature;
     this.#now = options.now ?? Date.now;
+    this.#stopHook = options.stopHook;
   }
 
   async run(request: AgentRunRequest): Promise<AgentRunResult> {
@@ -666,6 +683,47 @@ export class AgentRunner {
       if (normalized.calls.length === 0 && normalized.issues.length === 0) {
         if (!normalized.visibleText.trim()) {
           throw new ProtocolError("모델이 최종 답변이나 도구 호출을 반환하지 않았습니다.");
+        }
+        if (this.#stopHook && context.allowTools) {
+          const decision = await this.#stopHook.beforeStop({
+            ...context.identity,
+            text: normalized.visibleText,
+            stopHookActive: context.budget.snapshot().stopContinuations > 0,
+            signal: context.budget.signal,
+          });
+          if (decision.continue) {
+            if (!context.budget.tryConsumeStopContinuation()) {
+              const message = "Stop hook이 다시 completion을 차단했지만 run당 continuation 한도에 도달했습니다.";
+              context.journal.emit({
+                type: "notice",
+                level: "warning",
+                code: "stop_hook_continuation_exhausted",
+                message,
+              });
+              return {
+                termination: "budget_exhausted",
+                text: normalized.visibleText,
+                message,
+                ...(responseId === undefined ? {} : { responseId }),
+              };
+            }
+            const reason = boundedString(
+              decision.reason.trim() || "Stop hook이 작업을 계속하도록 요청했습니다.",
+              MAX_PROVIDER_REASON_BYTES,
+            ).text;
+            context.journal.emit({
+              type: "notice",
+              level: "warning",
+              code: "stop_hook_continuation",
+              message: reason,
+            });
+            this.#appendUserFeedback(
+              context,
+              `A trusted Stop hook requested one bounded continuation. Address this feedback without repeating completed tools: ${reason}`,
+            );
+            context.state.transition("MODEL");
+            continue;
+          }
         }
         return {
           termination: "completed",
