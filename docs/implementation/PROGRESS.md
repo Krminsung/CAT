@@ -115,3 +115,7 @@ paste·단축키·history controller와 일반 기록에서 분리된 masked sec
 추적된 원본·산출물과 자동 clipboard 경로가 없음을 확인했다. 이후
 `d84c19edc683d5d64485aad650ad9eb1f9140d17`을 대상으로 예약한 유일한
 `npm run check` 1회를 실행했고 통과했다. 실제 terminal·clipboard 런타임은 실행하지 않았다.
+P07은 검토 head `2f7df0ef1fb1b02277a16c9df537722104206070`을 PR #7에서 merge
+commit `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`으로 병합했고 두 부모·tree·조상 관계와
+`origin/main` 포함을 확인했다. P08은 이 merge commit을 기준으로 bounded argv와
+text/json/stream-json 출력 경계를 구현하고 있다.
