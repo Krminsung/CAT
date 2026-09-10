@@ -164,7 +164,7 @@ function assertRecordId(value: string): void {
   }
 }
 
-function normalizedMetadata(input: SessionMetadata): SessionMetadata {
+export function normalizeSessionMetadata(input: SessionMetadata): SessionMetadata {
   assertSessionId(input.sessionId);
   if (
     !isAbsolute(input.cwd) ||
@@ -267,7 +267,7 @@ function metadataFromJson(value: JsonValue | undefined): SessionMetadata {
   const responseId = optionalText(raw.responseId, "세션 response ID", 512);
   const name = optionalText(raw.name, "세션 이름", 256);
   const parentSessionId = optionalText(raw.parentSessionId, "parent 세션 ID", 128);
-  return normalizedMetadata({
+  return normalizeSessionMetadata({
     sessionId,
     cwd,
     model,
@@ -481,7 +481,7 @@ export class SessionJsonlStore {
     input: SessionMetadata,
     owner: SessionTranscriptWriter,
   ): Promise<StoredSessionRecord> {
-    const metadata = normalizedMetadata(input);
+    const metadata = normalizeSessionMetadata(input);
     if (
       owner.released ||
       owner.sessionId !== metadata.sessionId ||

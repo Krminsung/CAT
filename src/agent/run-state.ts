@@ -72,6 +72,16 @@ interface ActiveRun {
   readonly token: symbol;
 }
 
+function assertSessionIdentifier(sessionId: string): void {
+  if (
+    !sessionId ||
+    sessionId.length > 256 ||
+    /[\u0000-\u001f\u007f]/u.test(sessionId)
+  ) {
+    throw new ConfigurationError("sessionId 값이 올바르지 않습니다.");
+  }
+}
+
 export class RunOwnershipLease {
   readonly identity: RunIdentity;
   readonly #releaseOwned: () => boolean;
@@ -101,17 +111,47 @@ export type RunOwnershipResult =
       readonly termination: "concurrent_run";
     };
 
+export class SessionMaintenanceLease {
+  readonly sessionId: string;
+  readonly #releaseOwned: () => boolean;
+  #released = false;
+
+  constructor(sessionId: string, releaseOwned: () => boolean) {
+    this.sessionId = sessionId;
+    this.#releaseOwned = releaseOwned;
+  }
+
+  get released(): boolean {
+    return this.#released;
+  }
+
+  release(): boolean {
+    if (this.#released) return false;
+    this.#released = true;
+    return this.#releaseOwned();
+  }
+}
+
+export type SessionMaintenanceResult =
+  | { readonly acquired: true; readonly lease: SessionMaintenanceLease }
+  | {
+      readonly acquired: false;
+      readonly activeRunId: string;
+    };
+
 export class SessionRunCoordinator {
   readonly #active = new Map<string, ActiveRun>();
   readonly #activeRunIds = new Set<string>();
+  readonly #maintenance = new Map<string, symbol>();
 
   acquire(identity: RunIdentity): RunOwnershipResult {
     assertIdentity(identity);
     const existing = this.#active.get(identity.sessionId);
-    if (existing || this.#activeRunIds.has(identity.runId)) {
+    const maintenance = this.#maintenance.has(identity.sessionId);
+    if (existing || maintenance || this.#activeRunIds.has(identity.runId)) {
       return Object.freeze({
         acquired: false,
-        activeRunId: existing?.runId ?? identity.runId,
+        activeRunId: existing?.runId ?? (maintenance ? "session-maintenance" : identity.runId),
         termination: "concurrent_run",
       });
     }
@@ -131,6 +171,27 @@ export class SessionRunCoordinator {
 
   activeRunId(sessionId: string): string | undefined {
     return this.#active.get(sessionId)?.runId;
+  }
+
+  acquireMaintenance(sessionId: string): SessionMaintenanceResult {
+    assertSessionIdentifier(sessionId);
+    const existing = this.#active.get(sessionId);
+    if (existing || this.#maintenance.has(sessionId)) {
+      return Object.freeze({
+        acquired: false,
+        activeRunId: existing?.runId ?? "session-maintenance",
+      });
+    }
+    const token = Symbol(sessionId);
+    this.#maintenance.set(sessionId, token);
+    return Object.freeze({
+      acquired: true,
+      lease: new SessionMaintenanceLease(sessionId, () => {
+        if (this.#maintenance.get(sessionId) !== token) return false;
+        this.#maintenance.delete(sessionId);
+        return true;
+      }),
+    });
   }
 }
 

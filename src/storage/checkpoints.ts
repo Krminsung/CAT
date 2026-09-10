@@ -284,6 +284,27 @@ export class CheckpointManager {
     return record ? summary(record, this.guard.workspace) : undefined;
   }
 
+  clearSession(sessionId: string): void {
+    if (!sessionId) {
+      throw new ConfigurationError("정리할 checkpoint 세션 ID가 필요합니다.");
+    }
+    const pending = [...this.#pending.values()].some(
+      (record) => record.owner.sessionId === sessionId,
+    );
+    const failed = [...this.#failed.values()].some(
+      (record) => record.owner.sessionId === sessionId,
+    );
+    const rewindFailed = this.#completedBySession
+      .get(sessionId)
+      ?.some((record) => record.status === "rewind_failed") ?? false;
+    if (pending || failed || rewindFailed) {
+      throw new StorageError(
+        "복구가 끝나지 않은 checkpoint가 있어 세션 상태를 정리하지 않았습니다.",
+      );
+    }
+    this.#completedBySession.delete(sessionId);
+  }
+
   async #currentState(state: CheckpointFileState): Promise<{
     resolution: WorkspacePathResolution;
     exists: boolean;

@@ -191,3 +191,14 @@
   stale lock은 PID만으로 제거하지 않으며 metadata update도 같은 transcript writer 소유권을
   요구한다. 저장 전 알려진 secret과 credential field를 redaction하고 trust·credential·승인
   상태는 session schema에 넣지 않는다.
+
+## D021 — 세션 재개·분기의 격리와 rewind 결과
+
+- 상태: 승인됨
+- 결정: 영구 resume은 같은 session ID의 provider/profile/model/cwd만 복원하고 권한·관찰·계획
+  상태를 초기화한다. no-persistence resume과 모든 fork는 새 session ID를 사용하며 fork에는
+  bounded 최근 message/compaction만 다시 기록한다. lifecycle 전환과 rewind는 agent
+  coordinator의 session maintenance lease를 소유해야 하며 그동안 새 run 획득도 차단한다.
+- 결과: 분기 세션은 parent의 run ID, permission, task, checkpoint 소유권을 얻지 않는다.
+  checkpoint rewind는 파일 복원이 완전한 뒤에만 기록을 제거하고 부분 실패를 유지한다. 결과는
+  workspace 파일만 대상으로 했음을 표시하며 shell, network와 MCP 부작용 복원을 주장하지 않는다.
