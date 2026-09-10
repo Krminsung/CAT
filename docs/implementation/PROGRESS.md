@@ -82,6 +82,9 @@ agent loop, 도구와 앱 런타임은 검증하지 않았다. P05는 검토 hea
 `e5f082a0b8ccb5fdc70233837762941e63f7233b`로 병합했다. merge의 두 부모, tree,
 phase head의 조상 관계와 `origin/main`을 대조했다. P06은 이 merge commit을 기준으로
 bounded JSONL 세션 저장을 `6ad083a2fea6ba881b2c7c754c38cbebc0df90fc`에서 구현했다.
-현재는 paging된 source transcript에서 대화 기록만 새 ID로 상속하는 new/resume/continue/fork,
-메모리 전용 no-persistence, metadata 변경과 소유권 기반 rewind를 연결하고 있다. 단계 검증은
-아직 실행하지 않았다.
+paging된 source transcript에서 대화 기록만 새 ID로 상속하는 new/resume/continue/fork,
+메모리 전용 no-persistence, metadata 변경과 소유권 기반 rewind는
+`058e6bda00e74bdd3c0abcb0abe0815a47882b0a`에서 연결했다. 현재는 완전한 tool call/result
+쌍과 최근 대화를 우선하는 bounded model context projection, provider metadata 우선 context
+window과 자동 compact threshold, 활성 run과 교차하지 않는 transcript scanner를 구현하고 있다.
+단계 검증은 아직 실행하지 않았다.

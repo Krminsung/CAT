@@ -202,3 +202,16 @@
 - 결과: 분기 세션은 parent의 run ID, permission, task, checkpoint 소유권을 얻지 않는다.
   checkpoint rewind는 파일 복원이 완전한 뒤에만 기록을 제거하고 부분 실패를 유지한다. 결과는
   workspace 파일만 대상으로 했음을 표시하며 shell, network와 MCP 부작용 복원을 주장하지 않는다.
+
+## D022 — 저장 transcript와 모델 context projection의 분리
+
+- 상태: 승인됨
+- 결정: append-only transcript를 source of truth로 두고 모델에는 bounded projection만 보낸다.
+  완전한 tool call/result 쌍은 하나의 unit으로 보존하고 최근 unit부터 선택한다. 현재 실행에서
+  신뢰해 주입한 system message만 system role을 유지하며 저장된 system text와 compact summary는
+  권한을 가진 지침으로 승격하지 않는다. model context window은 provider metadata, 사용자 설정,
+  unknown 순서로 결정한다.
+- 결과: 큰 과거 observation은 redaction된 제한형 preview가 되고 불완전한 tool exchange는 실행
+  문맥에서 제외된다. 신뢰된 system 지침을 잘라 모델 요청을 계속하지 않으며, context metadata가
+  없을 때 임의의 128k 기본값을 가정하지 않는다. compact 완료 record는 원문을 지우지 않는 새
+  projection 경계로만 작동한다.

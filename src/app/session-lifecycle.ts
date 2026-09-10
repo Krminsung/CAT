@@ -28,9 +28,9 @@ const MAX_SESSION_INDEX_RECORDS = 50_000;
 const MAX_SESSION_INDEX_PAGES = 512;
 const MAX_SESSION_INDEX_BYTES = 256 * 1024 * 1024;
 const TRANSCRIPT_PAGE_RECORDS = 200;
-const MAX_INHERIT_SOURCE_RECORDS = 100_000;
-const MAX_INHERIT_SOURCE_PAGES = 512;
-const MAX_INHERIT_SOURCE_BYTES = 64 * 1024 * 1024;
+const MAX_TRANSCRIPT_SCAN_RECORDS = 100_000;
+const MAX_TRANSCRIPT_SCAN_PAGES = 512;
+const MAX_TRANSCRIPT_SCAN_BYTES = 64 * 1024 * 1024;
 const MAX_INHERITED_RECORDS = 2_000;
 const MAX_INHERITED_BYTES = 12 * 1024 * 1024;
 const MAX_MEMORY_RECORDS = 2_500;
@@ -50,6 +50,12 @@ export interface SessionLifecycleNotice {
     | "history_truncated"
     | "omitted_warnings";
   readonly message: string;
+}
+
+export interface SessionTranscriptScanResult {
+  readonly records: number;
+  readonly snapshotBytes: number;
+  readonly notices: readonly SessionLifecycleNotice[];
 }
 
 export interface RestoredSessionConfiguration {
@@ -553,6 +559,10 @@ class ManagedSessionHandle implements SessionHandle {
     return Object.freeze([...this.#memory]);
   }
 
+  memoryBytesWithin(): number {
+    return this.#memoryBytes;
+  }
+
   writerWithin(): SessionTranscriptWriter {
     if (!this.#writer || this.persistence !== "persistent") {
       throw new StorageError("영구 세션 transcript writer가 없습니다.");
@@ -644,6 +654,27 @@ export class SessionLifecycleService {
 
   active(sessionId: string): SessionHandle | undefined {
     return this.#active.get(sessionId);
+  }
+
+  async scanTranscript(
+    handle: SessionHandle,
+    visit: (record: StoredTranscriptRecord) => void,
+  ): Promise<SessionTranscriptScanResult> {
+    const managed = this.#managed(handle);
+    return await this.#withMaintenance(managed.metadata.sessionId, async () => {
+      return await managed.runExclusive(async () => {
+        if (managed.persistence === "persistent") {
+          return await this.#scanStoredTranscript(managed.metadata.sessionId, visit);
+        }
+        const records = managed.memoryRecordsWithin();
+        for (const record of records) visit(record);
+        return Object.freeze({
+          records: records.length,
+          snapshotBytes: managed.memoryBytesWithin(),
+          notices: Object.freeze([]),
+        });
+      });
+    });
   }
 
   async create(request: NewSessionRequest): Promise<SessionHandle> {
@@ -1204,6 +1235,14 @@ export class SessionLifecycleService {
 
   async #collectStoredHistory(sessionId: string): Promise<CollectedHistory> {
     const buffer = new RecentTranscriptBuffer();
+    const scan = await this.#scanStoredTranscript(sessionId, (record) => buffer.add(record));
+    return buffer.result(scan.notices);
+  }
+
+  async #scanStoredTranscript(
+    sessionId: string,
+    visit: (record: StoredTranscriptRecord) => void,
+  ): Promise<SessionTranscriptScanResult> {
     const notices: SessionLifecycleNotice[] = [];
     const seenCursors = new Set<string>();
     let cursor: string | undefined;
@@ -1212,8 +1251,8 @@ export class SessionLifecycleService {
     let snapshotBytes: number | undefined;
     let omittedWarnings = 0;
     while (true) {
-      if (pages >= MAX_INHERIT_SOURCE_PAGES) {
-        throw new StorageError("상속할 transcript page 검색 상한을 초과했습니다.");
+      if (pages >= MAX_TRANSCRIPT_SCAN_PAGES) {
+        throw new StorageError("Transcript page 검색 상한을 초과했습니다.");
       }
       const page = await this.#store.readTranscriptPage(sessionId, {
         ...(cursor === undefined ? {} : { cursor }),
@@ -1222,19 +1261,19 @@ export class SessionLifecycleService {
       pages += 1;
       if (snapshotBytes === undefined) {
         snapshotBytes = page.snapshotBytes;
-        if (snapshotBytes > MAX_INHERIT_SOURCE_BYTES) {
+        if (snapshotBytes > MAX_TRANSCRIPT_SCAN_BYTES) {
           throw new StorageError(
-            "상속할 transcript가 직접 분기할 수 있는 크기 상한을 초과했습니다. 먼저 압축해야 합니다.",
+            "Transcript가 직접 읽을 수 있는 크기 상한을 초과했습니다.",
           );
         }
       } else if (snapshotBytes !== page.snapshotBytes) {
-        throw new StorageError("상속할 transcript가 page 검색 중 변경되었습니다.");
+        throw new StorageError("Transcript가 page 검색 중 변경되었습니다.");
       }
       records += page.records.length;
-      if (records > MAX_INHERIT_SOURCE_RECORDS) {
-        throw new StorageError("상속할 transcript record 검색 상한을 초과했습니다.");
+      if (records > MAX_TRANSCRIPT_SCAN_RECORDS) {
+        throw new StorageError("Transcript record 검색 상한을 초과했습니다.");
       }
-      for (const item of page.records) buffer.add(item.value);
+      for (const item of page.records) visit(item.value);
       omittedWarnings += page.omittedWarnings;
       for (const notice of warningNotices(page.warnings, 0, "corrupt_transcript")) {
         if (notices.length < MAX_LIFECYCLE_NOTICES) notices.push(notice);
@@ -1256,7 +1295,11 @@ export class SessionLifecycleService {
       if (notices.length < MAX_LIFECYCLE_NOTICES) notices.push(omittedNotice);
       else notices[MAX_LIFECYCLE_NOTICES - 1] = omittedNotice;
     }
-    return buffer.result(notices);
+    return Object.freeze({
+      records,
+      snapshotBytes: snapshotBytes ?? 0,
+      notices: Object.freeze(notices),
+    });
   }
 
   #collectMemoryHistory(
