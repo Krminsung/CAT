@@ -6,6 +6,7 @@ export type CatErrorCode =
   | "permission_denied"
   | "provider_failure"
   | "protocol_failure"
+  | "hook_failure"
   | "tool_failure"
   | "storage_failure";
 
@@ -62,6 +63,14 @@ export class ProtocolError extends CatError {
 
   constructor(message: string, options?: ErrorOptions) {
     super("protocol_failure", message, options);
+  }
+}
+
+export class HookError extends CatError {
+  override name = "HookError";
+
+  constructor(message: string, options?: ErrorOptions) {
+    super("hook_failure", message, options);
   }
 }
 

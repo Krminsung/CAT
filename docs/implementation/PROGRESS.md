@@ -146,3 +146,6 @@ canonical 경계·중복·순환·깊이·파일 수·전체 byte 상한을 강�
 P09.1은 `a84e9ceb400927cc6d70bbd8199aa1067890b6e0`에서 완료했다. 이어서 확장 본문을
 지연 로드하는 skill·Markdown command catalog, built-in 충돌 차단, catalog 이름으로만 조회하는
 `load_skill`과 bounded positional argument 렌더링을 P09.2에서 구현하고 있다.
+P09.2는 `173ee09750350d30c238f89a1a09dd87e3eaa334`에서 완료했다. P09.3에서는 정확히
+8개 event, 세 blockable event의 exit code 2 의미, 최소 환경, bounded JSON stdin·통합 output·추가
+context, timeout·abort·process group 정리와 engine 재진입 차단을 구현하고 있다.

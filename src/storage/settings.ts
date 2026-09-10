@@ -20,6 +20,7 @@ export interface SettingsValues {
   tools: string;
   projectDocMaxBytes: number;
   projectDocFallbackFilenames: string[];
+  hooks?: JsonObject;
   provider?: string;
   profile?: string;
   model?: string;
@@ -62,6 +63,7 @@ const SETTING_KEYS = new Set([
   "tools",
   "projectDocMaxBytes",
   "projectDocFallbackFilenames",
+  "hooks",
   "provider",
   "profile",
   "model",
@@ -221,6 +223,12 @@ export function parseSettingsValues(
     }
     result.projectDocFallbackFilenames = fallbackNames;
   }
+  if (raw.hooks !== undefined) {
+    if (typeof raw.hooks !== "object" || raw.hooks === null || Array.isArray(raw.hooks)) {
+      fail(source, "hooks", "객체여야 합니다");
+    }
+    result.hooks = structuredClone(raw.hooks) as JsonObject;
+  }
   const provider = optionalString(raw, "provider", source, 64);
   if (provider !== undefined) {
     if (!IDENTIFIER_PATTERN.test(provider)) fail(source, "provider", "안전한 식별자여야 합니다");
@@ -326,6 +334,7 @@ function overridesToJson(overrides: SettingsOverrides): JsonObject {
   assign("tools", overrides.tools);
   assign("projectDocMaxBytes", overrides.projectDocMaxBytes);
   assign("projectDocFallbackFilenames", overrides.projectDocFallbackFilenames);
+  assign("hooks", overrides.hooks);
   assign("provider", overrides.provider);
   assign("profile", overrides.profile);
   assign("model", overrides.model);
