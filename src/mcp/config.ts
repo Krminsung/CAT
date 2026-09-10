@@ -198,7 +198,7 @@ function boundedText(value: unknown, label: string, maximumBytes: number, allowE
     typeof value !== "string" ||
     (!allowEmpty && !value) ||
     Buffer.byteLength(value, "utf8") > maximumBytes ||
-    /[\u0000-\u001f\u007f]/u.test(value)
+    /[\p{Cc}\p{Cf}]/u.test(value)
   ) {
     throw new McpError(`${label}의 형식 또는 크기가 올바르지 않습니다.`);
   }

@@ -86,7 +86,7 @@ const MAX_MANAGER_NOTICES = 256;
 const MAX_STATUS_TEXT_BYTES = 4_096;
 const MCP_TOOL_OUTPUT_BYTES = 1024 * 1024;
 const MCP_RECONNECT_TIMEOUT_MS = 5 * 60_000;
-const SENSITIVE_OUTPUT_FIELD = /(?:^|[_ -])(?:api[_ -]?key|authorization|cookies?|password|passwd|secrets?|tokens?|credentials?|private[_ -]?key)(?:$|[_ -])/iu;
+const SENSITIVE_OUTPUT_FIELD = /(?:^|_)(?:api_?key|auth(?:orization)?|bearer|cookies?|password|passwd|secrets?|tokens?|credentials?|private_?key)(?:$|_)/iu;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -137,7 +137,9 @@ function redactJson(
     if (Object.hasOwn(result, safeKey)) {
       safeKey = `[중복 redaction key ${Object.keys(result).length + 1}]`;
     }
-    const normalizedKey = key.replace(/([a-z0-9])([A-Z])/gu, "$1_$2");
+    const normalizedKey = key
+      .replace(/([a-z0-9])([A-Z])/gu, "$1_$2")
+      .replace(/[^A-Za-z0-9]+/gu, "_");
     result[safeKey] = SENSITIVE_OUTPUT_FIELD.test(normalizedKey)
       ? "[REDACTED]"
       : redactJson(child, redactor, state, depth + 1);

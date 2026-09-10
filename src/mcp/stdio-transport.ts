@@ -15,6 +15,8 @@ const TERM_GRACE_MS = 1_500;
 const KILL_GRACE_MS = 1_000;
 const MAX_ARGUMENTS = 4_096;
 const MAX_ARGUMENT_BYTES = 1024 * 1024;
+const MAX_COMMAND_BYTES = 4_096;
+const MAX_CWD_BYTES = 4_096;
 const MAX_METHOD_BYTES = 256;
 const MAX_JSON_DEPTH = 64;
 const MAX_JSON_NODES = 100_000;
@@ -54,8 +56,10 @@ function assertTransportOptions(options: McpStdioTransportOptions): void {
     /[\u0000-\u001f\u007f]/u.test(options.serverName) ||
     !options.command ||
     options.command.includes("\0") ||
+    Buffer.byteLength(options.command, "utf8") > MAX_COMMAND_BYTES ||
     !options.cwd ||
     options.cwd.includes("\0") ||
+    Buffer.byteLength(options.cwd, "utf8") > MAX_CWD_BYTES ||
     args.length > MAX_ARGUMENTS ||
     args.some((argument) => argument.includes("\0")) ||
     argumentBytes > MAX_ARGUMENT_BYTES ||
@@ -263,6 +267,15 @@ export class McpStdioTransport {
       );
       this.#failTransport(failure);
       void this.close("stdout failure").catch(() => undefined);
+    });
+    child.stderr.on("error", (error) => {
+      if (this.#process !== child) return;
+      const failure = new McpError(
+        `MCP 서버 stderr 오류 (${this.serverName}): ${this.#redactor.redact(error.message)}`,
+        { cause: error },
+      );
+      this.#failTransport(failure);
+      void this.close("stderr failure").catch(() => undefined);
     });
     child.stdout.once("end", () => {
       if (this.#process !== child) return;

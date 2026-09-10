@@ -185,4 +185,9 @@ MCP 설정과 environment secret reference, 설정 저장과 process 시작의 �
 사용하는 manager를 연결하고 있다. 세 관리 built-in과 CLI list/get/add/remove, `/mcp [reconnect]`,
 동적 도구의 host schema·central permission 실행 경로, reload·세션 전환·앱 종료 cleanup을 포함한다.
 workspace와 cwd identity를 승인 뒤에도 재확인하고, 종료 확인 실패·분기/reference schema 복잡도·
-민감한 MCP 출력 field에 대한 fail-closed 보완도 함께 적용했다. 자동 검증은 아직 실행하지 않았다.
+민감한 MCP 출력 field에 대한 fail-closed 보완도 함께 적용했다. P10.4는
+`c7fcf0d4d4f5ceecf50e3e3c335acd0d92b70ede`에서 완료했다. 전체 정적 검토에서 schema가 아닌
+annotation data를 가리키는 reference와 모호한 URI 인코딩을 차단하고, 민감 출력 field 이름 정규화,
+설정 문자열의 Cc/Cf 거부, transport command·cwd byte 상한과 stderr stream 오류 정리를 보완하고
+있다. dependency 방향, 중앙 executor·승인 경계, 추적 파일과 `origin/main`을 대조했으며 자동 검증과
+실제 MCP·앱 runtime은 실행하지 않았다.

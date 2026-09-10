@@ -303,7 +303,8 @@
 - 결정: MCP 입출력 schema는 JSON Schema 2020-12만 지원하고 크기·구조·분기 상한을 사전 검사한
   뒤 exact-pinned Ajv로 host에서 검증한다. 문서 내부 JSON Pointer 외 참조와 정규식·비동기·동적
   reference 등 제한 시간 안의 안전한 평가를 보장하기 어려운 keyword는 지원하지 않는다. 내부
-  reference가 가리키는 조합 분기까지 제한하고 순환 reference는 이번 subset에서 비활성화한다.
+  reference는 모호한 URI 인코딩이 없는 제한된 JSON Pointer로 구조 검사에서 확인된 schema 위치만
+  가리킬 수 있고, 그 조합 분기까지 제한하며 순환 reference는 이번 subset에서 비활성화한다.
 - 결과: 검증할 수 없는 tool은 permissive schema로 바꾸지 않고 disabled 상태가 된다. 서버 annotations는
   자동 승인에 사용하지 않으며 server 설정과 발견된 tool 계약의 version을 external permission과 승인
   scope에 포함한다. 따라서 이름만 같은 재설정·schema 변경은 기존 이름 기반 허용을 상속하지 않는다.

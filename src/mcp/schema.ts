@@ -239,7 +239,7 @@ function assertLocalReference(value: unknown, path: string): void {
   if (
     typeof value !== "string" ||
     Buffer.byteLength(value, "utf8") > MAX_REF_BYTES ||
-    !/^#(?:\/(?:[^~/\u0000-\u001f]|~[01])*)*$/u.test(value)
+    !/^#(?:\/(?:[A-Za-z0-9._$-]|~[01])*)*$/u.test(value)
   ) {
     schemaFail(`${path}에는 문서 내부 JSON Pointer 참조만 사용할 수 있습니다.`);
   }
@@ -275,11 +275,19 @@ function referencedSchema(
   return current as JsonObject | boolean;
 }
 
+function pointerToken(value: string): string {
+  return value.replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
 interface SchemaComplexity {
   compositionBranches: number;
 }
 
-function assertReferenceComplexity(root: JsonObject, label: string): void {
+function assertReferenceComplexity(
+  root: JsonObject,
+  label: string,
+  schemaPointers: ReadonlySet<string>,
+): void {
   const active = new Set<object>();
   const checkedProduct = new Map<object, number>();
   let steps = 0;
@@ -336,6 +344,9 @@ function assertReferenceComplexity(root: JsonObject, label: string): void {
         }
       }
       if (typeof value.$ref === "string") {
+        if (!schemaPointers.has(value.$ref)) {
+          schemaFail(`${path}.$ref가 검증된 schema 위치를 가리키지 않습니다.`);
+        }
         visit(referencedSchema(root, value.$ref, `${path}.$ref`), `${path}.$ref`, branchProduct);
       }
     } finally {
@@ -352,7 +363,10 @@ function assertSchemaNode(
   root: boolean,
   complexity: SchemaComplexity,
   branchProduct: number,
+  pointer: string,
+  schemaPointers: Set<string>,
 ): void {
+  schemaPointers.add(pointer);
   if (depth > MAX_SCHEMA_DEPTH) schemaFail(`${path} schema의 중첩이 너무 깊습니다.`);
   if (typeof value === "boolean") return;
   for (const key of Object.keys(value)) {
@@ -394,7 +408,16 @@ function assertSchemaNode(
     const child = value[keyword];
     if (child === undefined) continue;
     for (const [name, nested] of Object.entries(schemaMap(child, `${path}.${keyword}`))) {
-      assertSchemaNode(nested, `${path}.${keyword}.${name}`, depth + 1, false, complexity, branchProduct);
+      assertSchemaNode(
+        nested,
+        `${path}.${keyword}.${name}`,
+        depth + 1,
+        false,
+        complexity,
+        branchProduct,
+        `${pointer}/${pointerToken(keyword)}/${pointerToken(name)}`,
+        schemaPointers,
+      );
     }
   }
   const compositionSchemas = SCHEMA_ARRAY_KEYWORDS.flatMap((keyword) => {
@@ -423,12 +446,23 @@ function assertSchemaNode(
         false,
         complexity,
         nextProduct,
+        `${pointer}/${pointerToken(keyword)}/${index}`,
+        schemaPointers,
       );
     }
   }
   if (value.prefixItems !== undefined) {
     for (const [index, nested] of schemaArray(value.prefixItems, `${path}.prefixItems`, MAX_TUPLE_ITEMS).entries()) {
-      assertSchemaNode(nested, `${path}.prefixItems[${index}]`, depth + 1, false, complexity, branchProduct);
+      assertSchemaNode(
+        nested,
+        `${path}.prefixItems[${index}]`,
+        depth + 1,
+        false,
+        complexity,
+        branchProduct,
+        `${pointer}/prefixItems/${index}`,
+        schemaPointers,
+      );
     }
   }
   for (const keyword of SCHEMA_VALUE_KEYWORDS) {
@@ -444,6 +478,8 @@ function assertSchemaNode(
       false,
       complexity,
       branchProduct,
+      `${pointer}/${pointerToken(keyword)}`,
+      schemaPointers,
     );
   }
 }
@@ -457,8 +493,9 @@ function assertSupportedSchema(schema: JsonObject, label: string): void {
     MAX_SCHEMA_NODES,
     schemaFail,
   );
-  assertSchemaNode(schema, label, 0, true, { compositionBranches: 0 }, 1);
-  assertReferenceComplexity(schema, label);
+  const schemaPointers = new Set<string>();
+  assertSchemaNode(schema, label, 0, true, { compositionBranches: 0 }, 1, "#", schemaPointers);
+  assertReferenceComplexity(schema, label, schemaPointers);
   if (schema.type !== "object") {
     schemaFail(`${label} schema의 최상위 type은 object여야 합니다.`);
   }
