@@ -143,3 +143,6 @@ commit `7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f`으로 병합했다. merge의 �
 tree, phase head 조상 관계와 `origin/main` 포함을 확인했다. P09는 이 merge commit을 기준으로
 전역 지침과 신뢰된 프로젝트의 root→cwd 지침을 우선순위대로 선택하고, `@path` include의
 canonical 경계·중복·순환·깊이·파일 수·전체 byte 상한을 강제하는 P09.1을 구현하고 있다.
+P09.1은 `a84e9ceb400927cc6d70bbd8199aa1067890b6e0`에서 완료했다. 이어서 확장 본문을
+지연 로드하는 skill·Markdown command catalog, built-in 충돌 차단, catalog 이름으로만 조회하는
+`load_skill`과 bounded positional argument 렌더링을 P09.2에서 구현하고 있다.
