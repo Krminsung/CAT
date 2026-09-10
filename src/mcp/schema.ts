@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import Ajv2020, {
+import {
+  Ajv2020,
   type ErrorObject,
   type Schema,
   type ValidateFunction,
