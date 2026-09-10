@@ -158,3 +158,6 @@ Pre/Post hook, 공유 budget의 Stop continuation 1회, PreCompact와 세션 전
 notice 수를 파일 32개·알림 256개 경계 안으로 제한하고, lazy extension을 catalog 시점과 같은
 device·inode·size·mtime·ctime의 파일로만 읽도록 보완하고 있다. 지침·extension read 전후의 canonical
 경로와 identity, `O_NOFOLLOW`를 재확인하며 긴 skill catalog는 완전한 이름 행만 모델에 제공한다.
+이 보완은 `1805cae3e60378311cb18694140b2a11bc924050`에서 확정했다. base부터 전체 diff, trust 이후
+process 순서, 중앙 permission과 추가 deny, 공유 Stop budget, 8개 event 연결, dependency 방향과 추적
+파일을 정적으로 대조했다. `origin/main`은 P09 기준 SHA와 같고 자동 검증은 아직 실행하지 않았다.
