@@ -12,7 +12,7 @@ P08 기준 main은 `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`이다. 구현은 �
 | P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
 | P06 세션·컨텍스트 | DONE | PASS (1/1) | PR #6 / MERGED `c434311` |
 | P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
-| P08 CLI·명령 | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
+| P08 CLI·명령 | VERIFYING | RESERVED (1/1) | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P10 stdio MCP | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -123,7 +123,12 @@ text/json/stream-json 출력 경계를 `8e468a6b7c8326fbb70a215116f241d40fedc189
 `dc6413a944583827ce6363397e62348f72a6c244`에서 완료했다. model/provider/profile/session,
 권한·질문·승인과 config/cost/status용 bounded overlay, masked API key 입력과 secret 없는
 `auth setup/status/use/remove` 관리 흐름은 `eea1fd73a083e53550a4fb09856bbcda005f8214`에서
-완료했다. 현재 session 선택→trust→설정→인증된 provider/model→bounded context와 agent
+완료했다. session 선택→trust→설정→인증된 provider/model→bounded context와 agent
 run→transcript 저장→화면·session·transport 종료를 조립하고, `@file`과 `!`를 중앙 도구 경계에
-연결한 P08.4 구현을 전체 정적 검토하기 직전이다. 자동 검사와 앱·TUI·provider·도구 런타임은
-실행하지 않았다.
+연결한 P08.4는 `ec76acc1a99c564d33c7467c9aa2d4a5f69c2f8c`에서 완료했다. 전체 정적
+검토에서 확인한 명령별 help, provider/model 전환 순서, 구조화/TUI 민감 field redaction과
+큰따옴표 속 background 연산 차단은 `a1eb310fa94c9b96a2dd1eb5c0d32b750fd84526`에서
+보완했다. agent→TUI 역의존, 중앙 executor 우회, 검사 script 변경, 추적된 secret·원본·산출물과
+GitHub Actions workflow가 없음을 확인했다. `origin/main`이 P08 기준 SHA와 같음을 대조하고
+유일한 `npm run check` 1회를 예약했으며 아직 실행하지 않았다. 앱·TUI·provider·session·도구
+런타임은 실행하지 않았다.
