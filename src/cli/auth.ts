@@ -248,9 +248,13 @@ export class AuthManagementController {
     }
     const commandArgs = args.slice(1);
     if (commandArgs.includes("-h") || commandArgs.includes("--help")) {
-      output.writeTrustedText(command === "setup"
-        ? authSetupHelp()
-        : `usage: cat-tui auth ${command} PROFILE\n`);
+      output.writeTrustedText(
+        command === "setup"
+          ? authSetupHelp()
+          : command === "status"
+            ? "usage: cat-tui auth status\n"
+            : `usage: cat-tui auth ${command} PROFILE\n`,
+      );
       return 0;
     }
     if (command === "status") {

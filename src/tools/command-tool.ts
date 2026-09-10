@@ -130,8 +130,13 @@ function containsBackgroundOperator(command: string): boolean {
     }
     if (quote === '"') {
       if (character === "\\") escaped = true;
-      else if (character === '"') quote = undefined;
-      continue;
+      else if (character === '"') {
+        quote = undefined;
+        continue;
+      } else if (character !== "&") {
+        continue;
+      }
+      // 큰따옴표 안에는 command substitution이 올 수 있으므로 단독 &도 보수적으로 차단한다.
     }
     if (character === "\\") {
       escaped = true;

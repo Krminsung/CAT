@@ -17,6 +17,8 @@ const MAX_JSON_NODES = 100_000;
 const MAX_DYNAMIC_SECRETS = 256;
 const MAX_DYNAMIC_SECRET_BYTES = 64 * 1024;
 const MAX_DYNAMIC_SECRETS_BYTES = 1024 * 1024;
+const SENSITIVE_FIELD = /^(?:api[_ -]?key|authorization|cookie|set-cookie|password|passwd|secret|token|access[_ -]?token|refresh[_ -]?token|credentials?)$/iu;
+const REDACTED = "[REDACTED]";
 
 export interface CliWritable {
   write(text: string): unknown;
@@ -71,7 +73,9 @@ function safeJsonCopy(
       if (Object.hasOwn(output, safeKey)) {
         throw new ProtocolError("구조화 출력 key가 redaction 뒤 충돌했습니다.");
       }
-      output[safeKey] = safeJsonCopy(item, redactor, state, depth + 1);
+      output[safeKey] = SENSITIVE_FIELD.test(key)
+        ? REDACTED
+        : safeJsonCopy(item, redactor, state, depth + 1);
     }
     return output;
   } finally {

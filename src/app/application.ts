@@ -1256,18 +1256,13 @@ class AgentApplicationRuntime {
     }
     await auth.credential.withValue(async (apiKey) => {
       await this.#registerKnownSecrets([apiKey]);
-      const executor = new CentralToolExecutor(this.registry, {
-        policy: this.policy,
-        redactor: new Redactor(this.#knownSecrets),
-      });
-      const runner = this.#runnerFor(auth, selected, executor);
-      this.#auth = auth;
-      this.#model = selected;
-      this.#models = Object.freeze([...models]);
-      this.#executor = executor;
-      this.#runner = runner;
     });
-    this.#responseId = undefined;
+    const executor = new CentralToolExecutor(this.registry, {
+      policy: this.policy,
+      redactor: new Redactor(this.#knownSecrets),
+    });
+    const runner = this.#runnerFor(auth, selected, executor);
+    let transcriptError: ConfigurationError | undefined;
     if (updateSession) {
       const updated = await this.lifecycle.update(this.#handle, {
         model: selected,
@@ -1276,12 +1271,19 @@ class AgentApplicationRuntime {
         responseId: null,
       });
       if (updated.transcriptStatus === "record_failed") {
-        throw new ConfigurationError(
+        transcriptError = new ConfigurationError(
           `Provider 변경은 적용했지만 세션 기록에 실패했습니다: ${updated.transcriptError ?? "알 수 없음"}`,
         );
       }
     }
+    this.#auth = auth;
+    this.#model = selected;
+    this.#models = Object.freeze([...models]);
+    this.#executor = executor;
+    this.#runner = runner;
+    this.#responseId = undefined;
     this.#refreshHeader();
+    if (transcriptError) throw transcriptError;
   }
 
   async #registerKnownSecrets(secrets: readonly string[]): Promise<void> {
