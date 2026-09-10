@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P07 기준 main은 `c434311e79ac2c112ea8ac08e31b5a320dff3e2f`이다. 구현은 이 커밋에서
+P08 기준 main은 `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -11,8 +11,8 @@ P07 기준 main은 `c434311e79ac2c112ea8ac08e31b5a320dff3e2f`이다. 구현은 �
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
 | P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
 | P06 세션·컨텍스트 | DONE | PASS (1/1) | PR #6 / MERGED `c434311` |
-| P07 TUI core | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
-| P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
+| P08 CLI·명령 | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P10 stdio MCP | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -119,4 +119,7 @@ P07은 검토 head `2f7df0ef1fb1b02277a16c9df537722104206070`을 PR #7에서 mer
 commit `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`으로 병합했고 두 부모·tree·조상 관계와
 `origin/main` 포함을 확인했다. P08은 이 merge commit을 기준으로 bounded argv와
 text/json/stream-json 출력 경계를 `8e468a6b7c8326fbb70a215116f241d40fedc189`에서 구현했다.
-현재는 정확히 28개 명령 정의에서 capability 기반 help·완성·dispatch를 파생하고 있다.
+정확히 28개 명령 정의에서 capability 기반 help·완성·dispatch를 파생하는 registry는
+`dc6413a944583827ce6363397e62348f72a6c244`에서 완료했다. 현재 model/provider/profile/session,
+권한·질문·승인과 config/cost/status용 bounded overlay, masked API key 입력과 secret 없는
+`auth setup/status/use/remove` 관리 흐름을 구현하고 정적으로 검토하고 있다.

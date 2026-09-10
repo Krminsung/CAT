@@ -115,6 +115,17 @@ export class CliOutput {
     this.#stdout.write(text);
   }
 
+  writeText(text: string): void {
+    if (Buffer.byteLength(text, "utf8") > MAX_TEXT_OUTPUT_BYTES) {
+      throw new ProtocolError("CLI 출력이 허용 크기를 초과했습니다.");
+    }
+    const safe = sanitizeTerminalText(text, {
+      maximumBytes: MAX_TEXT_OUTPUT_BYTES,
+      redactor: this.#redactor,
+    }).text.replaceAll("\r", "");
+    if (safe) this.#stdout.write(safe.endsWith("\n") ? safe : `${safe}\n`);
+  }
+
   diagnostic(message: string): void {
     const safe = sanitizeTerminalText(message, {
       maximumBytes: MAX_DIAGNOSTIC_BYTES,

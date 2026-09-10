@@ -3,6 +3,8 @@ import {
   CURSOR_MARKER,
   ProcessTerminal,
   ScrollView,
+  SelectList,
+  Text,
   TuiAltScreen,
   VStack,
   truncateToWidth,
@@ -10,6 +12,7 @@ import {
   type EditorTheme,
   type Focusable,
   type OverlayHandle,
+  type SelectItem,
   type Terminal,
   type TuiMouseEvent,
   type TuiMouseEventResult,
@@ -64,6 +67,13 @@ const MAX_CONFIGURED_SECRET_BYTES = 256 * 1024;
 const MAX_CONFIGURED_SECRET_ENTRY_BYTES = 16 * 1024;
 const MAX_REGISTERED_SECRETS = 32;
 const MAX_REGISTERED_SECRET_BYTES = 256 * 1024;
+const MAX_SELECTION_OPTIONS = 128;
+const MAX_SELECTION_BYTES = 256 * 1024;
+const MAX_SELECTION_VALUE_BYTES = 512;
+const MAX_SELECTION_LABEL_BYTES = 2 * 1024;
+const MAX_SELECTION_DESCRIPTION_BYTES = 8 * 1024;
+const MAX_SELECTION_TITLE_BYTES = 2 * 1024;
+const MAX_SELECTION_MESSAGE_BYTES = 16 * 1024;
 
 const plainStyle = (text: string): string => text;
 
@@ -127,13 +137,32 @@ export interface CatTerminalScreenOptions {
   readonly clipboard?: ClipboardWriter;
 }
 
-interface ActiveSecretPrompt {
+interface ActiveModal {
   cancel(error: Error): void;
 }
 
 export interface SecretPromptOptions {
   readonly label: string;
   readonly message?: string;
+  readonly signal?: AbortSignal;
+}
+
+export interface TerminalSelectionOption {
+  readonly value: string;
+  readonly label: string;
+  readonly description?: string;
+}
+
+export interface TerminalSelectionOptions {
+  readonly title: string;
+  readonly message?: string;
+  readonly options: readonly TerminalSelectionOption[];
+  readonly signal?: AbortSignal;
+}
+
+export interface TerminalInformationOptions {
+  readonly title: string;
+  readonly message: string;
   readonly signal?: AbortSignal;
 }
 
@@ -154,6 +183,99 @@ export function detectTerminalTtyState(): TerminalTtyState {
 function normalizedRenderWidth(width: number): number {
   if (!Number.isFinite(width)) return 1;
   return Math.max(1, Math.min(MAX_RENDER_COLUMNS, Math.floor(width)));
+}
+
+function selectionText(
+  value: string,
+  label: string,
+  maximumBytes: number,
+  redactor: TerminalTextRedactor,
+  multiline: boolean,
+): string {
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    Buffer.byteLength(value, "utf8") > maximumBytes
+  ) {
+    throw new TerminalScreenError(
+      "screen_application_failed",
+      `${label}의 형식 또는 크기가 올바르지 않습니다.`,
+    );
+  }
+  const safe = multiline
+    ? sanitizeTerminalText(value, { maximumBytes, redactor }).text.trim()
+    : safeTerminalLine(value, { maximumBytes, redactor }).trim();
+  if (!safe) {
+    throw new TerminalScreenError(
+      "screen_application_failed",
+      `${label}에 표시 가능한 문자가 없습니다.`,
+    );
+  }
+  return safe;
+}
+
+function selectionItems(
+  options: readonly TerminalSelectionOption[],
+  redactor: TerminalTextRedactor,
+): SelectItem[] {
+  if (options.length < 1 || options.length > MAX_SELECTION_OPTIONS) {
+    throw new TerminalScreenError(
+      "screen_application_failed",
+      `선택지는 1–${MAX_SELECTION_OPTIONS}개여야 합니다.`,
+    );
+  }
+  const items: SelectItem[] = [];
+  const values = new Set<string>();
+  let totalBytes = 0;
+  for (const option of options) {
+    const value = option.value.trim();
+    const valueBytes = Buffer.byteLength(option.value, "utf8");
+    const labelBytes = Buffer.byteLength(option.label, "utf8");
+    const descriptionBytes = option.description === undefined
+      ? 0
+      : Buffer.byteLength(option.description, "utf8");
+    totalBytes += valueBytes + labelBytes + descriptionBytes;
+    if (
+      !value ||
+      valueBytes > MAX_SELECTION_VALUE_BYTES ||
+      /\p{Cc}/u.test(value) ||
+      values.has(value)
+    ) {
+      throw new TerminalScreenError(
+        "screen_application_failed",
+        "선택지 value는 서로 다른 bounded 문자열이어야 합니다.",
+      );
+    }
+    if (totalBytes > MAX_SELECTION_BYTES) {
+      throw new TerminalScreenError(
+        "screen_application_failed",
+        "선택지 전체 크기가 허용 한도를 초과했습니다.",
+      );
+    }
+    const label = selectionText(
+      option.label,
+      "선택지 label",
+      MAX_SELECTION_LABEL_BYTES,
+      redactor,
+      false,
+    );
+    const description = option.description === undefined
+      ? undefined
+      : selectionText(
+          option.description,
+          "선택지 description",
+          MAX_SELECTION_DESCRIPTION_BYTES,
+          redactor,
+          false,
+        );
+    values.add(value);
+    items.push({
+      value,
+      label,
+      ...(description === undefined ? {} : { description }),
+    });
+  }
+  return items;
 }
 
 function safeRenderedLine(
@@ -286,6 +408,70 @@ class BoundedSingleLine implements Component {
 
   render(width: number): string[] {
     return [truncateToWidth(this.#text, normalizedRenderWidth(width), "…")];
+  }
+}
+
+class SelectionPanel implements Component {
+  readonly #heading: Text;
+  readonly #list: SelectList;
+  readonly #footer: Text;
+
+  constructor(options: {
+    readonly title: string;
+    readonly message?: string;
+    readonly items: SelectItem[];
+  }) {
+    const heading = options.message
+      ? `${options.title}\n\n${options.message}`
+      : options.title;
+    this.#heading = new Text(heading, 0, 0);
+    this.#list = new SelectList(
+      options.items,
+      Math.min(10, options.items.length),
+      EDITOR_THEME.selectList,
+    );
+    this.#footer = new Text("Enter로 선택 · Esc로 취소", 0, 0);
+  }
+
+  set onSelect(callback: ((item: SelectItem) => void) | undefined) {
+    if (callback === undefined) delete this.#list.onSelect;
+    else this.#list.onSelect = callback;
+  }
+
+  set onCancel(callback: (() => void) | undefined) {
+    if (callback === undefined) delete this.#list.onCancel;
+    else this.#list.onCancel = callback;
+  }
+
+  set onSelectionChange(callback: ((item: SelectItem) => void) | undefined) {
+    if (callback === undefined) delete this.#list.onSelectionChange;
+    else this.#list.onSelectionChange = callback;
+  }
+
+  handleInput(data: string): void {
+    this.#list.handleInput(data);
+  }
+
+  invalidate(): void {
+    this.#heading.invalidate();
+    this.#list.invalidate();
+    this.#footer.invalidate();
+  }
+
+  render(width: number): string[] {
+    return [
+      ...this.#heading.render(width),
+      "",
+      ...this.#list.render(width),
+      "",
+      ...this.#footer.render(width),
+    ];
+  }
+
+  dispose(): void {
+    delete this.#list.onSelect;
+    delete this.#list.onCancel;
+    delete this.#list.onSelectionChange;
   }
 }
 
@@ -422,7 +608,8 @@ export class CatTerminalScreen {
   #restorationAttempted = false;
   #exitResolved = false;
   #inputController: TerminalInputController | undefined;
-  #activeSecret: ActiveSecretPrompt | undefined;
+  #activeSecret: ActiveModal | undefined;
+  #activeSelection: ActiveModal | undefined;
   #clipboardCopy: AbortController | undefined;
 
   constructor(options: CatTerminalScreenOptions) {
@@ -589,6 +776,7 @@ export class CatTerminalScreen {
     this.#state = "stopping";
     const rawViewError = this.#rawView.cancel();
     this.#clipboardCopy?.abort();
+    this.#activeSelection?.cancel(new CancelledError("터미널 화면이 닫혀 선택을 취소했습니다."));
     this.#activeSecret?.cancel(new CancelledError("터미널 화면이 닫혀 비밀 입력을 취소했습니다."));
     this.#inputController?.dispose();
     this.#inputController = undefined;
@@ -663,22 +851,16 @@ export class CatTerminalScreen {
         "실행 중인 대화형 화면에서만 비밀값을 입력할 수 있습니다.",
       ));
     }
-    if (this.#activeSecret) {
+    if (this.#activeSecret || this.#activeSelection) {
       return Promise.reject(new TerminalScreenError(
         "screen_application_failed",
-        "다른 비밀 입력이 이미 열려 있습니다.",
+        "다른 modal 입력이 이미 열려 있습니다.",
       ));
     }
-    if (this.#rawView.active) {
+    if (this.#rawView.active || this.#clipboardCopy) {
       return Promise.reject(new TerminalScreenError(
         "screen_application_failed",
-        "대화 복사 보기를 닫은 뒤 비밀값을 입력할 수 있습니다.",
-      ));
-    }
-    if (this.#inputController?.busy) {
-      return Promise.reject(new TerminalScreenError(
-        "screen_application_failed",
-        "실행 중인 요청이 끝난 뒤 비밀값을 입력할 수 있습니다.",
+        "대화 복사 작업을 닫은 뒤 비밀값을 입력할 수 있습니다.",
       ));
     }
     if (options.signal?.aborted) {
@@ -718,7 +900,7 @@ export class CatTerminalScreen {
           this.requestRender();
         }
       };
-      const active: ActiveSecretPrompt = {
+      const active: ActiveModal = {
         cancel: (error) => {
           if (settled) return;
           settled = true;
@@ -762,6 +944,140 @@ export class CatTerminalScreen {
         active.cancel(error instanceof Error ? error : new Error("비밀 입력 화면을 열지 못했습니다."));
       }
     });
+  }
+
+  requestSelection(options: TerminalSelectionOptions): Promise<string> {
+    if (this.#state !== "running") {
+      return Promise.reject(new TerminalScreenError(
+        "screen_application_failed",
+        "실행 중인 대화형 화면에서만 선택 화면을 열 수 있습니다.",
+      ));
+    }
+    if (this.#activeSelection || this.#activeSecret) {
+      return Promise.reject(new TerminalScreenError(
+        "screen_application_failed",
+        "다른 modal 입력이 이미 열려 있습니다.",
+      ));
+    }
+    if (this.#rawView.active || this.#clipboardCopy) {
+      return Promise.reject(new TerminalScreenError(
+        "screen_application_failed",
+        "대화 복사 작업을 닫은 뒤 선택 화면을 열 수 있습니다.",
+      ));
+    }
+    if (options.signal?.aborted) {
+      return Promise.reject(new CancelledError("선택 화면을 열기 전에 취소됐습니다."));
+    }
+
+    let title: string;
+    let message: string | undefined;
+    let items: SelectItem[];
+    try {
+      title = selectionText(
+        options.title,
+        "선택 화면 title",
+        MAX_SELECTION_TITLE_BYTES,
+        this.#redactor,
+        false,
+      );
+      message = options.message === undefined
+        ? undefined
+        : selectionText(
+            options.message,
+            "선택 화면 message",
+            MAX_SELECTION_MESSAGE_BYTES,
+            this.#redactor,
+            true,
+          );
+      items = selectionItems(options.options, this.#redactor);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      const panel = new SelectionPanel({
+        title,
+        ...(message === undefined ? {} : { message }),
+        items,
+      });
+      const boundary = new ComponentBoundary(
+        panel,
+        "선택 입력",
+        this.#redactor,
+        (operation, label, error) => this.#captureComponentFailure(operation, label, error),
+      );
+      let overlay: OverlayHandle | undefined;
+      let settled = false;
+
+      const abort = (): void => {
+        active.cancel(new CancelledError("선택 요청이 취소됐습니다."));
+      };
+      const cleanup = (): void => {
+        options.signal?.removeEventListener("abort", abort);
+        panel.dispose();
+        this.#inputController?.setModalInput(false);
+        if (this.#activeSelection === active) this.#activeSelection = undefined;
+        try {
+          overlay?.hide();
+        } catch (error) {
+          this.#captureComponentFailure("invalidate", "선택 overlay", error);
+        }
+        if (this.#state === "running") {
+          this.#tui.setFocus(this.#editorBoundary);
+          this.requestRender();
+        }
+      };
+      const active: ActiveModal = {
+        cancel: (error) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(error);
+        },
+      };
+      panel.onSelectionChange = () => this.requestRender();
+      panel.onCancel = () => active.cancel(new CancelledError("선택을 취소했습니다."));
+      panel.onSelect = (item) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(item.value);
+      };
+
+      this.#activeSelection = active;
+      this.#inputController?.setModalInput(true);
+      options.signal?.addEventListener("abort", abort, { once: true });
+      if (options.signal?.aborted) {
+        abort();
+        return;
+      }
+      try {
+        overlay = this.#tui.showOverlay(boundary, {
+          width: "88%",
+          minWidth: 32,
+          maxHeight: 20,
+          margin: 1,
+        });
+        this.#tui.setFocus(boundary);
+        this.requestRender();
+      } catch (error) {
+        active.cancel(error instanceof Error ? error : new Error("선택 화면을 열지 못했습니다."));
+      }
+    });
+  }
+
+  async showInformation(options: TerminalInformationOptions): Promise<void> {
+    try {
+      await this.requestSelection({
+        title: options.title,
+        message: options.message,
+        options: [{ value: "close", label: "확인" }],
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+      });
+    } catch (error) {
+      if (error instanceof CancelledError && options.signal?.aborted !== true) return;
+      throw error;
+    }
   }
 
   async run(
@@ -874,10 +1190,10 @@ export class CatTerminalScreen {
         "대화 복사 보기가 이미 열려 있습니다.",
       );
     }
-    if (this.#activeSecret || this.#inputController?.busy || this.#clipboardCopy) {
+    if (this.#activeSecret || this.#activeSelection || this.#clipboardCopy) {
       throw new TerminalScreenError(
         "screen_application_failed",
-        "입력 또는 실행이 끝난 뒤 대화 복사 보기를 열 수 있습니다.",
+        "modal 입력 또는 clipboard 작업이 끝난 뒤 대화 복사 보기를 열 수 있습니다.",
       );
     }
     try {
@@ -895,7 +1211,12 @@ export class CatTerminalScreen {
     signal?: AbortSignal,
   ): Promise<ClipboardWriteResult> {
     if (this.#state !== "running") return Object.freeze({ status: "unavailable" });
-    if (this.#rawView.active || this.#clipboardCopy) {
+    if (
+      this.#rawView.active ||
+      this.#activeSecret ||
+      this.#activeSelection ||
+      this.#clipboardCopy
+    ) {
       return Object.freeze({ status: "failed" });
     }
     const snapshot = this.#transcriptModel.rawSnapshot(MAX_CLIPBOARD_TEXT_BYTES);
