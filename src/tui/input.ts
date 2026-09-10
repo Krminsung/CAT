@@ -186,7 +186,9 @@ export class TerminalInputController {
       throw new Error("초기 권한 모드가 올바르지 않습니다.");
     }
     this.#permissionMode = initialPermissionMode;
-    for (const entry of configuration.initialHistory ?? []) this.#remember(entry);
+    for (const entry of configuration.initialHistory?.slice(-MAX_HISTORY_ENTRIES) ?? []) {
+      this.#remember(entry);
+    }
     this.#host.editor.onSubmit = (text) => this.#acceptSubmission(text);
     this.#host.editor.disableSubmit = false;
     const listener: TuiInputListener = (data) => this.#handleGlobalInput(data);

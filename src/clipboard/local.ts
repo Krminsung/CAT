@@ -14,6 +14,9 @@ import {
 
 const CLIPBOARD_TIMEOUT_MS = 1_000;
 const CLIPBOARD_FORCE_CLOSE_MS = 250;
+const MAX_PATH_BYTES = 64 * 1024;
+const MAX_PATH_ENTRIES = 256;
+const MAX_PATH_ENTRY_BYTES = 4 * 1024;
 
 interface ClipboardAdapterCandidate {
   readonly id: string;
@@ -85,22 +88,31 @@ function adapterCandidates(
 async function resolveExecutable(
   executable: string,
   environment: NodeJS.ProcessEnv,
+  signal: AbortSignal | undefined,
 ): Promise<string | undefined> {
-  if (!executable || executable.includes("\0")) return undefined;
+  if (signal?.aborted || !executable || executable.includes("\0")) return undefined;
   if (isAbsolute(executable)) {
     try {
       await access(executable, fsConstants.X_OK);
-      return executable;
+      return signal?.aborted ? undefined : executable;
     } catch {
       return undefined;
     }
   }
-  for (const directory of (environment.PATH ?? "").split(delimiter)) {
-    if (!directory || !isAbsolute(directory) || directory.includes("\0")) continue;
+  const path = environment.PATH ?? "";
+  if (Buffer.byteLength(path, "utf8") > MAX_PATH_BYTES) return undefined;
+  for (const directory of path.split(delimiter).slice(0, MAX_PATH_ENTRIES)) {
+    if (signal?.aborted) return undefined;
+    if (
+      !directory ||
+      !isAbsolute(directory) ||
+      directory.includes("\0") ||
+      Buffer.byteLength(directory, "utf8") > MAX_PATH_ENTRY_BYTES
+    ) continue;
     const candidate = join(directory, executable);
     try {
       await access(candidate, fsConstants.X_OK);
-      return candidate;
+      return signal?.aborted ? undefined : candidate;
     } catch {
       // 다음 고정 adapter 후보를 확인한다.
     }
@@ -111,8 +123,9 @@ async function resolveExecutable(
 async function resolveAdapter(
   candidate: ClipboardAdapterCandidate,
   environment: NodeJS.ProcessEnv,
+  signal: AbortSignal | undefined,
 ): Promise<ResolvedClipboardAdapter | undefined> {
-  const executablePath = await resolveExecutable(candidate.executable, environment);
+  const executablePath = await resolveExecutable(candidate.executable, environment, signal);
   return executablePath ? { ...candidate, executablePath } : undefined;
 }
 
@@ -204,6 +217,7 @@ async function writeWithAdapter(
 export class LocalClipboardWriter implements ClipboardWriter {
   readonly #environment: NodeJS.ProcessEnv;
   readonly #platform: NodeJS.Platform;
+  #writing = false;
 
   constructor(options: LocalClipboardWriterOptions = {}) {
     this.#environment = options.environment ?? process.env;
@@ -225,29 +239,37 @@ export class LocalClipboardWriter implements ClipboardWriter {
       });
     }
     if (request.signal?.aborted) return Object.freeze({ status: "cancelled" });
+    if (this.#writing) return Object.freeze({ status: "failed" });
 
-    let found = false;
-    for (const candidate of adapterCandidates(this.#platform, this.#environment)) {
-      const adapter = await resolveAdapter(candidate, this.#environment);
-      if (!adapter) continue;
-      found = true;
-      let environment: NodeJS.ProcessEnv;
-      try {
-        environment = buildChildEnvironment({
-          source: this.#environment,
-          passThrough: adapter.environment,
-        });
-      } catch {
-        continue;
+    this.#writing = true;
+    try {
+      let found = false;
+      for (const candidate of adapterCandidates(this.#platform, this.#environment)) {
+        if (request.signal?.aborted) return Object.freeze({ status: "cancelled" });
+        const adapter = await resolveAdapter(candidate, this.#environment, request.signal);
+        if (request.signal?.aborted) return Object.freeze({ status: "cancelled" });
+        if (!adapter) continue;
+        found = true;
+        let environment: NodeJS.ProcessEnv;
+        try {
+          environment = buildChildEnvironment({
+            source: this.#environment,
+            passThrough: adapter.environment,
+          });
+        } catch {
+          continue;
+        }
+        const status = await writeWithAdapter(adapter, request.text, environment, request.signal);
+        if (status === "written") {
+          return Object.freeze({ status: "written", adapter: adapter.id });
+        }
+        if (status === "cancelled") return Object.freeze({ status: "cancelled" });
       }
-      const status = await writeWithAdapter(adapter, request.text, environment, request.signal);
-      if (status === "written") {
-        return Object.freeze({ status: "written", adapter: adapter.id });
-      }
-      if (status === "cancelled") return Object.freeze({ status: "cancelled" });
+      return found
+        ? Object.freeze({ status: "failed" })
+        : Object.freeze({ status: "unavailable" });
+    } finally {
+      this.#writing = false;
     }
-    return found
-      ? Object.freeze({ status: "failed" })
-      : Object.freeze({ status: "unavailable" });
   }
 }

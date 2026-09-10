@@ -284,3 +284,15 @@
   없다. 로컬 write는 크기·시간·환경·실행 파일과 argv가 제한된 owned child만 사용하고 clipboard read를
   노출하지 않는다. raw 전환과 screen 종료가 겹치면 direct terminal을 먼저 멈춘 뒤 하나의 terminal 복원
   경계로 합류하며, 실제 terminal·desktop별 selection과 clipboard 품질은 런타임 미검증으로 남긴다.
+
+## D029 — 출력 정리 순서와 사용자 표면 수명
+
+- 상태: 승인됨
+- 결정: 외부 terminal escape와 제어 문자를 제거해 표시 text를 정규화한 다음 secret redaction을
+  수행하고 redactor 출력도 다시 정리한다. 표시 byte 경계 뒤에는 허용한 최대 secret 길이의 문맥을
+  포함하며 source 절단 경계의 불완전한 secret prefix는 화면에 내보내지 않는다. raw는 제한 안의 최신
+  transcript를 우선하고 화면이 secret, raw와 clipboard 작업의 배타 수명과 abort를 소유한다.
+- 결과: escape를 secret 중간에 끼워 제거 후 값을 재조립하는 우회와 절단 경계의 부분 노출을 줄인다.
+  configured secret, initial history와 executable PATH 탐색은 각각 개수·byte 상한을 가지며 clipboard
+  탐색과 child는 화면 종료 signal을 따른다. redaction은 완전한 유출 방지로 주장하지 않고 실제 IME,
+  terminal 복원과 desktop clipboard 동작은 실행하지 않은 상태로 남긴다.

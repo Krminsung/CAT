@@ -59,6 +59,9 @@ const EMERGENCY_TERMINAL_RESTORE =
 const MAX_RENDER_COLUMNS = 1_000;
 const MAX_RENDERED_LINE_BYTES = 64 * 1024;
 const MAX_COMPONENT_ROWS = 8_192;
+const MAX_CONFIGURED_SECRETS = 64;
+const MAX_CONFIGURED_SECRET_BYTES = 256 * 1024;
+const MAX_CONFIGURED_SECRET_ENTRY_BYTES = 16 * 1024;
 const MAX_REGISTERED_SECRETS = 32;
 const MAX_REGISTERED_SECRET_BYTES = 256 * 1024;
 
@@ -360,6 +363,41 @@ function failureMessage(error: unknown): string {
   return error instanceof Error && error.message ? error.message : "알 수 없는 오류";
 }
 
+function configuredScreenRedactor(options: CatTerminalScreenOptions): TerminalTextRedactor {
+  const secrets = options.secrets ?? [];
+  if (secrets.length > MAX_CONFIGURED_SECRETS) {
+    throw new TerminalScreenError(
+      "screen_application_failed",
+      "화면 redaction secret 수가 허용 한도를 초과했습니다.",
+    );
+  }
+  const selected: string[] = [];
+  const seen = new Set<string>();
+  let totalBytes = 0;
+  for (const secret of secrets) {
+    if (!secret || seen.has(secret)) continue;
+    const bytes = Buffer.byteLength(secret, "utf8");
+    if (
+      bytes > MAX_CONFIGURED_SECRET_ENTRY_BYTES ||
+      totalBytes + bytes > MAX_CONFIGURED_SECRET_BYTES
+    ) {
+      throw new TerminalScreenError(
+        "screen_application_failed",
+        "화면 redaction secret 크기가 허용 한도를 초과했습니다.",
+      );
+    }
+    seen.add(secret);
+    selected.push(secret);
+    totalBytes += bytes;
+  }
+  const knownSecrets = new Redactor(selected);
+  const base = options.redactor;
+  if (!base) return knownSecrets;
+  return {
+    redact: (text) => knownSecrets.redact(base.redact(text)),
+  };
+}
+
 export class CatTerminalScreen {
   readonly #terminal: Terminal;
   readonly #tty: TerminalTtyState;
@@ -385,15 +423,14 @@ export class CatTerminalScreen {
   #exitResolved = false;
   #inputController: TerminalInputController | undefined;
   #activeSecret: ActiveSecretPrompt | undefined;
+  #clipboardCopy: AbortController | undefined;
 
   constructor(options: CatTerminalScreenOptions) {
     this.#terminal = options.terminal ?? new ProcessTerminal();
     this.#tty = { ...(options.tty ?? detectTerminalTtyState()) };
     this.#diagnostics = options.diagnostics ?? process.stderr;
     this.#clipboard = options.clipboard ?? new LocalClipboardWriter();
-    this.#redactor = new ScreenRedactor(
-      options.redactor ?? new Redactor(options.secrets ?? []),
-    );
+    this.#redactor = new ScreenRedactor(configuredScreenRedactor(options));
     this.#transcript = new Container();
     this.#transcriptModel = new TerminalTranscript(this.#transcript, {
       sanitize: (text, maximumBytes, singleLine = false) => singleLine
@@ -551,6 +588,7 @@ export class CatTerminalScreen {
     if (this.#state === "stopped" || this.#state === "stopping") return;
     this.#state = "stopping";
     const rawViewError = this.#rawView.cancel();
+    this.#clipboardCopy?.abort();
     this.#activeSecret?.cancel(new CancelledError("터미널 화면이 닫혀 비밀 입력을 취소했습니다."));
     this.#inputController?.dispose();
     this.#inputController = undefined;
@@ -631,6 +669,12 @@ export class CatTerminalScreen {
         "다른 비밀 입력이 이미 열려 있습니다.",
       ));
     }
+    if (this.#rawView.active) {
+      return Promise.reject(new TerminalScreenError(
+        "screen_application_failed",
+        "대화 복사 보기를 닫은 뒤 비밀값을 입력할 수 있습니다.",
+      ));
+    }
     if (this.#inputController?.busy) {
       return Promise.reject(new TerminalScreenError(
         "screen_application_failed",
@@ -701,6 +745,10 @@ export class CatTerminalScreen {
       this.#activeSecret = active;
       this.#inputController?.setModalInput(true);
       options.signal?.addEventListener("abort", abort, { once: true });
+      if (options.signal?.aborted) {
+        abort();
+        return;
+      }
       try {
         overlay = this.#tui.showOverlay(boundary, {
           width: "80%",
@@ -826,7 +874,7 @@ export class CatTerminalScreen {
         "대화 복사 보기가 이미 열려 있습니다.",
       );
     }
-    if (this.#activeSecret || this.#inputController?.busy) {
+    if (this.#activeSecret || this.#inputController?.busy || this.#clipboardCopy) {
       throw new TerminalScreenError(
         "screen_application_failed",
         "입력 또는 실행이 끝난 뒤 대화 복사 보기를 열 수 있습니다.",
@@ -847,6 +895,9 @@ export class CatTerminalScreen {
     signal?: AbortSignal,
   ): Promise<ClipboardWriteResult> {
     if (this.#state !== "running") return Object.freeze({ status: "unavailable" });
+    if (this.#rawView.active || this.#clipboardCopy) {
+      return Object.freeze({ status: "failed" });
+    }
     const snapshot = this.#transcriptModel.rawSnapshot(MAX_CLIPBOARD_TEXT_BYTES);
     let result: ClipboardWriteResult;
     if (snapshot.truncated) {
@@ -855,14 +906,22 @@ export class CatTerminalScreen {
         maximumBytes: MAX_CLIPBOARD_TEXT_BYTES,
       });
     } else {
+      const controller = new AbortController();
+      const abort = (): void => controller.abort();
+      this.#clipboardCopy = controller;
+      signal?.addEventListener("abort", abort, { once: true });
+      if (signal?.aborted) abort();
       try {
         result = await this.#clipboard.writeText({
           text: snapshot.text,
           origin,
-          ...(signal === undefined ? {} : { signal }),
+          signal: controller.signal,
         });
       } catch {
         result = Object.freeze({ status: "failed" });
+      } finally {
+        signal?.removeEventListener("abort", abort);
+        if (this.#clipboardCopy === controller) this.#clipboardCopy = undefined;
       }
     }
     const message: Readonly<Record<ClipboardWriteResult["status"], string>> = {

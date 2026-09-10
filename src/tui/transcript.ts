@@ -55,6 +55,7 @@ export interface RawTranscriptSnapshot {
   readonly text: string;
   readonly truncated: boolean;
   readonly entries: number;
+  readonly includedEntries: number;
 }
 
 export interface TerminalTranscriptOptions {
@@ -690,7 +691,10 @@ export class TerminalTranscript {
     const rows: string[] = [];
     let bytes = 0;
     let truncated = false;
-    for (const entry of this.#entries) {
+    let includedEntries = 0;
+    for (let index = this.#entries.length - 1; index >= 0; index -= 1) {
+      const entry = this.#entries[index];
+      if (!entry) continue;
       const text = entry.component.rawText();
       const separator = rows.length === 0 ? "" : "\n\n";
       const available = limit - bytes - Buffer.byteLength(separator, "utf8");
@@ -699,14 +703,24 @@ export class TerminalTranscript {
         break;
       }
       const accepted = utf8Prefix(text, available);
-      rows.push(`${separator}${accepted}`);
+      if (accepted || text.length === 0) {
+        rows.push(accepted);
+        includedEntries += 1;
+      }
       bytes += Buffer.byteLength(separator, "utf8") + Buffer.byteLength(accepted, "utf8");
       if (accepted !== text) {
         truncated = true;
         break;
       }
     }
-    return Object.freeze({ text: rows.join(""), truncated, entries: this.#entries.length });
+    if (includedEntries < this.#entries.length) truncated = true;
+    rows.reverse();
+    return Object.freeze({
+      text: rows.join("\n\n"),
+      truncated,
+      entries: this.#entries.length,
+      includedEntries,
+    });
   }
 
   finalize(): void {

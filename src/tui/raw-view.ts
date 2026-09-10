@@ -55,7 +55,9 @@ function renderRawScreen(
   const body = sanitize(snapshot.text, MAX_RAW_TRANSCRIPT_BYTES);
   const rows = [
     "cat · 대화 복사 보기",
-    `표시 항목 ${snapshot.entries}개${snapshot.truncated ? " · 오래되거나 큰 내용 일부 생략" : ""}`,
+    `표시 항목 ${snapshot.includedEntries}/${snapshot.entries}개${
+      snapshot.truncated ? " · 오래되거나 큰 내용 일부 생략" : ""
+    }`,
     "",
     body,
     "",
@@ -107,6 +109,7 @@ export class RawTranscriptView {
     let leftAlternateScreen = false;
     let reason: RawTranscriptExitReason | undefined;
     let failure: unknown;
+    let failed = false;
     try {
       this.#options.leaveAlternateScreen();
       leftAlternateScreen = true;
@@ -132,13 +135,15 @@ export class RawTranscriptView {
       });
     } catch (error) {
       failure = error;
+      failed = true;
     }
 
     if (this.#terminalStarted) {
       try {
         this.#options.terminal.stop();
       } catch (error) {
-        failure ??= error;
+        if (!failed) failure = error;
+        failed = true;
       } finally {
         this.#terminalStarted = false;
       }
@@ -157,7 +162,7 @@ export class RawTranscriptView {
         );
       }
     }
-    if (failure !== undefined) {
+    if (failed) {
       throw viewError(
         "raw_transition_failed",
         "대화 복사 보기 전환 중 터미널 오류가 발생했습니다.",
