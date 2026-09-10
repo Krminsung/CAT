@@ -86,5 +86,7 @@ paging된 source transcript에서 대화 기록만 새 ID로 상속하는 new/re
 메모리 전용 no-persistence, metadata 변경과 소유권 기반 rewind는
 `058e6bda00e74bdd3c0abcb0abe0815a47882b0a`에서 연결했다. 현재는 완전한 tool call/result
 쌍과 최근 대화를 우선하는 bounded model context projection, provider metadata 우선 context
-window과 자동 compact threshold, 활성 run과 교차하지 않는 transcript scanner를 구현하고 있다.
-단계 검증은 아직 실행하지 않았다.
+window과 자동 compact threshold, 활성 run과 교차하지 않는 transcript scanner를
+`23a4c410d5c409f38a9e181a300c2c9428aa2e94`에서 구현했다. 현재는 같은 run의 recovery,
+compaction, model request와 transport retry 예산을 받는 비재귀 manual/auto 압축, bounded
+continuity 보존과 append-only 완료 경계를 연결하고 있다. 단계 검증은 아직 실행하지 않았다.

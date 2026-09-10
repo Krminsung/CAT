@@ -13,7 +13,7 @@ import type { StoredTranscriptRecord } from "../storage/sessions.js";
 import {
   estimateConversationTokens,
   evaluateAutoCompact,
-  resolveModelContext,
+  normalizeModelContextInfo,
   type AutoCompactDecision,
   type ModelContextInfo,
 } from "./model-context.js";
@@ -264,7 +264,9 @@ function messageBytes(messages: readonly ConversationMessage[]): number {
   return serializedBytes(messages, "Projection message");
 }
 
-function boundedSecrets(secrets: readonly string[] | undefined): readonly string[] {
+export function normalizeContextRedactionSecrets(
+  secrets: readonly string[] | undefined,
+): readonly string[] {
   if (secrets === undefined) return Object.freeze([]);
   if (!Array.isArray(secrets) || secrets.length > MAX_REDACTION_SECRETS) {
     throw new ConfigurationError("Projection redaction secret 수가 너무 많습니다.");
@@ -292,43 +294,6 @@ function boundedSecrets(secrets: readonly string[] | undefined): readonly string
     selected.push(secret);
   }
   return Object.freeze(selected);
-}
-
-function normalizedContext(context: ModelContextInfo): ModelContextInfo {
-  if (typeof context.model !== "string") {
-    throw new ConfigurationError("Model context의 model ID가 올바르지 않습니다.");
-  }
-  const source: unknown = context.source;
-  if (source === "provider_metadata") {
-    if (context.contextWindow === undefined) {
-      throw new ConfigurationError("Provider model context window이 없습니다.");
-    }
-    return resolveModelContext({
-      model: context.model,
-      providerContextWindow: context.contextWindow,
-      autoCompactThreshold: context.autoCompactThreshold,
-    });
-  }
-  if (source === "user_setting") {
-    if (context.contextWindow === undefined) {
-      throw new ConfigurationError("사용자 model context window이 없습니다.");
-    }
-    return resolveModelContext({
-      model: context.model,
-      userContextWindow: context.contextWindow,
-      autoCompactThreshold: context.autoCompactThreshold,
-    });
-  }
-  if (source !== "unknown") {
-    throw new ConfigurationError("Model context 정보의 출처가 올바르지 않습니다.");
-  }
-  if (context.contextWindow !== undefined || context.autoCompactAtTokens !== undefined) {
-    throw new ConfigurationError("알 수 없는 model context에 임의의 token 상한이 있습니다.");
-  }
-  return resolveModelContext({
-    model: context.model,
-    autoCompactThreshold: context.autoCompactThreshold,
-  });
 }
 
 function toolCalls(message: AssistantMessage): readonly ToolCallContent[] {
@@ -583,9 +548,9 @@ export class ModelContextProjector {
   #finished = false;
 
   constructor(options: ModelContextProjectorOptions) {
-    this.#context = normalizedContext(options.context);
+    this.#context = normalizeModelContextInfo(options.context);
     this.#limits = resolveLimits(options.limits);
-    this.#redactor = new Redactor(boundedSecrets(options.secrets));
+    this.#redactor = new Redactor(normalizeContextRedactionSecrets(options.secrets));
   }
 
   addTrustedSystem(message: SystemMessage): void {

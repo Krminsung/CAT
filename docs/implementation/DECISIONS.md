@@ -215,3 +215,15 @@
   문맥에서 제외된다. 신뢰된 system 지침을 잘라 모델 요청을 계속하지 않으며, context metadata가
   없을 때 임의의 128k 기본값을 가정하지 않는다. compact 완료 record는 원문을 지우지 않는 새
   projection 경계로만 작동한다.
+
+## D023 — 비재귀 compaction과 실패 시 원문 보존
+
+- 상태: 승인됨
+- 결정: manual과 auto compaction은 같은 single-pass service를 사용한다. service는 현재 run이
+  소유한 extension budget port에서 compaction·공통 recovery와 model request를 소비하고 같은
+  retry port와 signal을 provider에 전달한다. 도구 없는 provider stream을 직접 한 번 호출하며
+  agent loop를 재귀 호출하지 않는다.
+- 결과: 최근 완전한 tool exchange와 bounded continuity만 압축 입력·보존 구간에 포함된다. summary와
+  continuity는 historical data이며 system 권한을 얻지 않는다. 완료 후보가 실제로 context를 줄여
+  안전한 projection을 만들 때만 append-only 완료 경계를 기록한다. 모든 실패는 원문을 삭제하지
+  않는 명시적 stop이고, append 실패 뒤 경계 존재 여부를 확신할 수 없으면 `unknown`으로 드러낸다.
