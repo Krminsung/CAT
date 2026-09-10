@@ -8,10 +8,10 @@
   "baseMainSha": "e38ef6fa490d8e337042c289f167a5bb438b7fad",
   "lastCommitSha": "dd0c1f4923fc36a1382c535b339084f434aca34a",
   "verification": {
-    "attemptsUsed": 0,
+    "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": "dd0c1f4923fc36a1382c535b339084f434aca34a",
+    "targetCommitSha": null,
     "result": "NOT_RUN",
     "exitCode": null
   },

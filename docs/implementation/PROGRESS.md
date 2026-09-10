@@ -191,5 +191,6 @@ annotation data를 가리키는 reference와 모호한 URI 인코딩을 차단�
 설정 문자열의 Cc/Cf 거부, transport command·cwd byte 상한과 stderr stream 오류 정리를 보완하고
 있다. 이 보완은 `dd0c1f4923fc36a1382c535b339084f434aca34a`에서 확정했다. dependency 방향,
 중앙 executor·승인 경계, 추적 파일과 `origin/main`을 대조했으며 자동 검증과 실제 MCP·앱 runtime은
-실행하지 않았다. 이 코드 commit을 P10의 유일한 검사 대상으로 예약했으며 P10 전용 실행 승인을
-기다린다.
+실행하지 않았다. 이전 예약 문서가 코드 commit과 `0 / 1`을 검사 대상으로 기록했지만, 기준 문서
+3.3의 선예약 규칙에 맞춰 명령 실행 전에 `1 / 1`로 정정하고 이 예약 정정 기록 commit 자체를 유일한
+검사 대상으로 삼는다. `npm run check`는 아직 실행하지 않았으며 P10 전용 실행 승인을 기다린다.
