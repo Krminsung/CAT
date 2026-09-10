@@ -3,17 +3,17 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P09",
-  "currentStep": "P09.VERIFY",
-  "status": "VERIFYING",
+  "currentStep": "P09.PUBLISH",
+  "status": "VERIFIED",
   "baseMainSha": "7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f",
-  "lastCommitSha": "1805cae3e60378311cb18694140b2a11bc924050",
+  "lastCommitSha": "5a28f9e1bfbd54bfb2784ce7a06ccb9e3cf01618",
   "verification": {
     "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": null,
-    "result": "NOT_RUN",
-    "exitCode": null
+    "targetCommitSha": "5a28f9e1bfbd54bfb2784ce7a06ccb9e3cf01618",
+    "result": "PASS",
+    "exitCode": 0
   },
   "publication": {
     "branch": "cat/p09-extensions-hooks",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Run the reserved npm run check exactly once",
+  "nextAction": "Create and publish cat/p09-extensions-hooks, then review and merge its PR",
   "blocker": null
 }

@@ -161,3 +161,7 @@ device·inode·size·mtime·ctime의 파일로만 읽도록 보완하고 있다.
 이 보완은 `1805cae3e60378311cb18694140b2a11bc924050`에서 확정했다. base부터 전체 diff, trust 이후
 process 순서, 중앙 permission과 추가 deny, 공유 Stop budget, 8개 event 연결, dependency 방향과 추적
 파일을 정적으로 대조했다. `origin/main`은 P09 기준 SHA와 같고 자동 검증은 아직 실행하지 않았다.
+`5a28f9e1bfbd54bfb2784ce7a06ccb9e3cf01618`을 검사 대상으로 예약한 뒤 P09에서 허용된 유일한
+`npm run check`를 실행했고, 2026-09-10T13:19:27+09:00부터 약 1.49초 뒤 exit 0으로 통과했다.
+검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 앱, TUI, provider, 도구, 실제 hook·extension
+runtime과 원본 script는 실행하지 않았다.
