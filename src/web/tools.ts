@@ -35,7 +35,7 @@ import {
 
 const FETCH_OUTPUT_BYTES = 320 * 1024;
 const SEARCH_OUTPUT_BYTES = 128 * 1024;
-const MAX_FETCH_TEXT_BYTES = 192 * 1024;
+const MAX_FETCH_TEXT_BYTES = 96 * 1024;
 const MAX_FETCH_TEXT_CODE_POINTS = 60_000;
 const MAX_TITLE_BYTES = 2_048;
 
@@ -433,7 +433,13 @@ export function registerPublicWebTools(
           const decoded = decodePublicWebDocument(response);
           const parsed = decoded.html
             ? parseHtmlDocument(decoded.text, response.finalUrl)
-            : { text: decoded.text, title: "", links: [], linksTruncated: false };
+            : {
+                text: decoded.text,
+                title: "",
+                links: [],
+                linksTruncated: false,
+                truncated: false,
+              };
           const content = parsed.text.trim();
           if (!content || looksLikeAccessChallenge(content)) {
             return failure(
@@ -453,7 +459,8 @@ export function registerPublicWebTools(
           const truncated = response.truncated ||
             text.truncated ||
             title.truncated ||
-            parsed.linksTruncated;
+            parsed.linksTruncated ||
+            parsed.truncated;
           const finalUrl = new URL(response.finalUrl);
           return toolSuccess(
             {

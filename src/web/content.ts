@@ -47,6 +47,9 @@ const BLOCK_TAGS = new Set([
 const SKIPPED_TAGS = new Set(["script", "style", "noscript", "svg", "template"]);
 const MAX_LINKS = 40;
 const MAX_LINK_BYTES = 2_048;
+const MAX_HTML_TOKENS = 65_536;
+const MAX_TEXT_PARTS = 32_768;
+const MAX_SKIPPED_DEPTH = 128;
 
 export class PublicWebContentError extends Error {
   override name = "PublicWebContentError";
@@ -79,6 +82,7 @@ export interface ParsedHtmlDocument {
   readonly title: string;
   readonly links: readonly string[];
   readonly linksTruncated: boolean;
+  readonly truncated: boolean;
 }
 
 function contentTypeParts(header: string): { mediaType: string; charset: string } {
@@ -202,17 +206,28 @@ export function parseHtmlDocument(html: string, baseUrl: string): ParsedHtmlDocu
   const titleParts: string[] = [];
   const links: string[] = [];
   let linksTruncated = false;
-  let skipDepth = 0;
+  let truncated = false;
+  let tokenCount = 0;
+  const skippedTags: string[] = [];
   let inTitle = false;
   const tokens = html.matchAll(
     /<!--[\s\S]*?(?:-->|$)|<![^>]*(?:>|$)|<\/?[A-Za-z][^>]*(?:>|$)|[^<]+|</gu,
   );
-  for (const match of tokens) {
+  tokenLoop: for (const match of tokens) {
+    tokenCount += 1;
+    if (tokenCount > MAX_HTML_TOKENS) {
+      truncated = true;
+      break;
+    }
     const token = match[0];
     if (!token.startsWith("<") || token === "<") {
-      if (skipDepth === 0) {
+      if (skippedTags.length === 0) {
         const data = inertWebText(decodeHtmlEntities(token));
-        parts.push(data);
+        if (parts.length >= MAX_TEXT_PARTS) {
+          truncated = true;
+          break;
+        }
+        if (data) parts.push(data);
         if (inTitle) titleParts.push(data);
       }
       continue;
@@ -220,16 +235,42 @@ export function parseHtmlDocument(html: string, baseUrl: string): ParsedHtmlDocu
     const closing = /^<\//u.test(token);
     const tag = /^<\/?\s*([A-Za-z0-9]+)/u.exec(token)?.[1]?.toLowerCase();
     if (!tag) continue;
+    if (skippedTags.length > 0) {
+      if (closing && skippedTags.at(-1) === tag) skippedTags.pop();
+      else if (!closing && SKIPPED_TAGS.has(tag) && !/\/\s*>$/u.test(token)) {
+        if (skippedTags.length >= MAX_SKIPPED_DEPTH) {
+          truncated = true;
+          break;
+        }
+        skippedTags.push(tag);
+      }
+      continue;
+    }
     if (closing) {
-      if (SKIPPED_TAGS.has(tag) && skipDepth > 0) skipDepth -= 1;
-      else if (skipDepth === 0 && BLOCK_TAGS.has(tag)) parts.push("\n");
+      if (BLOCK_TAGS.has(tag)) {
+        if (parts.length >= MAX_TEXT_PARTS) {
+          truncated = true;
+          break;
+        }
+        parts.push("\n");
+      }
       if (tag === "title") inTitle = false;
       continue;
     }
-    if (SKIPPED_TAGS.has(tag)) skipDepth += 1;
-    else if (skipDepth === 0 && BLOCK_TAGS.has(tag)) parts.push("\n");
-    if (tag === "title" && skipDepth === 0) inTitle = true;
-    if (tag !== "a" || skipDepth !== 0) continue;
+    const selfClosing = /\/\s*>$/u.test(token);
+    if (SKIPPED_TAGS.has(tag)) {
+      if (!selfClosing) skippedTags.push(tag);
+      continue;
+    }
+    if (BLOCK_TAGS.has(tag)) {
+      if (parts.length >= MAX_TEXT_PARTS) {
+        truncated = true;
+        break tokenLoop;
+      }
+      parts.push("\n");
+    }
+    if (tag === "title" && !selfClosing) inTitle = true;
+    if (tag !== "a") continue;
     if (links.length >= MAX_LINKS) {
       linksTruncated = true;
       continue;
@@ -252,13 +293,20 @@ export function parseHtmlDocument(html: string, baseUrl: string): ParsedHtmlDocu
       // Malformed document links are data, not a fetch instruction.
     }
   }
+  if (skippedTags.length > 0) truncated = true;
   const text = parts.join("")
     .split(/\n/gu)
     .map((line) => line.replace(/[\t\f\v ]+/gu, " ").trim())
     .filter(Boolean)
     .join("\n");
   const title = titleParts.join("").replace(/\s+/gu, " ").trim();
-  return { text, title, links: Object.freeze(links), linksTruncated };
+  return {
+    text,
+    title,
+    links: Object.freeze(links),
+    linksTruncated,
+    truncated,
+  };
 }
 
 export function looksLikeAccessChallenge(value: string): boolean {

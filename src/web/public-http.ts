@@ -5,6 +5,10 @@ import type {
 } from "node:dns";
 import { BlockList, isIP } from "node:net";
 import {
+  checkServerIdentity as verifyServerIdentity,
+  type TLSSocket,
+} from "node:tls";
+import {
   Agent,
   buildConnector,
   errors as undiciErrors,
@@ -429,6 +433,7 @@ function createPinnedDispatcher(
     timeout: Math.min(timeoutMs, CONNECT_TIMEOUT_MS),
     maxCachedSessions: 0,
     allowH2: false,
+    rejectUnauthorized: true,
   });
   const connect: ReturnType<typeof buildConnector> = (options, callback) => {
     baseConnector(options, (error, socket) => {
@@ -450,6 +455,22 @@ function createPinnedDispatcher(
         socket.destroy();
         callback(new Error("실제 연결 주소가 검증한 공개 DNS 주소와 일치하지 않습니다."), null);
         return;
+      }
+      if (options.protocol === "https:") {
+        let identityError: Error | undefined;
+        try {
+          const certificate = (socket as TLSSocket).getPeerCertificate(true);
+          identityError = verifyServerIdentity(destination.hostname, certificate);
+        } catch (error) {
+          identityError = error instanceof Error
+            ? error
+            : new Error("공개 HTTPS 인증서 이름을 검증하지 못했습니다.");
+        }
+        if (identityError !== undefined) {
+          socket.destroy();
+          callback(identityError, null);
+          return;
+        }
       }
       callback(null, socket);
     });
@@ -511,7 +532,11 @@ async function readBodyPrefix(
   try {
     while (true) {
       if (signal.aborted) throw aborted();
-      const { done, value } = await reader.read();
+      const { done, value } = await awaitWithSignal(
+        reader.read(),
+        signal,
+        aborted,
+      );
       if (signal.aborted) throw aborted();
       if (done) {
         completed = true;

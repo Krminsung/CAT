@@ -740,9 +740,9 @@ export class AgentRunner {
           context.state.transition("MODEL");
           continue;
         }
-        visibleText = web.limitationText();
-        hostLimitedWebAnswer = true;
         const missingContext = webAssessment.action === "needs_user_context";
+        visibleText = web.limitationText(missingContext);
+        hostLimitedWebAnswer = true;
         context.journal.emit({
           type: "notice",
           level: "warning",
@@ -750,7 +750,9 @@ export class AgentRunner {
             ? "web_user_context_required"
             : "web_evidence_unavailable",
           message: missingContext
-            ? "사용자 위치를 추론하지 않고 날씨 조회에 필요한 지역을 다시 요청합니다."
+            ? web.disposition.reason === "needs_user_context"
+              ? "사용자 위치를 추론하지 않고 날씨 조회에 필요한 지역을 다시 요청합니다."
+              : "근거 없는 주장을 노출하지 않고 공개 정보 확인에 필요한 대상을 다시 요청합니다."
             : "실제 원문과 인용을 연결하지 못해 근거 없는 현재 정보 답변을 제한했습니다.",
         });
       }

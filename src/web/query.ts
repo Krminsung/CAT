@@ -6,17 +6,36 @@ const MAX_SECRETS = 512;
 const MAX_SECRET_BYTES = 8 * 1024;
 const MAX_SECRET_TOTAL_BYTES = 512 * 1024;
 const MAX_SEARCH_QUERY_CODE_POINTS = 500;
+const MAX_PERCENT_DECODE_PASSES = 8;
 const REDACTION_MARKER = "[REDACTED]";
 const SENSITIVE_QUERY_PARAMETER = /^(?:api[_-]?key|access[_-]?token|auth(?:orization)?|bearer|client[_-]?secret|code|cookie|credential|key|password|passwd|private[_-]?key|refresh[_-]?token|secret|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature)$/iu;
 
 const CONVERSATIONAL_FILLER = /(?<![A-Za-z0-9가-힣])(?:어때(?:요)?|어떤가요|어떻습니까|어떻게\s*돼(?:요)?|알려\s*(?:줘요?|주세요)|설명해\s*(?:줘요?|주세요)|궁금해(?:요)?|좀|혹시|please|tell\s+me|how\s+is|how's|what\s+is|what's)(?![A-Za-z0-9가-힣])/giu;
 
-function decodedComponent(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
+interface DecodedVariants {
+  readonly values: readonly string[];
+  readonly fullyDecoded: boolean;
+}
+
+function decodePercentRuns(value: string): string {
+  return value.replace(/(?:%[0-9A-Fa-f]{2})+/gu, (encoded) =>
+    Buffer.from(encoded.replaceAll("%", ""), "hex").toString("utf8")
+  );
+}
+
+function decodedVariants(value: string): DecodedVariants {
+  const values = [value];
+  let current = value;
+  for (let pass = 0; pass < MAX_PERCENT_DECODE_PASSES; pass += 1) {
+    const decoded = decodePercentRuns(current);
+    if (decoded === current) return { values, fullyDecoded: true };
+    values.push(decoded);
+    current = decoded;
   }
+  return {
+    values,
+    fullyDecoded: decodePercentRuns(current) === current,
+  };
 }
 
 /** Owns the exact secret set used to minimize data sent to unauthenticated public web endpoints. */
@@ -59,10 +78,16 @@ export class PublicWebInputGuard {
 
   containsProtectedData(value: string): boolean {
     if (this.#redactionUnavailable) return true;
+    const candidates = decodedVariants(value);
+    if (!candidates.fullyDecoded) return true;
     return this.#secrets.some((secret) => {
-      if (value.includes(secret)) return true;
-      const encoded = encodeURIComponent(secret);
-      return encoded !== secret && value.includes(encoded);
+      const protectedValues = decodedVariants(secret);
+      return !protectedValues.fullyDecoded ||
+        candidates.values.some((candidate) =>
+          protectedValues.values.some((protectedValue) =>
+            candidate.includes(protectedValue)
+          )
+        );
     });
   }
 
@@ -72,11 +97,27 @@ export class PublicWebInputGuard {
         "알려진 secret 전체를 안전하게 검사할 수 없어 공개 검색을 차단했습니다.",
       );
     }
-    let query = raw;
+    let redactedRaw = raw;
     for (const secret of this.#secrets) {
-      query = query.replaceAll(secret, " ");
-      const encoded = encodeURIComponent(secret);
-      if (encoded !== secret) query = query.replaceAll(encoded, " ");
+      redactedRaw = redactedRaw.replaceAll(secret, " ");
+    }
+    const decoded = decodedVariants(redactedRaw);
+    if (!decoded.fullyDecoded) {
+      throw new PermissionDeniedError(
+        "과도하게 중첩 인코딩된 내용이 있어 공개 검색을 차단했습니다.",
+      );
+    }
+    let query = decoded.values.at(-1) ?? redactedRaw;
+    for (const secret of this.#secrets) {
+      const protectedValues = decodedVariants(secret);
+      if (!protectedValues.fullyDecoded) {
+        throw new PermissionDeniedError(
+          "알려진 secret의 인코딩 형태를 안전하게 검사할 수 없어 공개 검색을 차단했습니다.",
+        );
+      }
+      for (const protectedValue of protectedValues.values) {
+        query = query.replaceAll(protectedValue, " ");
+      }
     }
     query = query
       .replace(/-----BEGIN [A-Z0-9 ]{0,32}PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]{0,32}PRIVATE KEY-----|$)/gu, " ")
@@ -115,13 +156,26 @@ export class PublicWebInputGuard {
       );
     }
     const url = normalizePublicWebUrl(raw);
-    const decodedPath = decodedComponent(url.pathname);
+    const encodedComponents = [
+      url.href,
+      url.pathname,
+      ...[...url.searchParams.entries()].flatMap(([name, value]) => [name, value]),
+    ].map(decodedVariants);
+    if (encodedComponents.some((component) => !component.fullyDecoded)) {
+      throw new PermissionDeniedError(
+        "과도하게 중첩 인코딩된 URL은 공개 웹으로 전송할 수 없습니다.",
+      );
+    }
+    const decodedComponents = encodedComponents.flatMap((component) => component.values);
     for (const secret of this.#secrets) {
+      const protectedValues = decodedVariants(secret);
       if (
-        url.href.includes(secret) ||
-        url.href.includes(encodeURIComponent(secret)) ||
-        decodedPath.includes(secret) ||
-        [...url.searchParams.values()].some((value) => value.includes(secret))
+        !protectedValues.fullyDecoded ||
+        decodedComponents.some((component) =>
+          protectedValues.values.some((protectedValue) =>
+            component.includes(protectedValue)
+          )
+        )
       ) {
         throw new PermissionDeniedError(
           "알려진 secret이 포함된 URL은 공개 웹으로 전송할 수 없습니다.",
@@ -129,7 +183,11 @@ export class PublicWebInputGuard {
       }
     }
     for (const name of url.searchParams.keys()) {
-      if (SENSITIVE_QUERY_PARAMETER.test(name)) {
+      const names = decodedVariants(name);
+      if (
+        !names.fullyDecoded ||
+        names.values.some((candidate) => SENSITIVE_QUERY_PARAMETER.test(candidate))
+      ) {
         throw new PermissionDeniedError(
           `민감한 query parameter ${name}이 포함된 URL은 공개 웹으로 전송할 수 없습니다.`,
         );

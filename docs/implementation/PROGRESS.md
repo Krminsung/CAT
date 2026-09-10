@@ -222,3 +222,7 @@ credential과 민감 environment를 갱신 가능한 public input guard에서 �
 완료 근거로 추적하고, 빠진 근거는 동일 run의 공통 예산에서 web 복구 한 번으로만 보완한다. 공개 page는
 비신뢰 data로 전달하며 근거 없는 초안은 노출·message 기록하지 않고, 복구 뒤에도 근거가 없으면 host
 제한 문구로 끝낸다. 위치 없는 날씨 요청은 host 위치를 추론하거나 외부 요청하지 않고 지역을 다시 묻는다.
+P11.3은 `23bcbcf5ea905e8e9dd59e7776edc3cd7e317d02`에서 완료했다. 전체 정적 검토에서는 TLS
+인증서 identity와 body abort, 반복 percent encoding secret, HTML·검색 parser 총량, 실제 검색 source
+선별, 민감·금지·모호한 query 및 후속 prompt, 웹 응답 보류·host 제한 문구와 권한 거부 뒤 우회 차단을
+보완하고 있다. 외부 URL, 앱·도구 runtime과 자동 검증은 실행하지 않았다.
