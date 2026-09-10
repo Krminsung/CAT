@@ -23,7 +23,7 @@ export class SlashCommandAutocompleteProvider implements AutocompleteProvider {
     if (options.signal.aborted || cursorLine < 0 || cursorLine >= lines.length) return null;
     const line = lines[cursorLine] ?? "";
     const before = line.slice(0, cursorCol);
-    const match = before.match(/^\/([A-Za-z0-9-]*)$/u);
+    const match = before.match(/^\/([A-Za-z0-9:_-]*)$/u);
     if (!match) return null;
     const prefix = match[0];
     const completions = this.source.completions(match[1] ?? "");

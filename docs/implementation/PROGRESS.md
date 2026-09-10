@@ -148,4 +148,9 @@ P09.1은 `a84e9ceb400927cc6d70bbd8199aa1067890b6e0`에서 완료했다. 이어�
 `load_skill`과 bounded positional argument 렌더링을 P09.2에서 구현하고 있다.
 P09.2는 `173ee09750350d30c238f89a1a09dd87e3eaa334`에서 완료했다. P09.3에서는 정확히
 8개 event, 세 blockable event의 exit code 2 의미, 최소 환경, bounded JSON stdin·통합 output·추가
-context, timeout·abort·process group 정리와 engine 재진입 차단을 구현하고 있다.
+context, timeout·abort·process group 정리와 engine 재진입 차단을
+`dd4851e591e985295f48df2209fe14bbd3abcd00`에서 완료했다. P09.4에서는 지침·skill catalog와
+SessionStart/UserPromptSubmit context를 권한 없는 비신뢰 모델 입력으로 연결하고, 중앙 executor의
+Pre/Post hook, 공유 budget의 Stop continuation 1회, PreCompact와 세션 전환·종료 event를 조립하고 있다.
+`/init`과 `# instruction`은 canonical 파일 관찰·중앙 write 경계를 사용하며 `/reload`는 기존 인증과
+승인을 보존한 채 검증된 설정·지침·command·skill·hook만 교체한다.

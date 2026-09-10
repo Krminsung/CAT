@@ -2,6 +2,11 @@ import { spawn } from "node:child_process";
 import type { ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 import { CancelledError, ConfigurationError, HookError } from "../core/errors.js";
+import type {
+  AgentStopHookDecision,
+  AgentStopHookPort,
+  AgentStopHookRequest,
+} from "../agent/runner.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
 import type { ToolExecutionResult } from "../core/tools.js";
 import { buildChildEnvironment } from "../security/environment.js";
@@ -435,7 +440,7 @@ export class HookEngine {
   readonly implementation: "none" | "configured";
   readonly #options: HookEngineOptions;
   readonly #groups: ReadonlyMap<HookEvent, readonly HookGroup[]>;
-  readonly #redactor: Redactor;
+  #redactor: Redactor;
   #sessionId: string;
   #transcriptPath: string;
   #running = false;
@@ -465,6 +470,11 @@ export class HookEngine {
     }
     this.#sessionId = sessionId;
     this.#transcriptPath = transcriptPath;
+  }
+
+  setRedactor(redactor: Redactor): void {
+    if (this.#running) throw new HookError("Hook 실행 중에는 redactor를 바꿀 수 없습니다.");
+    this.#redactor = redactor;
   }
 
   async run(
@@ -604,5 +614,24 @@ export class HookToolPort implements ToolHookPort {
       },
       request.context.signal,
     );
+  }
+}
+
+export class HookStopPort implements AgentStopHookPort {
+  constructor(readonly hooks: HookEngine) {}
+
+  async beforeStop(request: AgentStopHookRequest): Promise<AgentStopHookDecision> {
+    const outcome = await this.hooks.run(
+      "Stop",
+      "",
+      {
+        last_assistant_message: request.text,
+        stop_hook_active: request.stopHookActive,
+      },
+      request.signal,
+    );
+    return outcome.blocked
+      ? { continue: true, reason: outcome.reason }
+      : { continue: false };
   }
 }

@@ -12,8 +12,11 @@ function success(content: JsonObject): ToolExecutionResult {
 
 export function registerSkillLoaderTool(
   registry: ToolRegistry,
-  catalog: ExtensionCatalog,
+  catalogProvider: ExtensionCatalog | (() => ExtensionCatalog),
 ): void {
+  const catalog = (): ExtensionCatalog => typeof catalogProvider === "function"
+    ? catalogProvider()
+    : catalogProvider;
   registry.register({
     definition: {
       name: "load_skill",
@@ -39,7 +42,7 @@ export function registerSkillLoaderTool(
         if (typeof name !== "string") {
           throw new ConfigurationError("load_skill name은 문자열이어야 합니다.");
         }
-        const loaded = await catalog.loadSkill(name, context.signal);
+        const loaded = await catalog().loadSkill(name, context.signal);
         return success({
           name: loaded.descriptor.name,
           source: loaded.descriptor.source,
