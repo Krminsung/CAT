@@ -225,4 +225,6 @@ credential과 민감 environment를 갱신 가능한 public input guard에서 �
 P11.3은 `23bcbcf5ea905e8e9dd59e7776edc3cd7e317d02`에서 완료했다. 전체 정적 검토에서는 TLS
 인증서 identity와 body abort, 반복 percent encoding secret, HTML·검색 parser 총량, 실제 검색 source
 선별, 민감·금지·모호한 query 및 후속 prompt, 웹 응답 보류·host 제한 문구와 권한 거부 뒤 우회 차단을
-보완하고 있다. 외부 URL, 앱·도구 runtime과 자동 검증은 실행하지 않았다.
+보완했다. 이 보완은 `74d6c1b367d5260ad0e9144167b80960c8d130ad`에서 확정했다. base부터 전체
+diff의 기능·의존성·권한·취소·secret·출력·정리 경계와 추적 파일을 대조했고 `origin/main`은 P11 기준
+SHA와 같다. 외부 URL, 앱·도구 runtime과 자동 검증은 실행하지 않았다.
