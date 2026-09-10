@@ -10,7 +10,7 @@ P06 기준 main은 `e5f082a0b8ccb5fdc70233837762941e63f7233b`이다. 구현은 �
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
 | P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
-| P06 세션·컨텍스트 | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
+| P06 세션·컨텍스트 | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -92,5 +92,7 @@ compaction, model request와 transport retry 예산을 받는 비재귀 manual/a
 continuity 보존과 append-only 완료 경계를
 `fb238f43693e6237bc94db01403d6d97de4ba821`에서 연결했다. 전체 정적 검토에서 짧은 redaction
 secret, no-persistence resume의 maintenance 소유권, metadata 시각 단조성, sessionStore의 도구
-접근 차단, projection 식별자·경고 redaction과 compaction 손실성 표기를 보완하고 있다. 단계
-검증은 아직 실행하지 않았다.
+접근 차단, projection 식별자·경고 redaction과 compaction 손실성 표기를
+`e50f0a5368f6c12a01bc719cd0f96494b2a86b3e`에서 보완했다. 추적된 원본 archive·build
+산출물·secret·GitHub Actions workflow와 검사 우회는 발견되지 않았다. `origin/main`이 P06
+기준 SHA와 같음을 확인했고 유일한 `npm run check` 1회를 예약했으며 아직 실행하지 않았다.

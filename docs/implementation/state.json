@@ -3,12 +3,12 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P06",
-  "currentStep": "P06 static review fixes",
-  "status": "IMPLEMENTING",
+  "currentStep": "P06.VERIFY",
+  "status": "VERIFYING",
   "baseMainSha": "e5f082a0b8ccb5fdc70233837762941e63f7233b",
-  "lastCommitSha": "fb238f43693e6237bc94db01403d6d97de4ba821",
+  "lastCommitSha": "e50f0a5368f6c12a01bc719cd0f96494b2a86b3e",
   "verification": {
-    "attemptsUsed": 0,
+    "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
     "targetCommitSha": null,
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Commit P06 static review fixes without running verification",
+  "nextAction": "Run the reserved npm run check exactly once",
   "blocker": null
 }
