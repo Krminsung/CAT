@@ -1,7 +1,6 @@
 import {
   Container,
   CURSOR_MARKER,
-  Editor,
   ProcessTerminal,
   ScrollView,
   Text,
@@ -11,14 +10,23 @@ import {
   type Component,
   type EditorTheme,
   type Focusable,
+  type OverlayHandle,
   type Terminal,
   type TuiMouseEvent,
   type TuiMouseEventResult,
   type TuiStopOptions,
 } from "@earendil-works/pi-tui";
 
+import { CancelledError } from "../core/errors.js";
 import { PRODUCT_NAME, VERSION } from "../core/version.js";
 import { Redactor } from "../security/redaction.js";
+import {
+  BoundedEditor,
+  TerminalInputController,
+  type TerminalInputConfiguration,
+  type TerminalInputHost,
+} from "./input.js";
+import { SecretInputPanel } from "./secret-input.js";
 import {
   safeTerminalLine,
   sanitizeTerminalText,
@@ -36,6 +44,8 @@ const MAX_COMPONENT_ROWS = 8_192;
 const MAX_TRANSCRIPT_ENTRY_BYTES = 64 * 1024;
 const MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSCRIPT_ENTRIES = 256;
+const MAX_REGISTERED_SECRETS = 32;
+const MAX_REGISTERED_SECRET_BYTES = 256 * 1024;
 
 const plainStyle = (text: string): string => text;
 
@@ -101,6 +111,16 @@ export interface CatTerminalScreenOptions {
 interface TranscriptComponent {
   readonly component: Component;
   readonly bytes: number;
+}
+
+interface ActiveSecretPrompt {
+  cancel(error: Error): void;
+}
+
+export interface SecretPromptOptions {
+  readonly label: string;
+  readonly message?: string;
+  readonly signal?: AbortSignal;
 }
 
 type ComponentFailureHandler = (
@@ -289,6 +309,42 @@ class NativeSelectionTui extends TuiAltScreen {
   }
 }
 
+class ScreenRedactor implements TerminalTextRedactor {
+  readonly #base: TerminalTextRedactor;
+  readonly #secrets = new Set<string>();
+  #secretBytes = 0;
+  #dynamic = new Redactor();
+
+  constructor(base: TerminalTextRedactor) {
+    this.#base = base;
+  }
+
+  addSecret(secret: string): boolean {
+    if (this.#secrets.has(secret)) return true;
+    const bytes = Buffer.byteLength(secret, "utf8");
+    if (
+      bytes < 8 ||
+      bytes > 8 * 1024 ||
+      this.#secrets.size >= MAX_REGISTERED_SECRETS ||
+      this.#secretBytes + bytes > MAX_REGISTERED_SECRET_BYTES
+    ) return false;
+    this.#secrets.add(secret);
+    this.#secretBytes += bytes;
+    this.#dynamic = new Redactor([...this.#secrets]);
+    return true;
+  }
+
+  clearAddedSecrets(): void {
+    this.#secrets.clear();
+    this.#secretBytes = 0;
+    this.#dynamic = new Redactor();
+  }
+
+  redact(text: string): string {
+    return this.#dynamic.redact(this.#base.redact(text));
+  }
+}
+
 function failureMessage(error: unknown): string {
   return error instanceof Error && error.message ? error.message : "알 수 없는 오류";
 }
@@ -297,14 +353,14 @@ export class CatTerminalScreen {
   readonly #terminal: Terminal;
   readonly #tty: TerminalTtyState;
   readonly #diagnostics: TerminalDiagnosticWriter;
-  readonly #redactor: TerminalTextRedactor;
+  readonly #redactor: ScreenRedactor;
   readonly #tui: NativeSelectionTui;
   readonly #header: BoundedSingleLine;
   readonly #status: BoundedSingleLine;
   readonly #transcript = new Container();
   readonly #transcriptComponents: TranscriptComponent[] = [];
   readonly #scroll: ScrollView;
-  readonly #editor: Editor;
+  readonly #editor: BoundedEditor;
   readonly #editorBoundary: FocusableComponentBoundary;
   readonly #exitPromise: Promise<TerminalScreenExit>;
 
@@ -315,16 +371,16 @@ export class CatTerminalScreen {
   #restorationAttempted = false;
   #exitResolved = false;
   #transcriptBytes = 0;
+  #inputController: TerminalInputController | undefined;
+  #activeSecret: ActiveSecretPrompt | undefined;
 
   constructor(options: CatTerminalScreenOptions) {
     this.#terminal = options.terminal ?? new ProcessTerminal();
     this.#tty = { ...(options.tty ?? detectTerminalTtyState()) };
     this.#diagnostics = options.diagnostics ?? process.stderr;
-    if (options.redactor) {
-      this.#redactor = options.redactor;
-    } else {
-      this.#redactor = new Redactor(options.secrets ?? []);
-    }
+    this.#redactor = new ScreenRedactor(
+      options.redactor ?? new Redactor(options.secrets ?? []),
+    );
 
     const componentFailure: ComponentFailureHandler = (operation, label, error) => {
       this.#captureComponentFailure(operation, label, error);
@@ -340,10 +396,13 @@ export class CatTerminalScreen {
       options.status ?? `세션 ${options.sessionId} · 준비`,
       this.#redactor,
     );
-    this.#editor = new Editor(this.#tui, EDITOR_THEME, {
-      paddingX: 0,
-      autocompleteMaxVisible: 8,
-    });
+    this.#editor = new BoundedEditor(
+      this.#tui,
+      EDITOR_THEME,
+      { paddingX: 0, autocompleteMaxVisible: 8 },
+      () => this.setStatus("입력이 허용된 크기 제한에 도달했습니다."),
+    );
+    this.#editor.disableSubmit = true;
     this.#editorBoundary = new FocusableComponentBoundary(
       this.#editor,
       "입력 편집기",
@@ -398,7 +457,7 @@ export class CatTerminalScreen {
     return { ...this.#tty };
   }
 
-  get editor(): Editor {
+  get editor(): BoundedEditor {
     return this.#editor;
   }
 
@@ -452,6 +511,9 @@ export class CatTerminalScreen {
   stop(): void {
     if (this.#state === "stopped" || this.#state === "stopping") return;
     this.#state = "stopping";
+    this.#activeSecret?.cancel(new CancelledError("터미널 화면이 닫혀 비밀 입력을 취소했습니다."));
+    this.#inputController?.dispose();
+    this.#inputController = undefined;
     const restorationError = this.#restoreTerminal();
     if (restorationError && !this.#failure) {
       const detail = safeTerminalLine(failureMessage(restorationError), {
@@ -467,6 +529,7 @@ export class CatTerminalScreen {
     this.#state = "stopped";
     if (this.#failure) this.#writeDiagnostic(this.#failure);
     this.#resolveExitOnce();
+    this.#redactor.clearAddedSecrets();
   }
 
   close(): void {
@@ -475,6 +538,127 @@ export class CatTerminalScreen {
 
   waitForExit(): Promise<TerminalScreenExit> {
     return this.#exitPromise;
+  }
+
+  configureInput(configuration: TerminalInputConfiguration): TerminalInputController {
+    if (this.#state === "stopped" || this.#state === "stopping") {
+      throw new TerminalScreenError("screen_application_failed", "종료된 화면에는 입력을 연결할 수 없습니다.");
+    }
+    if (this.#inputController) {
+      throw new TerminalScreenError("screen_application_failed", "터미널 입력이 이미 연결되어 있습니다.");
+    }
+    const host: TerminalInputHost = {
+      editor: this.#editor,
+      addInputListener: (listener) => this.#tui.addInputListener(listener),
+      close: () => this.close(),
+      notice: (message) => this.setStatus(message),
+      render: () => this.requestRender(),
+      reportFailure: (error) => this.reportApplicationFailure(error),
+    };
+    this.#inputController = new TerminalInputController(host, configuration);
+    return this.#inputController;
+  }
+
+  setBusy(busy: boolean): void {
+    this.#inputController?.setBusy(busy);
+  }
+
+  requestSecret(options: SecretPromptOptions): Promise<string> {
+    if (this.#state !== "running") {
+      return Promise.reject(new TerminalScreenError(
+        "screen_application_failed",
+        "실행 중인 대화형 화면에서만 비밀값을 입력할 수 있습니다.",
+      ));
+    }
+    if (this.#activeSecret) {
+      return Promise.reject(new TerminalScreenError(
+        "screen_application_failed",
+        "다른 비밀 입력이 이미 열려 있습니다.",
+      ));
+    }
+    if (this.#inputController?.busy) {
+      return Promise.reject(new TerminalScreenError(
+        "screen_application_failed",
+        "실행 중인 요청이 끝난 뒤 비밀값을 입력할 수 있습니다.",
+      ));
+    }
+    if (options.signal?.aborted) {
+      return Promise.reject(new CancelledError("비밀 입력을 시작하기 전에 취소됐습니다."));
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      const panel = new SecretInputPanel({
+        label: options.label,
+        ...(options.message === undefined ? {} : { message: options.message }),
+        redactor: this.#redactor,
+      });
+      const boundary = new FocusableComponentBoundary(
+        panel,
+        "비밀 입력",
+        this.#redactor,
+        (operation, label, error) => this.#captureComponentFailure(operation, label, error),
+      );
+      let overlay: OverlayHandle | undefined;
+      let settled = false;
+
+      const abort = (): void => {
+        active.cancel(new CancelledError("비밀 입력이 취소됐습니다."));
+      };
+      const cleanup = (): void => {
+        options.signal?.removeEventListener("abort", abort);
+        panel.dispose();
+        this.#inputController?.setModalInput(false);
+        if (this.#activeSecret === active) this.#activeSecret = undefined;
+        try {
+          overlay?.hide();
+        } catch (error) {
+          this.#captureComponentFailure("invalidate", "비밀 입력 overlay", error);
+        }
+        if (this.#state === "running") {
+          this.#tui.setFocus(this.#editorBoundary);
+          this.requestRender();
+        }
+      };
+      const active: ActiveSecretPrompt = {
+        cancel: (error) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(error);
+        },
+      };
+      panel.onChange = () => this.requestRender();
+      panel.onInvalid = (message) => this.setStatus(message);
+      panel.onCancel = () => active.cancel(new CancelledError("비밀 입력을 취소했습니다."));
+      panel.onSubmit = (secret) => {
+        if (settled) return;
+        if (!this.#redactor.addSecret(secret)) {
+          const error = new Error("비밀값을 안전한 화면 redaction 목록에 등록하지 못했습니다.");
+          active.cancel(error);
+          this.reportApplicationFailure(error);
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve(secret);
+      };
+
+      this.#activeSecret = active;
+      this.#inputController?.setModalInput(true);
+      options.signal?.addEventListener("abort", abort, { once: true });
+      try {
+        overlay = this.#tui.showOverlay(boundary, {
+          width: "80%",
+          minWidth: 24,
+          maxHeight: 12,
+          margin: 1,
+        });
+        this.#tui.setFocus(boundary);
+        this.requestRender();
+      } catch (error) {
+        active.cancel(error instanceof Error ? error : new Error("비밀 입력 화면을 열지 못했습니다."));
+      }
+    });
   }
 
   async run(

@@ -249,3 +249,14 @@
 - 결과: 정상·오류 종료는 대화 내용을 main screen에 다시 출력하지 않고 raw mode, bracketed paste,
   mouse mode, autowrap, cursor와 alternate screen을 복원한다. 화면 오류는 모델 재호출이나 새 agent
   run을 만들지 않으며 실제 터미널별 복원 품질은 정적 검사만으로 확인했다고 주장하지 않는다.
+
+## D026 — 입력 소유권과 비밀 입력 분리
+
+- 상태: 승인됨
+- 결정: pi-tui Editor가 Unicode grapheme와 표시 폭, Enter 제출, Ctrl+J newline을 소유하고 cat의
+  input controller는 입력·paste·history 총량과 run 중 재제출을 제한한다. busy Ctrl+C는 현재 run의
+  cancel port를 한 번만 호출하며 permission/details/session 단축키는 명시적으로 연결된 callback만
+  사용한다. API key 등 비밀 입력은 별도 masked overlay component에서만 수집한다.
+- 결과: 여러 줄 paste 자체가 submit이나 command dispatch가 되지 않는다. 일반 prompt만 제한된
+  history에 들어가며 secret은 getter, transcript, history, clipboard로 노출하지 않고 제출 직후
+  화면 redaction 목록에 등록한다. 화면 또는 overlay 종료 시 listener와 secret 보유 상태를 정리한다.

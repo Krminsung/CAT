@@ -102,3 +102,6 @@ P06는 검토 head `5a0b32ed50faf6d32cd064052999039e71d44135`를 PR #6에서 mer
 commit `c434311e79ac2c112ea8ac08e31b5a320dff3e2f`로 병합했다. merge의 두 부모,
 tree, phase head의 조상 관계와 `origin/main`을 대조했다. P07은 이 merge commit을 기준으로
 alternate-screen 화면 수명주기와 TTY·복원 경계를 구현하고 있다.
+P07.1의 alternate-screen layout, 독립 TTY 판정, 제어 문자열 정리와 멱등 복원 경계는
+`2e8aa99595b31db0cdcb97fd706e017afcc49d8c`에서 완료했다. 현재 P07.2의 bounded Unicode
+editor, paste·단축키·history controller와 일반 기록에서 분리된 masked secret overlay를 구현하고 있다.
