@@ -189,5 +189,7 @@ workspace와 cwd identity를 승인 뒤에도 재확인하고, 종료 확인 실
 `c7fcf0d4d4f5ceecf50e3e3c335acd0d92b70ede`에서 완료했다. 전체 정적 검토에서 schema가 아닌
 annotation data를 가리키는 reference와 모호한 URI 인코딩을 차단하고, 민감 출력 field 이름 정규화,
 설정 문자열의 Cc/Cf 거부, transport command·cwd byte 상한과 stderr stream 오류 정리를 보완하고
-있다. dependency 방향, 중앙 executor·승인 경계, 추적 파일과 `origin/main`을 대조했으며 자동 검증과
-실제 MCP·앱 runtime은 실행하지 않았다.
+있다. 이 보완은 `dd0c1f4923fc36a1382c535b339084f434aca34a`에서 확정했다. dependency 방향,
+중앙 executor·승인 경계, 추적 파일과 `origin/main`을 대조했으며 자동 검증과 실제 MCP·앱 runtime은
+실행하지 않았다. 이 코드 commit을 P10의 유일한 검사 대상으로 예약했으며 P10 전용 실행 승인을
+기다린다.
