@@ -16,6 +16,13 @@ import {
   type TuiStopOptions,
 } from "@earendil-works/pi-tui";
 
+import { LocalClipboardWriter } from "../clipboard/local.js";
+import {
+  MAX_CLIPBOARD_TEXT_BYTES,
+  type ClipboardWriteOrigin,
+  type ClipboardWriteResult,
+  type ClipboardWriter,
+} from "../clipboard/types.js";
 import { CancelledError } from "../core/errors.js";
 import type { AgentEvent } from "../core/events.js";
 import { PRODUCT_NAME, VERSION } from "../core/version.js";
@@ -27,6 +34,11 @@ import {
   type TerminalInputConfiguration,
   type TerminalInputHost,
 } from "./input.js";
+import {
+  MAX_RAW_TRANSCRIPT_BYTES,
+  RawTranscriptView,
+  type RawTranscriptExitReason,
+} from "./raw-view.js";
 import { SecretInputPanel } from "./secret-input.js";
 import {
   safeTerminalLine,
@@ -109,6 +121,7 @@ export interface CatTerminalScreenOptions {
   readonly diagnostics?: TerminalDiagnosticWriter;
   readonly redactor?: TerminalTextRedactor;
   readonly secrets?: readonly string[];
+  readonly clipboard?: ClipboardWriter;
 }
 
 interface ActiveSecretPrompt {
@@ -351,6 +364,7 @@ export class CatTerminalScreen {
   readonly #terminal: Terminal;
   readonly #tty: TerminalTtyState;
   readonly #diagnostics: TerminalDiagnosticWriter;
+  readonly #clipboard: ClipboardWriter;
   readonly #redactor: ScreenRedactor;
   readonly #tui: NativeSelectionTui;
   readonly #header: BoundedSingleLine;
@@ -360,6 +374,7 @@ export class CatTerminalScreen {
   readonly #scroll: ScrollView;
   readonly #editor: BoundedEditor;
   readonly #editorBoundary: FocusableComponentBoundary;
+  readonly #rawView: RawTranscriptView;
   readonly #exitPromise: Promise<TerminalScreenExit>;
 
   #resolveExit: ((result: TerminalScreenExit) => void) | undefined;
@@ -375,6 +390,7 @@ export class CatTerminalScreen {
     this.#terminal = options.terminal ?? new ProcessTerminal();
     this.#tty = { ...(options.tty ?? detectTerminalTtyState()) };
     this.#diagnostics = options.diagnostics ?? process.stderr;
+    this.#clipboard = options.clipboard ?? new LocalClipboardWriter();
     this.#redactor = new ScreenRedactor(
       options.redactor ?? new Redactor(options.secrets ?? []),
     );
@@ -444,6 +460,21 @@ export class CatTerminalScreen {
       { component: statusBoundary, basis: 1, grow: 0, shrink: 0, minSize: 1, maxSize: 1 },
     ]));
     this.#tui.setFocus(this.#editorBoundary);
+    this.#rawView = new RawTranscriptView({
+      terminal: this.#terminal,
+      tty: this.#tty,
+      leaveAlternateScreen: () => this.#tui.stop({ preserveScreen: true }),
+      returnToAlternateScreen: () => {
+        this.#tui.setFocus(this.#editorBoundary);
+        this.#tui.start();
+        this.#tui.requestRender(true);
+      },
+      canReturnToAlternateScreen: () => this.#state === "running",
+      sanitize: (text, maximumBytes) => sanitizeTerminalText(text, {
+        maximumBytes,
+        redactor: this.#redactor,
+      }).text,
+    });
     this.#exitPromise = new Promise<TerminalScreenExit>((resolve) => {
       this.#resolveExit = resolve;
     });
@@ -467,6 +498,10 @@ export class CatTerminalScreen {
 
   get isFollowingTranscript(): boolean {
     return this.#scroll.isFollowingEnd;
+  }
+
+  get rawViewActive(): boolean {
+    return this.#rawView.active;
   }
 
   start(): void {
@@ -515,6 +550,7 @@ export class CatTerminalScreen {
   stop(): void {
     if (this.#state === "stopped" || this.#state === "stopping") return;
     this.#state = "stopping";
+    const rawViewError = this.#rawView.cancel();
     this.#activeSecret?.cancel(new CancelledError("터미널 화면이 닫혀 비밀 입력을 취소했습니다."));
     this.#inputController?.dispose();
     this.#inputController = undefined;
@@ -533,8 +569,8 @@ export class CatTerminalScreen {
         );
       }
     }
-    const restorationError = this.#restoreTerminal();
-    if (restorationError && !this.#failure) {
+    const restorationError = this.#restoreTerminal(rawViewError);
+    if (restorationError !== undefined && !this.#failure) {
       const detail = safeTerminalLine(failureMessage(restorationError), {
         maximumBytes: 4 * 1024,
         redactor: this.#redactor,
@@ -777,6 +813,70 @@ export class CatTerminalScreen {
       : this.#transcriptModel.rawSnapshot(maximumBytes);
   }
 
+  async showRawTranscript(): Promise<RawTranscriptExitReason> {
+    if (this.#state !== "running") {
+      throw new TerminalScreenError(
+        "screen_application_failed",
+        "실행 중인 대화형 화면에서만 대화 복사 보기를 열 수 있습니다.",
+      );
+    }
+    if (this.#rawView.active) {
+      throw new TerminalScreenError(
+        "screen_application_failed",
+        "대화 복사 보기가 이미 열려 있습니다.",
+      );
+    }
+    if (this.#activeSecret || this.#inputController?.busy) {
+      throw new TerminalScreenError(
+        "screen_application_failed",
+        "입력 또는 실행이 끝난 뒤 대화 복사 보기를 열 수 있습니다.",
+      );
+    }
+    try {
+      return await this.#rawView.show(
+        this.#transcriptModel.rawSnapshot(MAX_RAW_TRANSCRIPT_BYTES),
+      );
+    } catch (error) {
+      this.reportApplicationFailure(error);
+      throw error;
+    }
+  }
+
+  async copyTranscriptToClipboard(
+    origin: ClipboardWriteOrigin = "user_command",
+    signal?: AbortSignal,
+  ): Promise<ClipboardWriteResult> {
+    if (this.#state !== "running") return Object.freeze({ status: "unavailable" });
+    const snapshot = this.#transcriptModel.rawSnapshot(MAX_CLIPBOARD_TEXT_BYTES);
+    let result: ClipboardWriteResult;
+    if (snapshot.truncated) {
+      result = Object.freeze({
+        status: "too_large",
+        maximumBytes: MAX_CLIPBOARD_TEXT_BYTES,
+      });
+    } else {
+      try {
+        result = await this.#clipboard.writeText({
+          text: snapshot.text,
+          origin,
+          ...(signal === undefined ? {} : { signal }),
+        });
+      } catch {
+        result = Object.freeze({ status: "failed" });
+      }
+    }
+    const message: Readonly<Record<ClipboardWriteResult["status"], string>> = {
+      written: "대화 내용을 로컬 clipboard에 복사했습니다.",
+      empty: "복사할 대화 내용이 없습니다.",
+      too_large: "대화 내용이 clipboard 복사 크기 제한을 초과했습니다. /raw를 사용하세요.",
+      unavailable: "사용할 수 있는 로컬 clipboard 도구가 없습니다.",
+      cancelled: "clipboard 복사를 취소했습니다.",
+      failed: "로컬 clipboard에 복사하지 못했습니다.",
+    };
+    this.setStatus(message[result.status]);
+    return result;
+  }
+
   clearTranscript(): void {
     if (this.#state === "stopped" || this.#state === "stopping") return;
     this.#transcriptModel.clear();
@@ -784,7 +884,7 @@ export class CatTerminalScreen {
   }
 
   requestRender(force = false): void {
-    if (this.#state !== "running") return;
+    if (this.#state !== "running" || this.#rawView.active) return;
     try {
       this.#tui.requestRender(force);
     } catch (error) {
@@ -810,14 +910,14 @@ export class CatTerminalScreen {
     queueMicrotask(() => this.stop());
   }
 
-  #restoreTerminal(): unknown {
-    if (!this.#startAttempted || this.#restorationAttempted) return undefined;
+  #restoreTerminal(initialError?: unknown): unknown {
+    if (!this.#startAttempted || this.#restorationAttempted) return initialError;
     this.#restorationAttempted = true;
-    let firstError: unknown;
+    let firstError = initialError;
     try {
       this.#tui.stop({ preserveScreen: true });
     } catch (error) {
-      firstError = error;
+      firstError ??= error;
       try {
         this.#terminal.stop();
       } catch (terminalStopError) {

@@ -272,3 +272,15 @@
   사용자의 `ScrollView` follow 상태를 강제로 바꾸지 않아 위로 올린 위치를 유지한다. 완료 전 stream은
   화면 종료 시 redaction된 정적 text로 확정한 뒤 동적 secret 목록을 폐기하며, `/raw` 전환과 사용자가
   요청한 clipboard write는 다음 하위 작업에서만 연결한다.
+
+## D028 — 사용자 주도 복사와 raw terminal 전환
+
+- 상태: 승인됨
+- 결정: 기본 TUI는 mouse reporting과 자동 selection copy를 끄고 terminal native selection을 유지한다.
+  `/raw`는 TTY·idle 상태에서만 alternate screen을 잠시 벗어나 제한되고 정리된 transcript를 main screen에
+  쓰며 네 가지 명시적 복귀 키만 처리한다. 로컬 clipboard port는 user command/selection origin을 요구하고
+  write만 제공하며 SSH, OSC52와 tmux를 처리하지 않는다.
+- 결과: model text, tool output과 terminal content 자체는 clipboard process나 제어 sequence를 실행할 수
+  없다. 로컬 write는 크기·시간·환경·실행 파일과 argv가 제한된 owned child만 사용하고 clipboard read를
+  노출하지 않는다. raw 전환과 screen 종료가 겹치면 direct terminal을 먼저 멈춘 뒤 하나의 terminal 복원
+  경계로 합류하며, 실제 terminal·desktop별 selection과 clipboard 품질은 런타임 미검증으로 남긴다.

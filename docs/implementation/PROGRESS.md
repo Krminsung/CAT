@@ -105,5 +105,7 @@ alternate-screen 화면 수명주기와 TTY·복원 경계를 구현하고 있�
 P07.1의 alternate-screen layout, 독립 TTY 판정, 제어 문자열 정리와 멱등 복원 경계는
 `2e8aa99595b31db0cdcb97fd706e017afcc49d8c`에서 완료했다. P07.2의 bounded Unicode editor,
 paste·단축키·history controller와 일반 기록에서 분리된 masked secret overlay는
-`98528d984f6a999893c05b7d9dbd67328a10f809`에서 완료했다. 현재 P07.3의 항목별 stream projection,
-동일 ID tool·plan 갱신, 제한된 resume 표시와 사용자 scroll 보존을 구현하고 있다.
+`98528d984f6a999893c05b7d9dbd67328a10f809`에서 완료했다. P07.3의 항목별 stream projection,
+동일 ID tool·plan 갱신, 제한된 resume 표시와 사용자 scroll 보존은
+`b2219403e6d58901861a2186faf462af9cbf7d3b`에서 완료했다. 현재 P07.4의 native selection 유지,
+제한된 raw transcript 전환과 사용자 주도 로컬 clipboard abstraction을 구현하고 있다.
