@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P09 기준 main은 `7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f`이다. 구현은 이 커밋에서
+P10 기준 main은 `e38ef6fa490d8e337042c289f167a5bb438b7fad`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -13,8 +13,8 @@ P09 기준 main은 `7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f`이다. 구현은 �
 | P06 세션·컨텍스트 | DONE | PASS (1/1) | PR #6 / MERGED `c434311` |
 | P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
-| P09 확장·hooks | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
-| P10 stdio MCP | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
+| P10 stdio MCP | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
 | P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -165,3 +165,9 @@ process 순서, 중앙 permission과 추가 deny, 공유 Stop budget, 8개 event
 `npm run check`를 실행했고, 2026-09-10T13:19:27+09:00부터 약 1.49초 뒤 exit 0으로 통과했다.
 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 앱, TUI, provider, 도구, 실제 hook·extension
 runtime과 원본 script는 실행하지 않았다.
+P09는 검토 head `4033ba63f9cafd576338808b7522b03fbd22012f`를 PR #9에서 merge
+commit `e38ef6fa490d8e337042c289f167a5bb438b7fad`로 병합했다. merge의 두 부모,
+tree, phase head 조상 관계와 `origin/main` 포함을 확인했다. P10은 이 merge commit을 기준으로
+MCP protocol 의미와 분리된 bounded stdio transport를 구현하고 있다. 소유 child process의
+newline frame·pending request·stderr tail·timeout/abort/exit 정리와 stdin close→TERM→KILL
+종료 순서를 P10.1에 둔다.
