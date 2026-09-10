@@ -728,6 +728,17 @@ export class CatTerminalScreen {
     return this.#rawView.active;
   }
 
+  addKnownSecrets(secrets: readonly string[]): void {
+    for (const secret of secrets) {
+      if (!this.#redactor.addSecret(secret)) {
+        throw new TerminalScreenError(
+          "screen_application_failed",
+          "비밀값을 안전한 화면 redaction 목록에 등록하지 못했습니다.",
+        );
+      }
+    }
+  }
+
   start(): void {
     if (this.#state === "running") return;
     if (this.#state !== "idle") {

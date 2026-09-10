@@ -3,7 +3,10 @@ import { ProtocolError } from "../core/errors.js";
 import type { RunBudget, RunTermination } from "../core/execution.js";
 import type { ProviderUsage } from "../core/provider.js";
 import { Redactor } from "../security/redaction.js";
-import { sanitizeTerminalText } from "../tui/terminal-text.js";
+import {
+  sanitizeTerminalText,
+  type TerminalTextRedactor,
+} from "../tui/terminal-text.js";
 import type { CliOutputFormat } from "./args.js";
 
 const MAX_TEXT_OUTPUT_BYTES = 2 * 1024 * 1024;
@@ -11,6 +14,9 @@ const MAX_DIAGNOSTIC_BYTES = 64 * 1024;
 const MAX_JSON_RECORD_BYTES = 4 * 1024 * 1024;
 const MAX_JSON_DEPTH = 40;
 const MAX_JSON_NODES = 100_000;
+const MAX_DYNAMIC_SECRETS = 256;
+const MAX_DYNAMIC_SECRET_BYTES = 64 * 1024;
+const MAX_DYNAMIC_SECRETS_BYTES = 1024 * 1024;
 
 export interface CliWritable {
   write(text: string): unknown;
@@ -33,7 +39,7 @@ interface JsonCopyState {
 
 function safeJsonCopy(
   value: unknown,
-  redactor: Redactor,
+  redactor: TerminalTextRedactor,
   state: JsonCopyState,
   depth = 0,
 ): unknown {
@@ -73,7 +79,7 @@ function safeJsonCopy(
   }
 }
 
-function jsonLine(value: unknown, redactor: Redactor): string {
+function jsonLine(value: unknown, redactor: TerminalTextRedactor): string {
   const safe = safeJsonCopy(
     value,
     redactor,
@@ -90,7 +96,11 @@ export class CliOutput {
   readonly #format: CliOutputFormat;
   readonly #stdout: CliWritable;
   readonly #stderr: CliWritable;
-  readonly #redactor: Redactor;
+  readonly #baseRedactor: TerminalTextRedactor;
+  readonly #knownSecrets = new Set<string>();
+  #knownSecretBytes = 0;
+  #dynamicRedactor = new Redactor();
+  readonly #redactor: TerminalTextRedactor;
 
   constructor(options: {
     readonly format: CliOutputFormat;
@@ -101,11 +111,46 @@ export class CliOutput {
     this.#format = options.format;
     this.#stdout = options.stdout ?? process.stdout;
     this.#stderr = options.stderr ?? process.stderr;
-    this.#redactor = options.redactor ?? new Redactor();
+    this.#baseRedactor = options.redactor ?? new Redactor();
+    this.#redactor = {
+      redact: (text) => this.#dynamicRedactor.redact(this.#baseRedactor.redact(text)),
+    };
   }
 
   get format(): CliOutputFormat {
     return this.#format;
+  }
+
+  addKnownSecrets(secrets: readonly string[]): void {
+    const additions = new Set<string>();
+    let nextSecretBytes = this.#knownSecretBytes;
+    for (const secret of secrets) {
+      if (
+        typeof secret !== "string" ||
+        !secret ||
+        this.#knownSecrets.has(secret) ||
+        additions.has(secret)
+      ) continue;
+      const bytes = Buffer.byteLength(secret, "utf8");
+      if (bytes < 8 || bytes > MAX_DYNAMIC_SECRET_BYTES) {
+        throw new ProtocolError("CLI redaction secret의 크기가 안전한 범위를 벗어났습니다.");
+      }
+      if (
+        this.#knownSecrets.size + additions.size >= MAX_DYNAMIC_SECRETS ||
+        nextSecretBytes + bytes > MAX_DYNAMIC_SECRETS_BYTES
+      ) {
+        throw new ProtocolError("CLI redaction secret 전체 상한을 초과했습니다.");
+      }
+      additions.add(secret);
+      nextSecretBytes += bytes;
+    }
+    for (const secret of additions) {
+      this.#knownSecrets.add(secret);
+    }
+    this.#knownSecretBytes = nextSecretBytes;
+    if (additions.size > 0) {
+      this.#dynamicRedactor = new Redactor([...this.#knownSecrets]);
+    }
   }
 
   writeTrustedText(text: string): void {

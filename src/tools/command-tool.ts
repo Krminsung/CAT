@@ -115,6 +115,44 @@ function commandFailure(
   };
 }
 
+function containsBackgroundOperator(command: string): boolean {
+  let quote: "'" | '"' | undefined;
+  let escaped = false;
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index] ?? "";
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'") quote = undefined;
+      continue;
+    }
+    if (quote === '"') {
+      if (character === "\\") escaped = true;
+      else if (character === '"') quote = undefined;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character !== "&") continue;
+    const previous = command[index - 1];
+    const next = command[index + 1];
+    if (previous === "&" || next === "&") continue;
+    if ((previous === ">" || previous === "<") && (next === "-" || /[0-9]/u.test(next ?? ""))) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
 export async function registerForegroundCommandTool(
   registry: ToolRegistry,
   options: ForegroundCommandToolOptions,
@@ -129,12 +167,12 @@ export async function registerForegroundCommandTool(
     input: JsonObject,
     context: ToolExecutionContext,
   ): Promise<{ command: string; timeoutSeconds: number }> => {
-    if (input.background !== false) {
+    const command = validateShellCommand(stringArgument(input, "command"));
+    if (input.background !== false || containsBackgroundOperator(command)) {
       throw new ConfigurationError(
         "background 명령은 P12 작업 관리자 연결 전까지 지원하지 않습니다.",
       );
     }
-    const command = validateShellCommand(stringArgument(input, "command"));
     const timeoutSeconds = input.timeout_seconds;
     if (
       typeof timeoutSeconds !== "number" ||

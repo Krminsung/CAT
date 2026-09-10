@@ -120,6 +120,10 @@ commit `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`으로 병합했고 두 부모�
 `origin/main` 포함을 확인했다. P08은 이 merge commit을 기준으로 bounded argv와
 text/json/stream-json 출력 경계를 `8e468a6b7c8326fbb70a215116f241d40fedc189`에서 구현했다.
 정확히 28개 명령 정의에서 capability 기반 help·완성·dispatch를 파생하는 registry는
-`dc6413a944583827ce6363397e62348f72a6c244`에서 완료했다. 현재 model/provider/profile/session,
+`dc6413a944583827ce6363397e62348f72a6c244`에서 완료했다. model/provider/profile/session,
 권한·질문·승인과 config/cost/status용 bounded overlay, masked API key 입력과 secret 없는
-`auth setup/status/use/remove` 관리 흐름을 구현하고 정적으로 검토하고 있다.
+`auth setup/status/use/remove` 관리 흐름은 `eea1fd73a083e53550a4fb09856bbcda005f8214`에서
+완료했다. 현재 session 선택→trust→설정→인증된 provider/model→bounded context와 agent
+run→transcript 저장→화면·session·transport 종료를 조립하고, `@file`과 `!`를 중앙 도구 경계에
+연결한 P08.4 구현을 전체 정적 검토하기 직전이다. 자동 검사와 앱·TUI·provider·도구 런타임은
+실행하지 않았다.

@@ -780,7 +780,8 @@ export class JsonlWriterLease {
   readonly #maxLineBytes: number;
   readonly #maxDepth: number;
   readonly #maxNodes: number;
-  readonly #redactor: Redactor;
+  #secrets: readonly string[];
+  #redactor: Redactor;
   #lockHandle: FileHandle | undefined;
   #released = false;
   #writing = false;
@@ -806,11 +807,24 @@ export class JsonlWriterLease {
     this.#maxLineBytes = options.maxLineBytes;
     this.#maxDepth = options.maxDepth;
     this.#maxNodes = options.maxNodes;
-    this.#redactor = new Redactor(options.secrets);
+    this.#secrets = options.secrets;
+    this.#redactor = new Redactor(this.#secrets);
   }
 
   get released(): boolean {
     return this.#released;
+  }
+
+  addRedactionSecrets(secrets: readonly string[]): void {
+    if (this.#released || !this.#lockHandle) {
+      throw new StorageError("해제된 JSONL writer에는 redaction secret을 추가할 수 없습니다.");
+    }
+    if (this.#writing) {
+      throw new StorageError("JSONL append 중에는 redaction secret을 변경할 수 없습니다.");
+    }
+    const selected = normalizeJsonlSecrets([...this.#secrets, ...secrets]);
+    this.#secrets = selected;
+    this.#redactor = new Redactor(selected);
   }
 
   async append(record: JsonObject): Promise<void> {

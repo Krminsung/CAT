@@ -25,6 +25,7 @@ const PERMISSION_MODES: readonly PermissionMode[] = Object.freeze([
   "full-auto",
   "plan",
 ]);
+const MAX_OVERLAY_MESSAGE_BYTES = 15 * 1024;
 
 const APPROVAL_PRESENTATION: Readonly<
   Record<ApprovalChoice, { readonly label: string; readonly description: string }>
@@ -126,6 +127,15 @@ function tokenText(value: number | undefined): string {
   return value === undefined ? "알 수 없음" : value.toLocaleString("ko-KR");
 }
 
+function boundedUtf8(value: string, maximumBytes = MAX_OVERLAY_MESSAGE_BYTES): string {
+  const bytes = Buffer.from(value, "utf8");
+  if (bytes.byteLength <= maximumBytes) return value;
+  const marker = Buffer.from("\n[크기 제한으로 생략됨]", "utf8");
+  let end = Math.max(0, maximumBytes - marker.byteLength);
+  while (end > 0 && (bytes[end] ?? 0) >= 0x80 && (bytes[end] ?? 0) < 0xc0) end -= 1;
+  return Buffer.concat([bytes.subarray(0, end), marker]).toString("utf8");
+}
+
 export class TerminalInteractionPort
   implements ApprovalDecisionPort, ApprovalPromptPort, UserInputDecisionPort
 {
@@ -140,12 +150,13 @@ export class TerminalInteractionPort
     }
     const selected = await this.screen.requestSelection({
       title: "도구 실행 승인",
-      message:
-        `${request.summary}\n\n` +
+      message: boundedUtf8(
         `도구: ${request.toolName}\n` +
         `필요 권한: ${permissionRequirement(request)}\n` +
         `범위 규칙: ${request.rule}\n\n` +
+        `실행 요약:\n${request.summary}\n\n` +
         "프로젝트 저장은 현재 프로젝트의 이 규칙에만 적용됩니다.",
+      ),
       options: request.choices.map((choice) => ({
         value: choice,
         label: APPROVAL_PRESENTATION[choice].label,
@@ -234,14 +245,25 @@ export class TerminalOverlayController {
     signal?: AbortSignal,
   ): Promise<string | undefined> {
     if (models.length === 0) return undefined;
+    const currentModel = current === undefined
+      ? undefined
+      : models.find((model) => model.id === current);
+    const visible = (
+      currentModel === undefined
+        ? models
+        : [currentModel, ...models.filter((model) => model.id !== currentModel.id)]
+    ).slice(0, 128);
+    const omitted = models.length > visible.length
+      ? ` · ${models.length}개 중 ${visible.length}개 표시`
+      : "";
     return await this.#chooseOptional(
       "Model 선택",
-      models.map((model) => ({
+      visible.map((model) => ({
         value: model.id,
         label: `${model.id === current ? "● " : ""}${model.id}`,
         description: model.contextWindow === undefined
-          ? "context window 알 수 없음"
-          : `context ${model.contextWindow.toLocaleString("ko-KR")} tokens`,
+          ? `context window 알 수 없음${omitted}`
+          : `context ${model.contextWindow.toLocaleString("ko-KR")} tokens${omitted}`,
       })),
       signal,
     );
@@ -296,7 +318,7 @@ export class TerminalOverlayController {
   ): Promise<void> {
     await this.screen.showInformation({
       title: "현재 설정",
-      message:
+      message: boundedUtf8(
         `Workspace     ${summary.workspace}\n` +
         `Provider      ${summary.provider ?? "미선택"}\n` +
         `Profile       ${summary.profile ?? "미선택"}\n` +
@@ -306,6 +328,7 @@ export class TerminalOverlayController {
         `Details       ${summary.verbose ? "켜짐" : "꺼짐"}\n` +
         `Sources       ${summary.sources.join(" → ")}\n` +
         `Project file  ${summary.projectSettingsSkipped ? "trust 없음으로 생략" : "적용 가능"}`,
+      ),
       ...(signal === undefined ? {} : { signal }),
     });
   }

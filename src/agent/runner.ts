@@ -83,6 +83,8 @@ export interface AgentRunRequest extends RunIdentity {
   readonly signal?: AbortSignal;
   readonly onEvent?: AgentEventSink;
   readonly allowTools?: boolean;
+  /** 사전 compaction이 소비한 동일 run 예산의 소유권을 runner에 넘긴다. */
+  readonly budget?: RunBudgetController;
 }
 
 export interface AgentRunResult extends RunIdentity {
@@ -124,6 +126,17 @@ interface OwnedRunContext {
   readonly appendedResults: Set<string>;
   readonly usage: ProviderUsage;
   readonly allowTools: boolean;
+}
+
+function sameRunLimits(left: AgentRunLimits, right: AgentRunLimits): boolean {
+  return left.maxTurns === right.maxTurns &&
+    left.maxModelRequests === right.maxModelRequests &&
+    left.maxToolCalls === right.maxToolCalls &&
+    left.maxRecoveryAttempts === right.maxRecoveryAttempts &&
+    left.maxSameRecoveryKind === right.maxSameRecoveryKind &&
+    left.maxCompactions === right.maxCompactions &&
+    left.maxStopContinuations === right.maxStopContinuations &&
+    left.wallClockMs === right.wallClockMs;
 }
 
 const MAX_INITIAL_MESSAGES = 1_000;
@@ -447,14 +460,27 @@ export class AgentRunner {
   }
 
   async run(request: AgentRunRequest): Promise<AgentRunResult> {
-    const messages = cloneMessages(request.messages);
+    let messages: ConversationMessage[];
+    try {
+      messages = cloneMessages(request.messages);
+    } catch (error) {
+      request.budget?.cleanup();
+      throw error;
+    }
     const identity: RunIdentity = Object.freeze({
       sessionId: request.sessionId,
       runId: request.runId,
     });
-    const ownership = this.#coordinator.acquire(identity);
+    let ownership: ReturnType<SessionRunCoordinator["acquire"]>;
+    try {
+      ownership = this.#coordinator.acquire(identity);
+    } catch (error) {
+      request.budget?.cleanup();
+      throw error;
+    }
     const journal = new AgentEventJournal(identity, request.onEvent, this.#now);
     if (!ownership.acquired) {
+      request.budget?.cleanup();
       journal.start();
       const message = `이 session에서는 run ${ownership.activeRunId}이 이미 실행 중입니다.`;
       journal.emit({
@@ -481,14 +507,21 @@ export class AgentRunner {
     const ledger = new ToolCallExecutionLedger(identity.runId, this.#now);
     const normalizer = new ToolCallNormalizer({ fallbackMode: this.#fallbackMode });
     let budget: RunBudgetController;
+    let preparedBudget: RunBudgetController | undefined;
     try {
-      budget = new RunBudgetController({
+      preparedBudget = request.budget ?? new RunBudgetController({
         limits: this.#limits,
         ...(request.signal ? { signal: request.signal } : {}),
         now: this.#now,
       });
+      budget = preparedBudget;
+      if (request.budget && !sameRunLimits(preparedBudget.limits, this.#limits)) {
+        throw new ConfigurationError("사전 실행 예산이 agent runner 제한과 일치하지 않습니다.");
+      }
+      budget.assertActive();
     } catch (error) {
       ownership.lease.release();
+      preparedBudget?.cleanup();
       throw error;
     }
     const context: OwnedRunContext = {

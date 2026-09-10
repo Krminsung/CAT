@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { ConfigurationError, StorageError } from "../core/errors.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
+import { Redactor } from "../security/redaction.js";
 import type {
   CheckpointManager,
   CheckpointRestoreResult,
   CheckpointSummary,
 } from "../storage/checkpoints.js";
-import type { JsonlWarning } from "../storage/jsonl.js";
+import {
+  normalizeJsonlSecrets,
+  type JsonlWarning,
+} from "../storage/jsonl.js";
 import { canonicalWorkspace } from "../storage/paths.js";
 import {
   assertSessionId,
@@ -40,6 +44,8 @@ const MAX_LIFECYCLE_NOTICES = 128;
 const MAX_STATE_CLEANERS = 32;
 const RECORD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,255}$/u;
 const CLEANER_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/u;
+const SENSITIVE_FIELD = /^(?:api[_ -]?key|authorization|cookie|set-cookie|password|passwd|secret|token|access[_ -]?token|refresh[_ -]?token|credentials?)$/iu;
+const REDACTED = "[REDACTED]";
 
 export type SessionPersistence = "persistent" | "none";
 
@@ -71,6 +77,7 @@ export interface SessionHandle {
   readonly persistence: SessionPersistence;
   readonly closed: boolean;
   readonly notices: readonly SessionLifecycleNotice[];
+  addRedactionSecrets(secrets: readonly string[]): Promise<void>;
   appendTranscript(request: TranscriptAppendRequest): Promise<TranscriptAppendReceipt>;
 }
 
@@ -295,6 +302,35 @@ function cloneJsonObject(value: unknown): JsonObject {
   return copied;
 }
 
+function redactTranscriptValue(value: JsonValue, redactor: Redactor): JsonValue {
+  if (typeof value === "string") return redactor.redact(value);
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    const output = value.map((item) => redactTranscriptValue(item, redactor));
+    Object.freeze(output);
+    return output;
+  }
+  const output: JsonObject = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (redactor.redact(key) !== key) {
+      throw new ConfigurationError("메모리 transcript field 이름에 secret을 저장할 수 없습니다.");
+    }
+    output[key] = SENSITIVE_FIELD.test(key)
+      ? REDACTED
+      : redactTranscriptValue(item, redactor);
+  }
+  Object.freeze(output);
+  return output;
+}
+
+function redactTranscriptObject(value: JsonObject, redactor: Redactor): JsonObject {
+  const redacted = redactTranscriptValue(value, redactor);
+  if (redacted === null || typeof redacted !== "object" || Array.isArray(redacted)) {
+    throw new ConfigurationError("메모리 transcript redaction 결과가 객체가 아닙니다.");
+  }
+  return redacted;
+}
+
 function transcriptRecordBytes(record: StoredTranscriptRecord): number {
   const serialized = JSON.stringify(record);
   if (serialized === undefined) {
@@ -448,6 +484,8 @@ class ManagedSessionHandle implements SessionHandle {
   #closed = false;
   #operating = false;
   #memoryBytes = 0;
+  #redactionSecrets: readonly string[] = Object.freeze([]);
+  #redactor = new Redactor();
   readonly #memory: StoredTranscriptRecord[] = [];
   readonly #memoryRecordIds = new Set<string>();
 
@@ -480,6 +518,16 @@ class ManagedSessionHandle implements SessionHandle {
 
   get closed(): boolean {
     return this.#closed;
+  }
+
+  async addRedactionSecrets(secrets: readonly string[]): Promise<void> {
+    await this.runExclusive(async () => {
+      const selected = normalizeJsonlSecrets([...this.#redactionSecrets, ...secrets]);
+      this.#store.addRedactionSecrets(selected);
+      this.#writer?.addRedactionSecrets(selected);
+      this.#redactionSecrets = selected;
+      this.#redactor = new Redactor(selected);
+    });
   }
 
   async appendTranscript(request: TranscriptAppendRequest): Promise<TranscriptAppendReceipt> {
@@ -528,7 +576,10 @@ class ManagedSessionHandle implements SessionHandle {
     ) {
       throw new ConfigurationError("메모리 transcript run ID가 올바르지 않습니다.");
     }
-    const data = cloneJsonObject(request.data ?? {});
+    const data = redactTranscriptObject(
+      cloneJsonObject(request.data ?? {}),
+      this.#redactor,
+    );
     const record: StoredTranscriptRecord = Object.freeze({
       recordId,
       sessionId: this.#metadata.sessionId,
@@ -587,6 +638,8 @@ class ManagedSessionHandle implements SessionHandle {
     this.#memory.splice(0, this.#memory.length);
     this.#memoryRecordIds.clear();
     this.#memoryBytes = 0;
+    this.#redactionSecrets = Object.freeze([]);
+    this.#redactor = new Redactor();
     this.#closed = true;
   }
 
@@ -594,6 +647,8 @@ class ManagedSessionHandle implements SessionHandle {
     this.#memory.splice(0, this.#memory.length);
     this.#memoryRecordIds.clear();
     this.#memoryBytes = 0;
+    this.#redactionSecrets = Object.freeze([]);
+    this.#redactor = new Redactor();
     this.#closed = true;
     const writer = this.#writer;
     this.#writer = undefined;

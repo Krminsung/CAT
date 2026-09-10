@@ -35,7 +35,7 @@ function normalizedPolicyPaths(paths: readonly string[] | undefined, label: stri
 }
 
 function mentionsCredentialPath(views: readonly string[], protectedPaths: readonly string[]): boolean {
-  const generic = /(?:^|[\/\s;|&(<>=])(?:~|\$(?:home|\{home\}))?\/?\.(?:cat|smileserv)\/(?:credentials?|profiles?|secrets?|sessions?)(?:\.json|\/|(?=$|[\s;|&)>]))/u;
+  const generic = /(?:^|[\/\s;|&(<>=])(?:~|\$(?:home|\{home\}))?\/?\.(?:cat|smileserv)\/(?:credentials?|profiles?|secrets?|sessions?|trusted-workspaces|project-approvals)(?:\.json|\/|(?=$|[\s;|&)>]))/u;
   return views.some((view) =>
     generic.test(view.replaceAll("\\", "/")) ||
     protectedPaths.some((path) => view.replaceAll("\\", "/").includes(path))
@@ -155,7 +155,7 @@ export function blockedShellCommandReason(
   const views = commandViews(command);
   const protectedPaths = normalizedPolicyPaths(options.protectedPaths, "보호할 command 경로");
   if (mentionsCredentialPath(views, protectedPaths)) {
-    return "자격 증명·profile·secret·session 등 보호된 cat 저장소에는 셸 명령으로 직접 접근할 수 없습니다.";
+    return "자격 증명·설정·trust·승인·session 등 보호된 cat 저장소에는 셸 명령으로 직접 접근할 수 없습니다.";
   }
 
   const roots = normalizedPolicyPaths(

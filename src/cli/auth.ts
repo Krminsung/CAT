@@ -5,6 +5,7 @@ import {
   requireProviderDefinition,
   validateManualModelId,
 } from "../providers/catalog.js";
+import { validateApiKey } from "../storage/credentials.js";
 import { normalizeProfileName } from "../storage/profiles.js";
 import type { AuthService } from "../app/auth-service.js";
 import { CliUsageError } from "./args.js";
@@ -301,10 +302,11 @@ export class AuthManagementController {
       );
     }
     const provider = requireProviderDefinition(setup.provider);
-    const apiKey = await this.#secrets.requestSecret({
+    const apiKey = validateApiKey(await this.#secrets.requestSecret({
       label: `${provider.displayName} API key`,
       message: "API key만 저장합니다. OAuth나 구독 cookie는 지원하지 않습니다.",
-    });
+    }));
+    output.addKnownSecrets([apiKey]);
     const profile = await this.#auth.configure({
       name: setup.profile,
       provider: setup.provider,

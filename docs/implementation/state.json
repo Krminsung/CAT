@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P08",
-  "currentStep": "P08.3",
+  "currentStep": "P08.4",
   "status": "IMPLEMENTING",
   "baseMainSha": "4d91f4a4716831a488c3ebb4ed0d94e95cc06070",
-  "lastCommitSha": "dc6413a944583827ce6363397e62348f72a6c244",
+  "lastCommitSha": "eea1fd73a083e53550a4fb09856bbcda005f8214",
   "verification": {
     "attemptsUsed": 0,
     "maximumAttempts": 1,
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Complete P08.3 overlay and auth management static review, then commit it",
+  "nextAction": "Commit P08.4, review the complete P08 diff, then reserve the single static check",
   "blocker": null
 }

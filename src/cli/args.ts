@@ -353,7 +353,12 @@ export function parseCliInvocation(argv: readonly string[]): CliInvocation {
       else if (canonical === "--base-url") baseUrl = boundedText(value, canonical, 2_048);
       else if (canonical === "--max-turns") maxTurns = integer(value, canonical, 1, 100);
       else if (canonical === "--resume") resume = sessionIdentifier(value);
-      else if (canonical === "--name") name = boundedText(value, canonical, 1_024);
+      else if (canonical === "--name") {
+        name = boundedText(value, canonical, 1_024);
+        if ([...name].length > 256) {
+          throw new CliUsageError("--name은 256자를 초과할 수 없습니다.");
+        }
+      }
       else if (canonical === "--append-system-prompt") {
         appendSystemPrompt = boundedText(value, canonical, MAX_SYSTEM_PROMPT_BYTES, true);
       } else if (canonical === "--tools") {

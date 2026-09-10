@@ -392,6 +392,10 @@ export class SessionTranscriptWriter {
     return this.#lease.released;
   }
 
+  addRedactionSecrets(secrets: readonly string[]): void {
+    this.#lease.addRedactionSecrets(secrets);
+  }
+
   async append(request: TranscriptAppendRequest): Promise<TranscriptAppendReceipt> {
     if (
       !(TRANSCRIPT_RECORD_KINDS as readonly string[]).includes(request.kind)
@@ -429,7 +433,7 @@ export class SessionJsonlStore {
   readonly indexPath: string;
   readonly transcriptDirectory: string;
   readonly lockDirectory: string;
-  readonly #secrets: readonly string[];
+  #secrets: readonly string[];
   readonly #now: () => number;
   readonly #idFactory: () => string;
 
@@ -449,6 +453,10 @@ export class SessionJsonlStore {
     this.#secrets = normalizeJsonlSecrets(options.secrets ?? []);
     this.#now = options.now ?? Date.now;
     this.#idFactory = options.idFactory ?? randomUUID;
+  }
+
+  addRedactionSecrets(secrets: readonly string[]): void {
+    this.#secrets = normalizeJsonlSecrets([...this.#secrets, ...secrets]);
   }
 
   transcriptPath(sessionId: string): string {
