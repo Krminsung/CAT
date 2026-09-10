@@ -10,7 +10,7 @@ P06 기준 main은 `e5f082a0b8ccb5fdc70233837762941e63f7233b`이다. 구현은 �
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
 | P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
-| P06 세션·컨텍스트 | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
+| P06 세션·컨텍스트 | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -95,4 +95,6 @@ secret, no-persistence resume의 maintenance 소유권, metadata 시각 단조�
 접근 차단, projection 식별자·경고 redaction과 compaction 손실성 표기를
 `e50f0a5368f6c12a01bc719cd0f96494b2a86b3e`에서 보완했다. 추적된 원본 archive·build
 산출물·secret·GitHub Actions workflow와 검사 우회는 발견되지 않았다. `origin/main`이 P06
-기준 SHA와 같음을 확인했고 유일한 `npm run check` 1회를 예약했으며 아직 실행하지 않았다.
+기준 SHA와 같음을 확인한 뒤 `13908a0e1743d632734b8673d097b3f5ab44662c`를 대상으로
+예약한 유일한 `npm run check`를 실행했고 통과했다. 실제 세션 I/O, rewind, 모델 압축, 도구와
+앱 런타임은 실행하지 않았다.
