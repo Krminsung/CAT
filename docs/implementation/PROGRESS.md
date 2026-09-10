@@ -110,4 +110,7 @@ paste·단축키·history controller와 일반 기록에서 분리된 masked sec
 `b2219403e6d58901861a2186faf462af9cbf7d3b`에서 완료했다. P07.4의 native selection 유지,
 제한된 raw transcript 전환과 사용자 주도 로컬 clipboard abstraction은
 `996f1fb9e177163c12e763a607779d550b87e72c`에서 완료했다. 현재 P07 전체 정적 검토에서 확인한
-출력 redaction 순서, 최근 raw 기록, 입력·secret·clipboard 수명과 탐색 상한을 보완하고 있다.
+출력 redaction 순서, 최근 raw 기록, 입력·secret·clipboard 수명과 탐색 상한은
+`849ef8988b20707f58b27a68e76e43548d77c4a2`에서 보완했다. agent→TUI 역의존, 검사 우회,
+추적된 원본·산출물과 자동 clipboard 경로가 없음을 확인하고 유일한 `npm run check` 1회를
+예약했으며 아직 실행하지 않았다.
