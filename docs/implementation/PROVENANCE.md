@@ -27,3 +27,12 @@ budget과 compaction 분리라는 설계 원칙에만 참고한다. 해당 코�
 cat 소스는 기능 계약을 토대로 새 디렉터리 경계와 새 코드를 작성한다. 제공 archive의
 license metadata만으로 모든 참조 자료의 권리가 확인됐다고 주장하지 않는다. 공개
 배포 전 권리 확인은 별도이며, P14 완료도 공개 배포 승인을 의미하지 않는다.
+
+## P10 schema validator 의존성
+
+- package: `ajv@8.20.0` (MIT)
+- npm metadata 확인 integrity:
+  `sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==`
+- 설치 방식: `--save-exact --ignore-scripts --no-audit --no-fund`를 사용한 1회 설치
+- 사용 범위: MCP가 제공한 JSON Schema 2020-12의 host-side compile·validation. 원격 schema
+  load와 사용자 정의 keyword·format은 사용하지 않는다.

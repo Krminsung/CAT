@@ -21,6 +21,7 @@ export interface SettingsValues {
   projectDocMaxBytes: number;
   projectDocFallbackFilenames: string[];
   hooks?: JsonObject;
+  mcpServers?: JsonObject;
   provider?: string;
   profile?: string;
   model?: string;
@@ -64,6 +65,7 @@ const SETTING_KEYS = new Set([
   "projectDocMaxBytes",
   "projectDocFallbackFilenames",
   "hooks",
+  "mcpServers",
   "provider",
   "profile",
   "model",
@@ -229,6 +231,12 @@ export function parseSettingsValues(
     }
     result.hooks = structuredClone(raw.hooks) as JsonObject;
   }
+  if (raw.mcpServers !== undefined) {
+    if (typeof raw.mcpServers !== "object" || raw.mcpServers === null || Array.isArray(raw.mcpServers)) {
+      fail(source, "mcpServers", "객체여야 합니다");
+    }
+    result.mcpServers = structuredClone(raw.mcpServers) as JsonObject;
+  }
   const provider = optionalString(raw, "provider", source, 64);
   if (provider !== undefined) {
     if (!IDENTIFIER_PATTERN.test(provider)) fail(source, "provider", "안전한 식별자여야 합니다");
@@ -265,6 +273,14 @@ function environmentSettings(environment: NodeJS.ProcessEnv): JsonObject {
 }
 
 function mergeSettings(base: SettingsValues, overlay: SettingsOverrides): SettingsValues {
+  const mergedMcpServers = overlay.mcpServers === undefined
+    ? base.mcpServers === undefined
+      ? undefined
+      : structuredClone(base.mcpServers)
+    : {
+        ...(base.mcpServers === undefined ? {} : structuredClone(base.mcpServers)),
+        ...structuredClone(overlay.mcpServers),
+      };
   return {
     ...base,
     ...overlay,
@@ -275,6 +291,7 @@ function mergeSettings(base: SettingsValues, overlay: SettingsOverrides): Settin
     projectDocFallbackFilenames: overlay.projectDocFallbackFilenames
       ? [...overlay.projectDocFallbackFilenames]
       : [...base.projectDocFallbackFilenames],
+    ...(mergedMcpServers === undefined ? {} : { mcpServers: mergedMcpServers }),
   };
 }
 
@@ -335,6 +352,7 @@ function overridesToJson(overrides: SettingsOverrides): JsonObject {
   assign("projectDocMaxBytes", overrides.projectDocMaxBytes);
   assign("projectDocFallbackFilenames", overrides.projectDocFallbackFilenames);
   assign("hooks", overrides.hooks);
+  assign("mcpServers", overrides.mcpServers);
   assign("provider", overrides.provider);
   assign("profile", overrides.profile);
   assign("model", overrides.model);

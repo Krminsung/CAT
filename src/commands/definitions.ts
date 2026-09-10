@@ -69,7 +69,7 @@ const RAW_DEFINITIONS: readonly SlashCommandDefinition[] = [
   { name: "fork", description: "현재 대화를 새 ID의 세션으로 분기", usage: "/fork [name]", capability: "session", unavailableReason: "세션 분기 기능이 연결되지 않았습니다." },
   { name: "init", description: "기존 파일을 덮지 않고 AGENTS 지침 초기화", usage: "/init", capability: "extensions", unavailableReason: "프로젝트 지침 기능은 P09에서 활성화됩니다." },
   { name: "memory", description: "현재 로드된 프로젝트 지침 표시", usage: "/memory", capability: "extensions", unavailableReason: "프로젝트 지침 기능은 P09에서 활성화됩니다." },
-  { name: "mcp", description: "MCP 서버와 도구 상태 관리", usage: "/mcp [reconnect]", capability: "mcp", unavailableReason: "MCP 기능은 P10에서 활성화됩니다." },
+  { name: "mcp", description: "MCP 서버와 도구 상태 확인 또는 승인 후 재연결", usage: "/mcp [reconnect]", capability: "mcp", unavailableReason: "MCP manager가 연결되지 않았습니다." },
   { name: "connect", description: "masked 입력으로 API key profile 연결", usage: "/connect [provider] [profile]", capability: "authentication", unavailableReason: "인증 overlay가 연결되지 않았습니다." },
   { name: "disconnect", description: "지정 API key profile 제거", usage: "/disconnect [profile]", capability: "authentication", unavailableReason: "인증 관리 경로가 연결되지 않았습니다." },
   { name: "model", description: "model ID 확인 또는 선택", usage: "/model [model-id]", capability: "model", unavailableReason: "model 선택 경로가 연결되지 않았습니다." },

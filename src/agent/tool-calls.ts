@@ -256,11 +256,13 @@ export class ToolCallNormalizer {
       }
       try {
         const input = cloneInput(
-          validateToolInput(
-            candidate.input,
-            definition.inputSchema,
-            candidate.name,
-          ),
+          definition.validateInput
+            ? definition.validateInput(candidate.input)
+            : validateToolInput(
+                candidate.input,
+                definition.inputSchema,
+                candidate.name,
+              ),
         );
         calls.push(Object.freeze({
           callId: candidate.callId,

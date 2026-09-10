@@ -203,7 +203,7 @@ export class PermissionPolicy {
     if (modeAllows(this.#mode, check.category)) {
       return { allowed: true, source: "automatic" };
     }
-    if (this.#allowedTools.has(check.toolName)) {
+    if (this.#allowedTools.has(check.toolName) && check.permission.kind !== "external") {
       return { allowed: true, source: "configured" };
     }
     if (this.#projectApprovals.has(rule)) {

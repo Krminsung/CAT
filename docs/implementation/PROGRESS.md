@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P09 기준 main은 `7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f`이다. 구현은 이 커밋에서
+P10 기준 main은 `e38ef6fa490d8e337042c289f167a5bb438b7fad`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -13,8 +13,8 @@ P09 기준 main은 `7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f`이다. 구현은 �
 | P06 세션·컨텍스트 | DONE | PASS (1/1) | PR #6 / MERGED `c434311` |
 | P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
-| P09 확장·hooks | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
-| P10 stdio MCP | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
+| P10 stdio MCP | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
 | P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -165,3 +165,40 @@ process 순서, 중앙 permission과 추가 deny, 공유 Stop budget, 8개 event
 `npm run check`를 실행했고, 2026-09-10T13:19:27+09:00부터 약 1.49초 뒤 exit 0으로 통과했다.
 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 앱, TUI, provider, 도구, 실제 hook·extension
 runtime과 원본 script는 실행하지 않았다.
+P09는 검토 head `4033ba63f9cafd576338808b7522b03fbd22012f`를 PR #9에서 merge
+commit `e38ef6fa490d8e337042c289f167a5bb438b7fad`로 병합했다. merge의 두 부모,
+tree, phase head 조상 관계와 `origin/main` 포함을 확인했다. P10은 이 merge commit을 기준으로
+MCP protocol 의미와 분리된 bounded stdio transport를 구현하고 있다. 소유 child process의
+newline frame·pending request·stderr tail·timeout/abort/exit 정리와 stdin close→TERM→KILL
+종료 순서를 P10.1에 둔다.
+P10.1은 `0c713c2cd5d4415c678538202d21e29b3252b63a`에서 완료했다. P10.2에서는 legacy
+initialize lifecycle과 modern per-request metadata를 별도 adapter로 분리하고, page·entry·cursor·누적
+metadata 상한과 결정적 tool namespace를 구현하고 있다. 재연결 뒤 늦은 이전 child event가 새
+transport 상태를 덮지 않도록 process identity도 listener에서 다시 확인한다.
+P10.2는 `fbf6fcb2108e2653b9e03268d631bdefd3d22cb0`에서 완료했다. P10.3에서는
+JSON Schema 2020-12의 bounded subset과 문서 내부 참조만 허용하고, 정확히 고정한
+`ajv@8.20.0`으로 provider와 독립적인 입력 validator를 준비한다. 검증할 수 없는 schema는 해당
+동적 도구를 비활성화하며, MCP 도구 이름만으로 이전 승인을 재사용하지 않도록 server registry
+version이 든 external permission 계약과 원자적 registry 교체 경계를 구현했다.
+P10.3은 `a4a2161c17d61cc89482b27d63c555612faf7d22`에서 완료했다. P10.4에서는 계층형
+MCP 설정과 environment secret reference, 설정 저장과 process 시작의 분리, exact execution plan을
+사용하는 manager를 연결하고 있다. 세 관리 built-in과 CLI list/get/add/remove, `/mcp [reconnect]`,
+동적 도구의 host schema·central permission 실행 경로, reload·세션 전환·앱 종료 cleanup을 포함한다.
+workspace와 cwd identity를 승인 뒤에도 재확인하고, 종료 확인 실패·분기/reference schema 복잡도·
+민감한 MCP 출력 field에 대한 fail-closed 보완도 함께 적용했다. P10.4는
+`c7fcf0d4d4f5ceecf50e3e3c335acd0d92b70ede`에서 완료했다. 전체 정적 검토에서 schema가 아닌
+annotation data를 가리키는 reference와 모호한 URI 인코딩을 차단하고, 민감 출력 field 이름 정규화,
+설정 문자열의 Cc/Cf 거부, transport command·cwd byte 상한과 stderr stream 오류 정리를 보완하고
+있다. 이 보완은 `dd0c1f4923fc36a1382c535b339084f434aca34a`에서 확정했다. dependency 방향,
+중앙 executor·승인 경계, 추적 파일과 `origin/main`을 대조했으며 자동 검증과 실제 MCP·앱 runtime은
+실행하지 않았다. 이전 예약 문서가 코드 commit과 `0 / 1`을 검사 대상으로 기록했지만, 기준 문서
+3.3의 선예약 규칙에 맞춰 명령 실행 전에 `1 / 1`로 정정하고 이 예약 정정 기록 commit 자체를 유일한
+검사 대상으로 삼았다. 사용자가 P10의 `npm run check` 1회를 승인해
+`c3ff9690bffec738a8c5b9553a844e025d28bca4`에서 실행한 검사는 `src/mcp/schema.ts`의
+Ajv 2020 import에 대해 TS2709와 TS2351을 보고하고 종료 코드 2로 실패했다. 추가 검사, source 수정,
+push, PR과 merge는 진행하지 않았다. 이후 사용자가 P10 오류 수정과 `npm run check` 추가 1회를
+명시적으로 승인해, 보고된 Ajv import 진단만
+`472010295edcab81fb52992ffe5931b3b7d2740f`에서 수정했다. 첫 실패 기록을 보존한 채 두 번째이자
+마지막 승인 검사를 `0faa676b25c301924aaab63191ddacfe0ba09a48`에서 실행했고 종료 코드 0으로
+통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 MCP server·앱·TUI와 원본
+script·test runtime은 실행하지 않았다.
