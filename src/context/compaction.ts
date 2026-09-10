@@ -998,6 +998,17 @@ export class ContextCompactionService {
         sourceWasTruncated,
         omittedInputUnits: inputHistory.omittedUnits,
         omittedPreservedUnits: preservedSelection.omittedUnits,
+        usage: {
+          ...(summaryResult.usage.inputTokens === undefined
+            ? {}
+            : { inputTokens: summaryResult.usage.inputTokens }),
+          ...(summaryResult.usage.outputTokens === undefined
+            ? {}
+            : { outputTokens: summaryResult.usage.outputTokens }),
+          ...(summaryResult.usage.totalTokens === undefined
+            ? {}
+            : { totalTokens: summaryResult.usage.totalTokens }),
+        },
       };
       compactedProjection = compactionProjection(
         source.context,

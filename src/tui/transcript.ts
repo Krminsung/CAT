@@ -28,6 +28,8 @@ const MAX_PLAN_STEPS = 100;
 const MAX_RESTORE_RECORDS = 2_000;
 const MAX_TRACKED_RUNS = 64;
 const DEFAULT_RAW_SNAPSHOT_BYTES = 2 * 1024 * 1024;
+const SENSITIVE_FIELD = /^(?:api[_ -]?key|authorization|cookie|set-cookie|password|passwd|secret|token|access[_ -]?token|refresh[_ -]?token|credentials?)$/iu;
+const REDACTED = "[REDACTED]";
 
 const RUN_END_LABELS: Readonly<Record<RunTermination, string>> = {
   completed: "",
@@ -96,7 +98,11 @@ function validIdentifier(value: string): boolean {
 
 function jsonText(value: JsonValue): string {
   try {
-    return JSON.stringify(value, null, 2) ?? "null";
+    return JSON.stringify(
+      value,
+      (key: string, item: unknown): unknown => SENSITIVE_FIELD.test(key) ? REDACTED : item,
+      2,
+    ) ?? "null";
   } catch {
     return "[JSON 값을 표시할 수 없습니다.]";
   }

@@ -1,3 +1,4 @@
+export * from "./command-autocomplete.js";
 export * from "./input.js";
 export * from "./raw-view.js";
 export * from "./screen.js";

@@ -8,6 +8,7 @@ import { readJsonObject, writeJsonObjectAtomic } from "./json-file.js";
 const CREDENTIAL_SCHEMA_VERSION = 1;
 const MAX_CREDENTIAL_BYTES = 64 * 1024;
 const MAX_CREDENTIALS = 64;
+const REDACTION_MARKER = "[REDACTED]";
 const PROVIDER_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REFERENCE_PATTERN = /^cred_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
@@ -60,11 +61,18 @@ function normalizeProvider(value: string): string {
 
 export function validateApiKey(value: string): string {
   const selected = value.trim();
-  if (!selected || /[\r\n\0]/u.test(selected)) {
-    throw new ConfigurationError("API key 형식이 올바르지 않습니다.");
+  const bytes = Buffer.byteLength(selected, "utf8");
+  if (
+    bytes < 8 ||
+    /[\u0000-\u001f\u007f]/u.test(selected) ||
+    REDACTION_MARKER.includes(selected)
+  ) {
+    throw new ConfigurationError(
+      "API key는 제어 문자가 없는, 안전하게 가릴 수 있는 8 bytes 이상의 값이어야 합니다.",
+    );
   }
-  if ([...selected].length > 4_096) {
-    throw new ConfigurationError("API key는 4096자를 초과할 수 없습니다.");
+  if (bytes > 8 * 1024) {
+    throw new ConfigurationError("API key는 8192 bytes를 초과할 수 없습니다.");
   }
   return selected;
 }
@@ -236,7 +244,16 @@ export class CredentialStore {
     return true;
   }
 
+  async withRedactionSecrets<T>(
+    use: (secrets: readonly string[]) => Promise<T>,
+  ): Promise<T> {
+    const secrets = Object.freeze(
+      [...(await this.#read()).values()].map((record) => record.apiKey),
+    );
+    return await use(secrets);
+  }
+
   async redactor(): Promise<Redactor> {
-    return new Redactor([...(await this.#read()).values()].map((record) => record.apiKey));
+    return await this.withRedactionSecrets(async (secrets) => new Redactor(secrets));
   }
 }

@@ -48,8 +48,11 @@ function protectedStorageEntries(
   const legacyRoot = join(userHome, ".smileserv");
   return {
     files: [
+      { path: paths.userSettings, label: "cat 사용자 설정" },
       { path: paths.credentialStore, label: "cat 자격 증명 저장소" },
       { path: paths.profileStore, label: "cat provider profile 저장소" },
+      { path: paths.trustStore, label: "cat workspace trust 저장소" },
+      { path: paths.approvalStore, label: "cat 프로젝트 승인 저장소" },
       { path: join(paths.catHome, "secrets.json"), label: "cat secret 저장소" },
       { path: join(legacyRoot, "credentials.json"), label: "기존 자격 증명 저장소" },
       { path: join(legacyRoot, "providers.json"), label: "기존 provider 저장소" },

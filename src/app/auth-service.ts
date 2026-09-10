@@ -114,6 +114,22 @@ function environmentApiKey(
   return configured[0]?.value;
 }
 
+function exposesApiKey(value: string | undefined, apiKey: string): boolean {
+  if (!value) return false;
+  let candidate = value;
+  for (let depth = 0; depth < 2; depth += 1) {
+    if (candidate.includes(apiKey)) return true;
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) return false;
+      candidate = decoded;
+    } catch {
+      return false;
+    }
+  }
+  return candidate.includes(apiKey);
+}
+
 export class AuthService {
   constructor(
     readonly credentials: CredentialStore,
@@ -122,17 +138,32 @@ export class AuthService {
 
   async configure(input: ConfigureProfileInput): Promise<ProviderProfile> {
     const profileName = normalizeProfileName(input.name);
-    const before = await this.profiles.load();
-    const replaced = before.profiles.get(profileName);
+    const apiKey = validateApiKey(input.apiKey);
     const endpoint = normalizeProviderBaseUrl(
       input.baseUrl,
       "Provider base URL",
       input.allowInsecureHttp === true,
     );
+    const publicProfileValues = [
+      profileName,
+      input.provider.trim().toLowerCase(),
+      input.baseUrl.trim(),
+      endpoint.baseUrl,
+      input.modelsPath.trim(),
+      input.generationPath.trim(),
+      input.model?.trim(),
+    ];
+    if (publicProfileValues.some((value) => exposesApiKey(value, apiKey))) {
+      throw new ConfigurationError(
+        "API key를 provider profile의 공개 필드에 저장할 수 없습니다.",
+      );
+    }
+    const before = await this.profiles.load();
+    const replaced = before.profiles.get(profileName);
     const credential = await this.credentials.save({
       provider: input.provider,
       origin: endpoint.origin,
-      apiKey: input.apiKey,
+      apiKey,
     });
     let profileSaved = false;
     try {
