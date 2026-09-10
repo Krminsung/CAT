@@ -194,8 +194,13 @@ export class McpStdioTransport {
   async start(signal?: AbortSignal): Promise<void> {
     if (this.connected()) return;
     if (this.#startPromise) return await this.#startPromise;
-    if (this.#state === "closing") {
+    if (this.#closePromise || this.#state === "closing") {
       throw new McpError(`MCP 서버가 종료 중입니다: ${this.serverName}`);
+    }
+    if (this.#process) {
+      throw new McpError(
+        `이전 MCP 소유 process 종료를 확인하기 전에는 다시 시작할 수 없습니다: ${this.serverName}`,
+      );
     }
     if (signal?.aborted) throw new McpError(`MCP 서버 시작을 취소했습니다: ${this.serverName}`);
 
@@ -460,23 +465,29 @@ export class McpStdioTransport {
       this.#state = "closed";
       return;
     }
-    const closing = new Promise<void>((resolve) => {
+    const closing = new Promise<void>((resolve, reject) => {
       let settled = false;
       let termTimer: NodeJS.Timeout | undefined;
       let killTimer: NodeJS.Timeout | undefined;
       let forceTimer: NodeJS.Timeout | undefined;
-      const finish = (): void => {
+      const finish = (error?: Error): void => {
         if (settled) return;
         settled = true;
         if (termTimer) clearTimeout(termTimer);
         if (killTimer) clearTimeout(killTimer);
         if (forceTimer) clearTimeout(forceTimer);
-        child.off("close", finish);
+        child.off("close", closed);
+        if (error) {
+          if (this.#process === child) this.#state = "failed";
+          reject(error);
+          return;
+        }
         if (this.#process === child) this.#process = undefined;
         this.#state = "closed";
         resolve();
       };
-      child.once("close", finish);
+      const closed = (): void => finish();
+      child.once("close", closed);
       try {
         child.stdin.end();
       } catch {
@@ -486,7 +497,15 @@ export class McpStdioTransport {
         ownedSignal(child, "SIGTERM");
         killTimer = setTimeout(() => {
           ownedSignal(child, "SIGKILL");
-          forceTimer = setTimeout(finish, KILL_GRACE_MS);
+          forceTimer = setTimeout(() => {
+            if (child.exitCode !== null || child.signalCode !== null) {
+              finish();
+              return;
+            }
+            finish(new McpError(
+              `MCP 소유 process 종료를 확인하지 못했습니다: ${this.serverName}`,
+            ));
+          }, KILL_GRACE_MS);
           forceTimer.unref();
         }, TERM_GRACE_MS);
         killTimer.unref();

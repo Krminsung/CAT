@@ -179,4 +179,10 @@ P10.2는 `fbf6fcb2108e2653b9e03268d631bdefd3d22cb0`에서 완료했다. P10.3에
 JSON Schema 2020-12의 bounded subset과 문서 내부 참조만 허용하고, 정확히 고정한
 `ajv@8.20.0`으로 provider와 독립적인 입력 validator를 준비한다. 검증할 수 없는 schema는 해당
 동적 도구를 비활성화하며, MCP 도구 이름만으로 이전 승인을 재사용하지 않도록 server registry
-version이 든 external permission 계약과 원자적 registry 교체 경계를 구현하고 있다.
+version이 든 external permission 계약과 원자적 registry 교체 경계를 구현했다.
+P10.3은 `a4a2161c17d61cc89482b27d63c555612faf7d22`에서 완료했다. P10.4에서는 계층형
+MCP 설정과 environment secret reference, 설정 저장과 process 시작의 분리, exact execution plan을
+사용하는 manager를 연결하고 있다. 세 관리 built-in과 CLI list/get/add/remove, `/mcp [reconnect]`,
+동적 도구의 host schema·central permission 실행 경로, reload·세션 전환·앱 종료 cleanup을 포함한다.
+workspace와 cwd identity를 승인 뒤에도 재확인하고, 종료 확인 실패·분기/reference schema 복잡도·
+민감한 MCP 출력 field에 대한 fail-closed 보완도 함께 적용했다. 자동 검증은 아직 실행하지 않았다.

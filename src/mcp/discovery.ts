@@ -23,6 +23,7 @@ export interface McpDiscoveredTool {
   readonly inputSchema?: Readonly<JsonObject>;
   readonly outputSchema?: Readonly<JsonObject>;
   readonly annotations?: Readonly<JsonObject>;
+  readonly schemaIssue?: string;
 }
 
 export interface McpNamespacedTool extends McpDiscoveredTool {
@@ -158,11 +159,12 @@ export async function discoverMcpTools(
         continue;
       }
       names.add(toolName);
+      const schemaIssues: string[] = [];
       if (raw.inputSchema !== undefined && !isRecord(raw.inputSchema)) {
-        notice(`${serverName}.${toolName}: inputSchema가 객체가 아니어서 schema 검증 단계에서 비활성화됩니다.`);
+        schemaIssues.push("inputSchema가 객체가 아닙니다");
       }
       if (raw.outputSchema !== undefined && !isRecord(raw.outputSchema)) {
-        notice(`${serverName}.${toolName}: outputSchema가 객체가 아니어서 결과 schema를 사용하지 않습니다.`);
+        schemaIssues.push("outputSchema가 객체가 아닙니다");
       }
       if (raw.annotations !== undefined && !isRecord(raw.annotations)) {
         notice(`${serverName}.${toolName}: annotations가 객체가 아니라 무시합니다.`);
@@ -170,6 +172,7 @@ export async function discoverMcpTools(
       const inputSchema = optionalObject(raw.inputSchema);
       const outputSchema = optionalObject(raw.outputSchema);
       const annotations = optionalObject(raw.annotations);
+      const schemaIssue = schemaIssues.length === 0 ? undefined : schemaIssues.join(", ");
       tools.push(Object.freeze({
         serverName,
         protocolVersion: adapter.version,
@@ -178,6 +181,7 @@ export async function discoverMcpTools(
         ...(inputSchema === undefined ? {} : { inputSchema }),
         ...(outputSchema === undefined ? {} : { outputSchema }),
         ...(annotations === undefined ? {} : { annotations }),
+        ...(schemaIssue === undefined ? {} : { schemaIssue }),
       }));
     }
     const next = cursorValue(result.nextCursor, serverName);

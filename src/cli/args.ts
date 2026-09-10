@@ -130,7 +130,7 @@ export function cliHelp(): string {
     "  --version                      버전 표시\n\n" +
     "management commands:\n" +
     "  cat-tui auth <setup|status|use|remove> ...\n" +
-    "  cat-tui mcp ...       (P10에서 활성화)\n" +
+    "  cat-tui mcp <list|get|add|remove> ...\n" +
     "  cat-tui worktree ...  (P12에서 활성화)\n" +
     "  cat-tui ssh ...       (P12에서 활성화)\n";
 }

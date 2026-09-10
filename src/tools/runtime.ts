@@ -527,13 +527,17 @@ export class CentralToolExecutor {
   readonly #registry: ToolRegistry;
   readonly #policy: PermissionPolicy;
   readonly #hooks: ToolHookPort;
-  readonly #redactor: Redactor;
+  #redactor: Redactor;
 
   constructor(registry: ToolRegistry, options: CentralToolExecutorOptions) {
     this.#registry = registry;
     this.#policy = options.policy;
     this.#hooks = options.hooks ?? new NoopToolHookPort();
     this.#redactor = options.redactor ?? new Redactor();
+  }
+
+  setRedactor(redactor: Redactor): void {
+    this.#redactor = redactor;
   }
 
   providerTools(): readonly ProviderToolSpec[] {
