@@ -208,3 +208,11 @@ P10은 검토 head `1f1c5d5427dd58f655a9ca4477f1a71d91026ed4`를 PR #10에서 me
 분리된 public web transport를 구현하고 있다. URL·DNS 결과·redirect와 실제 socket remote address를
 확인하고, 검증한 주소만 반환하는 per-hop lookup을 사용한다. 환경 proxy는 fail closed하며 전체
 deadline, wire·해제 body, header·chunk·동시 요청과 종료 cleanup 상한을 P11.1에 둔다.
+P11.1은 `bef6aebfa5b85730529ba72ac093c1db1f91c3c5`에서 완료했다. P11.2에서는 알려진
+credential과 민감 environment를 갱신 가능한 public input guard에서 제거하고, 민감 query parameter가
+포함된 fetch URL은 fail closed한다. 원본의 Bing reader→DuckDuckGo reader→Bing HTML 순서를 각각 한
+번만 시도하는 `web_search`와 textual response를 실행 불가능한 제한형 텍스트로 만드는 `fetch_url`을
+중앙 public network 도구로 등록하고 있다. 결과에는 추출한 실제 source URL과 backend final URL을
+남기며 전체 provider 실패, 정상 응답의 결과 없음과 실제 결과를 서로 다른 상태로 보존한다. 앱 종료와
+조립 실패는 model transport와 별도로 public transport cleanup을 수행한다. 외부 요청과 자동 검증은
+실행하지 않았다.

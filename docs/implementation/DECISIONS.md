@@ -333,3 +333,17 @@
   검증한 연결 주소를 보장할 수 없다고 보고 fail closed하며, redirect마다 새 dispatcher와 DNS 검증을
   사용한다. 전체 20초 deadline, redirect 5회, wire·해제 본문 1MiB, header·chunk·동시 요청 상한을
   적용하고 transport 종료 시 소유 요청을 취소한다. 실제 외부 요청은 개발 단계에서 실행하지 않는다.
+
+## D033 — 최소 공개 query와 실제 web source
+
+- 상태: 승인됨
+- 결정: 공개 검색은 저장·model·MCP credential과 민감 environment 값을 갱신 가능한 별도 input guard가
+  먼저 제거한 최소 query만 사용한다. 직접 fetch URL에 알려진 secret 또는 credential/signature 계열
+  query parameter가 있으면 대상의 의미를 임의로 바꾸지 않고 요청 전체를 거부한다. 검색은 원본의
+  두 reader backend와 direct HTML fallback을 각각 최대 한 번만 사용하며 모든 요청은 D032 transport를
+  거친다.
+- 결과: 검색 결과는 backend 문서에서 추출하고 public URL 형식을 통과한 실제 title·URL·snippet·source만
+  반환한다. backend 전체 실패는 합성 결과나 빈 성공으로 숨기지 않고 정상 응답의 결과 없음과 구분한다.
+  fetch 본문은 textual media type만 제한된 문자 decode와 HTML/control 정리를 거쳐 실행 불가능한
+  비신뢰 데이터로 표시하며 실제 requested/final/source URL과 truncation을 보존한다. 이 redaction은
+  모든 개인정보를 판별한다고 주장하지 않고 외부 요청 자체는 개발 단계에서 실행하지 않는다.
