@@ -217,9 +217,11 @@ export class McpStdioTransport {
     }
     this.#process = child;
     child.stdout.on("data", (value: Buffer | string) => {
+      if (this.#process !== child) return;
       this.#consumeStdout(typeof value === "string" ? Buffer.from(value) : value);
     });
     child.stderr.on("data", (value: Buffer | string) => {
+      if (this.#process !== child) return;
       const chunk = typeof value === "string" ? Buffer.from(value) : value;
       if (chunk.byteLength >= MCP_MAX_STDERR_BYTES) {
         this.#stderrTail = Buffer.from(chunk.subarray(-MCP_MAX_STDERR_BYTES));
@@ -231,6 +233,7 @@ export class McpStdioTransport {
       }
     });
     child.on("error", (error) => {
+      if (this.#process !== child) return;
       const failure = new McpError(
         `MCP 서버 process 오류 (${this.serverName}): ${this.#redactor.redact(error.message)}`,
         { cause: error },
@@ -239,6 +242,7 @@ export class McpStdioTransport {
       void this.close("process failure").catch(() => undefined);
     });
     child.stdin.on("error", (error) => {
+      if (this.#process !== child) return;
       const failure = new McpError(
         `MCP 서버 stdin 오류 (${this.serverName}): ${this.#redactor.redact(error.message)}`,
         { cause: error },
@@ -247,6 +251,7 @@ export class McpStdioTransport {
       void this.close("stdin failure").catch(() => undefined);
     });
     child.stdout.on("error", (error) => {
+      if (this.#process !== child) return;
       const failure = new McpError(
         `MCP 서버 stdout 오류 (${this.serverName}): ${this.#redactor.redact(error.message)}`,
         { cause: error },
@@ -255,12 +260,14 @@ export class McpStdioTransport {
       void this.close("stdout failure").catch(() => undefined);
     });
     child.stdout.once("end", () => {
+      if (this.#process !== child) return;
       if (this.#state === "closing" || this.#state === "closed") return;
       const failure = new McpError(`MCP 서버 stdout이 종료되었습니다: ${this.serverName}`);
       this.#failTransport(failure);
       void this.close("stdout ended").catch(() => undefined);
     });
     child.once("exit", (code, exitSignal) => {
+      if (this.#process !== child) return;
       const detail = this.stderrTail().trim().slice(-2_000);
       const expected = this.#state === "closing" || this.#state === "closed";
       this.#process = undefined;

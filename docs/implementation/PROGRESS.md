@@ -171,3 +171,7 @@ tree, phase head 조상 관계와 `origin/main` 포함을 확인했다. P10은 �
 MCP protocol 의미와 분리된 bounded stdio transport를 구현하고 있다. 소유 child process의
 newline frame·pending request·stderr tail·timeout/abort/exit 정리와 stdin close→TERM→KILL
 종료 순서를 P10.1에 둔다.
+P10.1은 `0c713c2cd5d4415c678538202d21e29b3252b63a`에서 완료했다. P10.2에서는 legacy
+initialize lifecycle과 modern per-request metadata를 별도 adapter로 분리하고, page·entry·cursor·누적
+metadata 상한과 결정적 tool namespace를 구현하고 있다. 재연결 뒤 늦은 이전 child event가 새
+transport 상태를 덮지 않도록 process identity도 listener에서 다시 확인한다.
