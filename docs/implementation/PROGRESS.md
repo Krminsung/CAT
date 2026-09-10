@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P10 기준 main은 `e38ef6fa490d8e337042c289f167a5bb438b7fad`이다. 구현은 이 커밋에서
+P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -14,8 +14,8 @@ P10 기준 main은 `e38ef6fa490d8e337042c289f167a5bb438b7fad`이다. 구현은 �
 | P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
-| P10 stdio MCP | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
+| P11 public web | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -202,3 +202,9 @@ push, PR과 merge는 진행하지 않았다. 이후 사용자가 P10 오류 수�
 마지막 승인 검사를 `0faa676b25c301924aaab63191ddacfe0ba09a48`에서 실행했고 종료 코드 0으로
 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 MCP server·앱·TUI와 원본
 script·test runtime은 실행하지 않았다.
+P10은 검토 head `1f1c5d5427dd58f655a9ca4477f1a71d91026ed4`를 PR #10에서 merge commit
+`5af2be849c07b8a2752772ce73c090c662a9e008`로 병합했다. merge의 두 부모, tree, phase head
+조상 관계와 `origin/main` 포함을 확인했다. P11은 이 merge commit을 기준으로 인증된 model HTTP와
+분리된 public web transport를 구현하고 있다. URL·DNS 결과·redirect와 실제 socket remote address를
+확인하고, 검증한 주소만 반환하는 per-hop lookup을 사용한다. 환경 proxy는 fail closed하며 전체
+deadline, wire·해제 body, header·chunk·동시 요청과 종료 cleanup 상한을 P11.1에 둔다.

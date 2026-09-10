@@ -320,3 +320,16 @@
 - 결과: 저장·제거·reload는 stale 연결을 닫지만 자동 재연결하지 않는다. 재연결은 전체 deadline을 가지며
   identity 변경과 종료 확인 실패 시 시작된 소유 process를 정리하고 중단한다. session 전환·종료도
   manager cleanup 결과를 포함하고, 실제 stdio 서버 동작은 개발 단계에서 실행해 검증하지 않는다.
+
+## D032 — 공개 웹 DNS 고정과 direct-only transport
+
+- 상태: 승인됨
+- 결정: 공개 웹 요청은 인증된 model transport와 dispatcher를 공유하지 않는다. 각 URL과 redirect의
+  HTTP(S) scheme·userinfo·hostname을 확인하고 OS DNS 결과 전체에서 비공개·예약·link-local·multicast·
+  unspecified·IPv4-mapped 주소를 거부한다. 검증한 주소만 반환하는 per-hop lookup을 Undici connector에
+  주입하고 socket 연결 뒤 실제 remote address가 그 집합 안인지 다시 확인한다. TLS SNI와 인증서
+  hostname 검증에는 원래 URL hostname을 유지한다.
+- 결과: DNS 사전 확인 뒤 일반 fetch가 재조회하는 TOCTOU 경로를 두지 않는다. 환경 proxy가 설정되면
+  검증한 연결 주소를 보장할 수 없다고 보고 fail closed하며, redirect마다 새 dispatcher와 DNS 검증을
+  사용한다. 전체 20초 deadline, redirect 5회, wire·해제 본문 1MiB, header·chunk·동시 요청 상한을
+  적용하고 transport 종료 시 소유 요청을 취소한다. 실제 외부 요청은 개발 단계에서 실행하지 않는다.
