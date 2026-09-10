@@ -14,7 +14,7 @@ P10 기준 main은 `e38ef6fa490d8e337042c289f167a5bb438b7fad`이다. 구현은 �
 | P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
-| P10 stdio MCP | VERIFYING | 1차 FAIL, 2차 NOT_RUN (2/2 예약) | NOT_PUBLISHED |
+| P10 stdio MCP | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
 | P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -199,4 +199,6 @@ Ajv 2020 import에 대해 TS2709와 TS2351을 보고하고 종료 코드 2로 �
 push, PR과 merge는 진행하지 않았다. 이후 사용자가 P10 오류 수정과 `npm run check` 추가 1회를
 명시적으로 승인해, 보고된 Ajv import 진단만
 `472010295edcab81fb52992ffe5931b3b7d2740f`에서 수정했다. 첫 실패 기록을 보존한 채 두 번째이자
-마지막 승인 검사를 2/2로 예약했다.
+마지막 승인 검사를 `0faa676b25c301924aaab63191ddacfe0ba09a48`에서 실행했고 종료 코드 0으로
+통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 MCP server·앱·TUI와 원본
+script·test runtime은 실행하지 않았다.
