@@ -238,3 +238,14 @@
 - 결과: 모델이 자기 transcript를 변조하거나 읽는 경로를 기본 도구로 얻지 않는다. 재개 snapshot과
   활성 run이 교차하지 않고, 시계가 뒤로 가도 최신 revision의 시간 순서가 퇴행하지 않는다.
   미완료 tool exchange는 실행 가능한 호출 대신 제한된 redacted notice로 보존한다.
+
+## D025 — alternate-screen 수명주기와 출력 경계
+
+- 상태: 승인됨
+- 결정: 대화형 화면은 stdin과 stdout이 각각 TTY일 때만 pi-tui alternate screen을 시작한다.
+  stderr의 TTY 여부는 별도로 보존하며 진단은 ANSI 없는 제한된 텍스트로 stderr에만 기록한다.
+  화면 구성 요소는 외부 escape와 제어 문자를 제거하는 경계로 감싸고, mouse reporting은 기본부터
+  끈다. 시작 일부 실패, render/input 오류와 앱 예외는 모두 하나의 멱등적인 화면 종료 경로를 쓴다.
+- 결과: 정상·오류 종료는 대화 내용을 main screen에 다시 출력하지 않고 raw mode, bracketed paste,
+  mouse mode, autowrap, cursor와 alternate screen을 복원한다. 화면 오류는 모델 재호출이나 새 agent
+  run을 만들지 않으며 실제 터미널별 복원 품질은 정적 검사만으로 확인했다고 주장하지 않는다.

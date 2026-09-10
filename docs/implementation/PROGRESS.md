@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P06 기준 main은 `e5f082a0b8ccb5fdc70233837762941e63f7233b`이다. 구현은 이 커밋에서
+P07 기준 main은 `c434311e79ac2c112ea8ac08e31b5a320dff3e2f`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -10,8 +10,8 @@ P06 기준 main은 `e5f082a0b8ccb5fdc70233837762941e63f7233b`이다. 구현은 �
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
 | P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
-| P06 세션·컨텍스트 | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
-| P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P06 세션·컨텍스트 | DONE | PASS (1/1) | PR #6 / MERGED `c434311` |
+| P07 TUI core | IMPLEMENTING | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P10 stdio MCP | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -98,3 +98,7 @@ secret, no-persistence resume의 maintenance 소유권, metadata 시각 단조�
 기준 SHA와 같음을 확인한 뒤 `13908a0e1743d632734b8673d097b3f5ab44662c`를 대상으로
 예약한 유일한 `npm run check`를 실행했고 통과했다. 실제 세션 I/O, rewind, 모델 압축, 도구와
 앱 런타임은 실행하지 않았다.
+P06는 검토 head `5a0b32ed50faf6d32cd064052999039e71d44135`를 PR #6에서 merge
+commit `c434311e79ac2c112ea8ac08e31b5a320dff3e2f`로 병합했다. merge의 두 부모,
+tree, phase head의 조상 관계와 `origin/main`을 대조했다. P07은 이 merge commit을 기준으로
+alternate-screen 화면 수명주기와 TTY·복원 경계를 구현하고 있다.

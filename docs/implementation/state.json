@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P06",
-  "currentStep": "P06.PUBLISH",
-  "status": "VERIFIED",
-  "baseMainSha": "e5f082a0b8ccb5fdc70233837762941e63f7233b",
-  "lastCommitSha": "13908a0e1743d632734b8673d097b3f5ab44662c",
+  "currentPhase": "P07",
+  "currentStep": "P07.1",
+  "status": "IMPLEMENTING",
+  "baseMainSha": "c434311e79ac2c112ea8ac08e31b5a320dff3e2f",
+  "lastCommitSha": "c434311e79ac2c112ea8ac08e31b5a320dff3e2f",
   "verification": {
-    "attemptsUsed": 1,
+    "attemptsUsed": 0,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": "13908a0e1743d632734b8673d097b3f5ab44662c",
-    "result": "PASS",
-    "exitCode": 0
+    "targetCommitSha": null,
+    "result": "NOT_RUN",
+    "exitCode": null
   },
   "publication": {
-    "branch": "cat/p06-sessions-context",
+    "branch": "cat/p07-tui-core",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Create and publish cat/p06-sessions-context, then review and merge its PR",
+  "nextAction": "Complete P07.1 terminal screen lifecycle and static source review",
   "blocker": null
 }

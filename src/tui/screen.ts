@@ -1,0 +1,634 @@
+import {
+  Container,
+  CURSOR_MARKER,
+  Editor,
+  ProcessTerminal,
+  ScrollView,
+  Text,
+  TuiAltScreen,
+  VStack,
+  truncateToWidth,
+  type Component,
+  type EditorTheme,
+  type Focusable,
+  type Terminal,
+  type TuiMouseEvent,
+  type TuiMouseEventResult,
+  type TuiStopOptions,
+} from "@earendil-works/pi-tui";
+
+import { PRODUCT_NAME, VERSION } from "../core/version.js";
+import { Redactor } from "../security/redaction.js";
+import {
+  safeTerminalLine,
+  sanitizeTerminalText,
+  type TerminalTextRedactor,
+} from "./terminal-text.js";
+
+const DISABLE_MOUSE_REPORTING =
+  "\u001B[?1000l\u001B[?1002l\u001B[?1003l\u001B[?1004l\u001B[?1006l\u001B[?1015l";
+const EMERGENCY_TERMINAL_RESTORE =
+  "\u001B[?2026l\u001B[?2004l\u001B[?1007l" +
+  `${DISABLE_MOUSE_REPORTING}\u001B[?7h\u001B[?1049l\u001B[0m\u001B[?25h`;
+const MAX_RENDER_COLUMNS = 1_000;
+const MAX_RENDERED_LINE_BYTES = 64 * 1024;
+const MAX_COMPONENT_ROWS = 8_192;
+const MAX_TRANSCRIPT_ENTRY_BYTES = 64 * 1024;
+const MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024;
+const MAX_TRANSCRIPT_ENTRIES = 256;
+
+const plainStyle = (text: string): string => text;
+
+const EDITOR_THEME: EditorTheme = {
+  borderColor: plainStyle,
+  selectList: {
+    selectedPrefix: plainStyle,
+    selectedText: plainStyle,
+    description: plainStyle,
+    scrollInfo: plainStyle,
+    noMatch: plainStyle,
+  },
+};
+
+export interface TerminalTtyState {
+  readonly stdin: boolean;
+  readonly stdout: boolean;
+  readonly stderr: boolean;
+}
+
+export interface TerminalDiagnosticWriter {
+  write(text: string): unknown;
+}
+
+export type TerminalScreenErrorCode =
+  | "interactive_tty_required"
+  | "screen_start_failed"
+  | "screen_component_failed"
+  | "screen_application_failed"
+  | "screen_restore_failed";
+
+export class TerminalScreenError extends Error {
+  override name = "TerminalScreenError";
+
+  constructor(
+    readonly code: TerminalScreenErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+  }
+}
+
+export type TerminalScreenState = "idle" | "starting" | "running" | "stopping" | "stopped";
+
+export interface TerminalScreenExit {
+  readonly reason: "closed" | "failure";
+  readonly error?: TerminalScreenError;
+}
+
+export interface CatTerminalScreenOptions {
+  readonly model: string;
+  readonly workspace: string;
+  readonly sessionId: string;
+  readonly status?: string;
+  readonly terminal?: Terminal;
+  readonly tty?: TerminalTtyState;
+  readonly diagnostics?: TerminalDiagnosticWriter;
+  readonly redactor?: TerminalTextRedactor;
+  readonly secrets?: readonly string[];
+}
+
+interface TranscriptComponent {
+  readonly component: Component;
+  readonly bytes: number;
+}
+
+type ComponentFailureHandler = (
+  operation: "render" | "input" | "mouse" | "invalidate",
+  label: string,
+  error: unknown,
+) => void;
+
+export function detectTerminalTtyState(): TerminalTtyState {
+  return {
+    stdin: process.stdin.isTTY === true,
+    stdout: process.stdout.isTTY === true,
+    stderr: process.stderr.isTTY === true,
+  };
+}
+
+function normalizedRenderWidth(width: number): number {
+  if (!Number.isFinite(width)) return 1;
+  return Math.max(1, Math.min(MAX_RENDER_COLUMNS, Math.floor(width)));
+}
+
+function safeRenderedLine(
+  value: string,
+  width: number,
+  redactor: TerminalTextRedactor,
+  preserveCursor: boolean,
+): string {
+  const maximumWidth = normalizedRenderWidth(width);
+  if (!preserveCursor) {
+    return truncateToWidth(
+      safeTerminalLine(value, { maximumBytes: MAX_RENDERED_LINE_BYTES, redactor }),
+      maximumWidth,
+      "…",
+    );
+  }
+
+  const markerIndex = value.lastIndexOf(CURSOR_MARKER);
+  if (markerIndex < 0) {
+    return truncateToWidth(
+      safeTerminalLine(value, { maximumBytes: MAX_RENDERED_LINE_BYTES, redactor }),
+      maximumWidth,
+      "…",
+    );
+  }
+  const before = safeTerminalLine(value.slice(0, markerIndex), {
+    maximumBytes: Math.floor(MAX_RENDERED_LINE_BYTES / 2),
+    redactor,
+  });
+  const after = safeTerminalLine(value.slice(markerIndex + CURSOR_MARKER.length), {
+    maximumBytes: Math.floor(MAX_RENDERED_LINE_BYTES / 2),
+    redactor,
+  });
+  return truncateToWidth(`${before}${CURSOR_MARKER}${after}`, maximumWidth, "…");
+}
+
+class ComponentBoundary implements Component {
+  readonly wantsKeyRelease: boolean;
+
+  constructor(
+    protected readonly component: Component,
+    private readonly label: string,
+    private readonly redactor: TerminalTextRedactor,
+    private readonly failureHandler: ComponentFailureHandler,
+    private readonly preserveCursor = false,
+  ) {
+    this.wantsKeyRelease = component.wantsKeyRelease === true;
+  }
+
+  render(width: number): string[] {
+    try {
+      const safeWidth = normalizedRenderWidth(width);
+      const rendered = this.component.render(safeWidth);
+      if (!Array.isArray(rendered)) throw new Error("구성 요소가 행 배열을 반환하지 않았습니다.");
+      const rows: string[] = [];
+      const maximumRows = Math.min(rendered.length, MAX_COMPONENT_ROWS);
+      for (let index = 0; index < maximumRows; index += 1) {
+        const row = rendered[index];
+        if (typeof row !== "string") throw new Error("구성 요소가 문자열이 아닌 행을 반환했습니다.");
+        rows.push(safeRenderedLine(row, safeWidth, this.redactor, this.preserveCursor));
+      }
+      if (rendered.length > maximumRows) rows.push("… [화면 행 제한으로 생략]");
+      return rows;
+    } catch (error) {
+      this.failureHandler("render", this.label, error);
+      return ["[화면 구성 요소를 표시하지 못했습니다.]"];
+    }
+  }
+
+  handleInput(data: string): void {
+    try {
+      this.component.handleInput?.(data);
+    } catch (error) {
+      this.failureHandler("input", this.label, error);
+    }
+  }
+
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    try {
+      return this.component.handleMouse?.(event);
+    } catch (error) {
+      this.failureHandler("mouse", this.label, error);
+      return undefined;
+    }
+  }
+
+  invalidate(): void {
+    try {
+      this.component.invalidate();
+    } catch (error) {
+      this.failureHandler("invalidate", this.label, error);
+    }
+  }
+}
+
+class FocusableComponentBoundary extends ComponentBoundary implements Focusable {
+  constructor(
+    private readonly focusableComponent: Component & Focusable,
+    label: string,
+    redactor: TerminalTextRedactor,
+    failureHandler: ComponentFailureHandler,
+  ) {
+    super(focusableComponent, label, redactor, failureHandler, true);
+  }
+
+  get focused(): boolean {
+    return this.focusableComponent.focused;
+  }
+
+  set focused(value: boolean) {
+    this.focusableComponent.focused = value;
+  }
+}
+
+class BoundedSingleLine implements Component {
+  #text: string;
+
+  constructor(
+    text: string,
+    private readonly redactor: TerminalTextRedactor,
+  ) {
+    this.#text = safeTerminalLine(text, { redactor });
+  }
+
+  setText(text: string): void {
+    this.#text = safeTerminalLine(text, { redactor: this.redactor });
+  }
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    return [truncateToWidth(this.#text, normalizedRenderWidth(width), "…")];
+  }
+}
+
+class NativeSelectionTui extends TuiAltScreen {
+  constructor(
+    terminal: Terminal,
+    private readonly renderFailure: (error: unknown) => void,
+  ) {
+    super(terminal, true, undefined, {
+      mouse: false,
+      copyOnSelect: false,
+      wheelScrollLines: 3,
+    });
+  }
+
+  protected override beforeTerminalStart(): void {
+    super.beforeTerminalStart();
+    this.terminal.write(DISABLE_MOUSE_REPORTING);
+  }
+
+  protected override beforeTerminalStop(options: TuiStopOptions): void {
+    try {
+      this.terminal.write(DISABLE_MOUSE_REPORTING);
+    } finally {
+      super.beforeTerminalStop(options);
+    }
+  }
+
+  protected override doRender(): void {
+    try {
+      super.doRender();
+    } catch (error) {
+      this.renderFailure(error);
+    }
+  }
+}
+
+function failureMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : "알 수 없는 오류";
+}
+
+export class CatTerminalScreen {
+  readonly #terminal: Terminal;
+  readonly #tty: TerminalTtyState;
+  readonly #diagnostics: TerminalDiagnosticWriter;
+  readonly #redactor: TerminalTextRedactor;
+  readonly #tui: NativeSelectionTui;
+  readonly #header: BoundedSingleLine;
+  readonly #status: BoundedSingleLine;
+  readonly #transcript = new Container();
+  readonly #transcriptComponents: TranscriptComponent[] = [];
+  readonly #scroll: ScrollView;
+  readonly #editor: Editor;
+  readonly #editorBoundary: FocusableComponentBoundary;
+  readonly #exitPromise: Promise<TerminalScreenExit>;
+
+  #resolveExit: ((result: TerminalScreenExit) => void) | undefined;
+  #state: TerminalScreenState = "idle";
+  #failure: TerminalScreenError | undefined;
+  #startAttempted = false;
+  #restorationAttempted = false;
+  #exitResolved = false;
+  #transcriptBytes = 0;
+
+  constructor(options: CatTerminalScreenOptions) {
+    this.#terminal = options.terminal ?? new ProcessTerminal();
+    this.#tty = { ...(options.tty ?? detectTerminalTtyState()) };
+    this.#diagnostics = options.diagnostics ?? process.stderr;
+    if (options.redactor) {
+      this.#redactor = options.redactor;
+    } else {
+      this.#redactor = new Redactor(options.secrets ?? []);
+    }
+
+    const componentFailure: ComponentFailureHandler = (operation, label, error) => {
+      this.#captureComponentFailure(operation, label, error);
+    };
+    this.#tui = new NativeSelectionTui(this.#terminal, (error) => {
+      this.#captureComponentFailure("render", "화면 renderer", error);
+    });
+    this.#header = new BoundedSingleLine(
+      `${PRODUCT_NAME} v${VERSION} · ${options.model} · ${options.workspace}`,
+      this.#redactor,
+    );
+    this.#status = new BoundedSingleLine(
+      options.status ?? `세션 ${options.sessionId} · 준비`,
+      this.#redactor,
+    );
+    this.#editor = new Editor(this.#tui, EDITOR_THEME, {
+      paddingX: 0,
+      autocompleteMaxVisible: 8,
+    });
+    this.#editorBoundary = new FocusableComponentBoundary(
+      this.#editor,
+      "입력 편집기",
+      this.#redactor,
+      componentFailure,
+    );
+    const transcriptBoundary = new ComponentBoundary(
+      this.#transcript,
+      "대화 기록",
+      this.#redactor,
+      componentFailure,
+    );
+    this.#scroll = new ScrollView(transcriptBoundary, {
+      follow: "end",
+      primary: true,
+      overscroll: "chain",
+      scrollbar: "auto",
+    });
+    const headerBoundary = new ComponentBoundary(
+      this.#header,
+      "머리글",
+      this.#redactor,
+      componentFailure,
+    );
+    const statusBoundary = new ComponentBoundary(
+      this.#status,
+      "상태 표시줄",
+      this.#redactor,
+      componentFailure,
+    );
+    this.#tui.setLayoutRoot(new VStack([
+      { component: headerBoundary, basis: 1, grow: 0, shrink: 0, minSize: 1, maxSize: 1 },
+      { component: this.#scroll, basis: 0, grow: 1, shrink: 1, minSize: 1 },
+      { component: this.#editorBoundary, basis: "auto", grow: 0, shrink: 1, minSize: 3 },
+      { component: statusBoundary, basis: 1, grow: 0, shrink: 0, minSize: 1, maxSize: 1 },
+    ]));
+    this.#tui.setFocus(this.#editorBoundary);
+    this.#exitPromise = new Promise<TerminalScreenExit>((resolve) => {
+      this.#resolveExit = resolve;
+    });
+  }
+
+  get state(): TerminalScreenState {
+    return this.#state;
+  }
+
+  get isRunning(): boolean {
+    return this.#state === "running";
+  }
+
+  get tty(): TerminalTtyState {
+    return { ...this.#tty };
+  }
+
+  get editor(): Editor {
+    return this.#editor;
+  }
+
+  get isFollowingTranscript(): boolean {
+    return this.#scroll.isFollowingEnd;
+  }
+
+  start(): void {
+    if (this.#state === "running") return;
+    if (this.#state !== "idle") {
+      throw new TerminalScreenError("screen_start_failed", "종료된 터미널 화면은 다시 시작할 수 없습니다.");
+    }
+    if (!this.#tty.stdin || !this.#tty.stdout) {
+      const missing = [
+        ...(this.#tty.stdin ? [] : ["stdin"]),
+        ...(this.#tty.stdout ? [] : ["stdout"]),
+      ].join("/");
+      const error = new TerminalScreenError(
+        "interactive_tty_required",
+        `대화형 TUI에는 TTY ${missing}이 필요합니다.`,
+      );
+      this.#failure = error;
+      this.#state = "stopped";
+      this.#writeDiagnostic(error);
+      this.#resolveExitOnce();
+      throw error;
+    }
+
+    this.#state = "starting";
+    this.#startAttempted = true;
+    try {
+      this.#tui.setFocus(this.#editorBoundary);
+      this.#tui.start();
+      this.#state = "running";
+    } catch (cause) {
+      const detail = safeTerminalLine(failureMessage(cause), {
+        maximumBytes: 4 * 1024,
+        redactor: this.#redactor,
+      });
+      const error = new TerminalScreenError(
+        "screen_start_failed",
+        `터미널 화면을 시작하지 못했습니다: ${detail}`,
+        { cause },
+      );
+      this.#failure = error;
+      this.stop();
+      throw error;
+    }
+  }
+
+  stop(): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    this.#state = "stopping";
+    const restorationError = this.#restoreTerminal();
+    if (restorationError && !this.#failure) {
+      const detail = safeTerminalLine(failureMessage(restorationError), {
+        maximumBytes: 4 * 1024,
+        redactor: this.#redactor,
+      });
+      this.#failure = new TerminalScreenError(
+        "screen_restore_failed",
+        `터미널 상태를 완전히 복원하지 못했습니다: ${detail}`,
+        { cause: restorationError },
+      );
+    }
+    this.#state = "stopped";
+    if (this.#failure) this.#writeDiagnostic(this.#failure);
+    this.#resolveExitOnce();
+  }
+
+  close(): void {
+    this.stop();
+  }
+
+  waitForExit(): Promise<TerminalScreenExit> {
+    return this.#exitPromise;
+  }
+
+  async run(
+    application: (screen: CatTerminalScreen) => Promise<void>,
+  ): Promise<TerminalScreenExit> {
+    try {
+      this.start();
+      await application(this);
+    } catch (error) {
+      if (!this.#failure) this.reportApplicationFailure(error);
+    } finally {
+      this.stop();
+    }
+    return this.waitForExit();
+  }
+
+  reportApplicationFailure(error: unknown): void {
+    if (this.#state === "stopped" || this.#state === "stopping" || this.#failure) return;
+    const detail = safeTerminalLine(failureMessage(error), {
+      maximumBytes: 4 * 1024,
+      redactor: this.#redactor,
+    });
+    this.#failure = new TerminalScreenError(
+      "screen_application_failed",
+      `터미널 애플리케이션 오류가 발생했습니다: ${detail}`,
+      { cause: error },
+    );
+    queueMicrotask(() => this.stop());
+  }
+
+  setHeader(text: string): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    this.#header.setText(text);
+    this.requestRender();
+  }
+
+  setStatus(text: string): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    this.#status.setText(text);
+    this.requestRender();
+  }
+
+  appendTranscriptText(text: string): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    const sanitized = sanitizeTerminalText(text, {
+      maximumBytes: MAX_TRANSCRIPT_ENTRY_BYTES,
+      redactor: this.#redactor,
+    });
+    if (!sanitized.text) return;
+    const textComponent = new Text(sanitized.text, 0, 0);
+    const component = new ComponentBoundary(
+      textComponent,
+      "대화 항목",
+      this.#redactor,
+      (operation, label, error) => this.#captureComponentFailure(operation, label, error),
+    );
+    const bytes = Buffer.byteLength(sanitized.text, "utf8");
+    this.#transcript.addChild(component);
+    this.#transcriptComponents.push({ component, bytes });
+    this.#transcriptBytes += bytes;
+    while (
+      this.#transcriptComponents.length > MAX_TRANSCRIPT_ENTRIES ||
+      this.#transcriptBytes > MAX_TRANSCRIPT_BYTES
+    ) {
+      const removed = this.#transcriptComponents.shift();
+      if (!removed) break;
+      this.#transcript.removeChild(removed.component);
+      this.#transcriptBytes -= removed.bytes;
+    }
+    this.requestRender();
+  }
+
+  clearTranscript(): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    this.#transcript.clear();
+    this.#transcriptComponents.length = 0;
+    this.#transcriptBytes = 0;
+    this.#scroll.scrollToEnd();
+    this.requestRender();
+  }
+
+  requestRender(force = false): void {
+    if (this.#state !== "running") return;
+    try {
+      this.#tui.requestRender(force);
+    } catch (error) {
+      this.#captureComponentFailure("render", "화면 갱신", error);
+    }
+  }
+
+  #captureComponentFailure(
+    operation: "render" | "input" | "mouse" | "invalidate",
+    label: string,
+    cause: unknown,
+  ): void {
+    if (this.#state === "stopped" || this.#state === "stopping" || this.#failure) return;
+    const detail = safeTerminalLine(failureMessage(cause), {
+      maximumBytes: 4 * 1024,
+      redactor: this.#redactor,
+    });
+    this.#failure = new TerminalScreenError(
+      "screen_component_failed",
+      `${label} ${operation} 중 오류가 발생했습니다: ${detail}`,
+      { cause },
+    );
+    queueMicrotask(() => this.stop());
+  }
+
+  #restoreTerminal(): unknown {
+    if (!this.#startAttempted || this.#restorationAttempted) return undefined;
+    this.#restorationAttempted = true;
+    let firstError: unknown;
+    try {
+      this.#tui.stop({ preserveScreen: true });
+    } catch (error) {
+      firstError = error;
+      try {
+        this.#terminal.stop();
+      } catch (terminalStopError) {
+        firstError ??= terminalStopError;
+      }
+    }
+    try {
+      this.#terminal.write(EMERGENCY_TERMINAL_RESTORE);
+    } catch (error) {
+      firstError ??= error;
+    }
+    try {
+      this.#terminal.showCursor();
+    } catch (error) {
+      firstError ??= error;
+    }
+    return firstError;
+  }
+
+  #writeDiagnostic(error: TerminalScreenError): void {
+    const message = safeTerminalLine(`${PRODUCT_NAME}: ${error.message}`, {
+      maximumBytes: 8 * 1024,
+      redactor: this.#redactor,
+    });
+    try {
+      this.#diagnostics.write(`${message}\n`);
+    } catch {
+      // Terminal restoration and exit settlement must not depend on diagnostic output.
+    }
+  }
+
+  #resolveExitOnce(): void {
+    if (this.#exitResolved) return;
+    this.#exitResolved = true;
+    const result: TerminalScreenExit = this.#failure
+      ? { reason: "failure", error: this.#failure }
+      : { reason: "closed" };
+    this.#resolveExit?.(result);
+    this.#resolveExit = undefined;
+  }
+}
