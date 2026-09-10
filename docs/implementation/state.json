@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P08",
-  "currentStep": "P08.PUBLISH",
-  "status": "VERIFIED",
-  "baseMainSha": "4d91f4a4716831a488c3ebb4ed0d94e95cc06070",
-  "lastCommitSha": "b3d39d85cf8790a7c6ae4d5290086e3a8f0cdf40",
+  "currentPhase": "P09",
+  "currentStep": "P09.1",
+  "status": "IMPLEMENTING",
+  "baseMainSha": "7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f",
+  "lastCommitSha": "7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f",
   "verification": {
-    "attemptsUsed": 2,
-    "maximumAttempts": 2,
+    "attemptsUsed": 0,
+    "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": "b3d39d85cf8790a7c6ae4d5290086e3a8f0cdf40",
-    "result": "PASS",
-    "exitCode": 0
+    "targetCommitSha": null,
+    "result": "NOT_RUN",
+    "exitCode": null
   },
   "publication": {
-    "branch": "cat/p08-cli-commands",
+    "branch": "cat/p09-extensions-hooks",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Create and publish cat/p08-cli-commands, then review and merge its PR",
+  "nextAction": "Review and commit P09.1, then implement P09.2 lazy skills and markdown commands",
   "blocker": null
 }
