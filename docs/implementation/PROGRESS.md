@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P05 기준 main은 `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`이다. 구현은 이 커밋에서
+P06 기준 main은 `e5f082a0b8ccb5fdc70233837762941e63f7233b`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -9,8 +9,8 @@ P05 기준 main은 `b2c3bdb562c1a67d4191fec17bfd04a5f0e41663`이다. 구현은 �
 | P02 설정·인증·trust | DONE | PASS (1/1) | PR #2 / MERGED `2429b41` |
 | P03 provider·transport | DONE | PASS (1/1) | PR #3 / MERGED `3581145` |
 | P04 권한·기본 도구 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #4 / MERGED `b2c3bdb` |
-| P05 bounded agent loop | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P06 세션·컨텍스트 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P05 bounded agent loop | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #5 / MERGED `e5f082a` |
+| P06 세션·컨텍스트 | VERIFIED | PASS (1/1) | NOT_PUBLISHED |
 | P07 TUI core | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P08 CLI·명령 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P09 확장·hooks | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -77,4 +77,24 @@ fallback prefix의 선형 처리와 종료 전 자원 정리는
 오류만 `ed1ecf73bb18cbd618bda2574d6b1daeeec5e16e`에서 수정했다. 첫 실패 기록을
 보존한 채 `1e99d7a99ec3a96042eec2de186953e99add33bd`를 대상으로 두 번째이자
 마지막 승인 검사를 실행했고 통과했다. 결과는 정적 검사 통과이며 실제 provider,
-agent loop, 도구와 앱 런타임은 검증하지 않았다.
+agent loop, 도구와 앱 런타임은 검증하지 않았다. P05는 검토 head
+`d9f9a87195fe9507f50f1f5989958cab9d3983d5`를 PR #5에서 merge commit
+`e5f082a0b8ccb5fdc70233837762941e63f7233b`로 병합했다. merge의 두 부모, tree,
+phase head의 조상 관계와 `origin/main`을 대조했다. P06은 이 merge commit을 기준으로
+bounded JSONL 세션 저장을 `6ad083a2fea6ba881b2c7c754c38cbebc0df90fc`에서 구현했다.
+paging된 source transcript에서 대화 기록만 새 ID로 상속하는 new/resume/continue/fork,
+메모리 전용 no-persistence, metadata 변경과 소유권 기반 rewind는
+`058e6bda00e74bdd3c0abcb0abe0815a47882b0a`에서 연결했다. 현재는 완전한 tool call/result
+쌍과 최근 대화를 우선하는 bounded model context projection, provider metadata 우선 context
+window과 자동 compact threshold, 활성 run과 교차하지 않는 transcript scanner를
+`23a4c410d5c409f38a9e181a300c2c9428aa2e94`에서 구현했다. 현재는 같은 run의 recovery,
+compaction, model request와 transport retry 예산을 받는 비재귀 manual/auto 압축, bounded
+continuity 보존과 append-only 완료 경계를
+`fb238f43693e6237bc94db01403d6d97de4ba821`에서 연결했다. 전체 정적 검토에서 짧은 redaction
+secret, no-persistence resume의 maintenance 소유권, metadata 시각 단조성, sessionStore의 도구
+접근 차단, projection 식별자·경고 redaction과 compaction 손실성 표기를
+`e50f0a5368f6c12a01bc719cd0f96494b2a86b3e`에서 보완했다. 추적된 원본 archive·build
+산출물·secret·GitHub Actions workflow와 검사 우회는 발견되지 않았다. `origin/main`이 P06
+기준 SHA와 같음을 확인한 뒤 `13908a0e1743d632734b8673d097b3f5ab44662c`를 대상으로
+예약한 유일한 `npm run check`를 실행했고 통과했다. 실제 세션 I/O, rewind, 모델 압축, 도구와
+앱 런타임은 실행하지 않았다.

@@ -180,3 +180,61 @@
   부작용을 소비하지 않는다. 모든 permission denial은 즉시 run을 끝내므로 대체 도구 우회가
   없다. transport 외부에는 HTTP retry loop를 두지 않고 compaction, Stop hook과 web 복구는
   P05의 공통 extension budget port를 사용해야 한다.
+
+## D020 — append-only 세션 저장과 writer 소유권
+
+- 상태: 승인됨
+- 결정: session index와 transcript는 versioned JSONL record로 append하고, reader는
+  record·line·page byte와 JSON tree를 모두 제한한 cursor page만 반환한다. session별
+  transcript writer는 배타 lock의 무작위 token과 file identity를 수명 동안 보유한다.
+- 결과: 손상된 중간 line과 잘린 마지막 line은 원본을 지우지 않고 구분된 경고가 된다.
+  stale lock은 PID만으로 제거하지 않으며 metadata update도 같은 transcript writer 소유권을
+  요구한다. 저장 전 알려진 secret과 credential field를 redaction하고 trust·credential·승인
+  상태는 session schema에 넣지 않는다.
+
+## D021 — 세션 재개·분기의 격리와 rewind 결과
+
+- 상태: 승인됨
+- 결정: 영구 resume은 같은 session ID의 provider/profile/model/cwd만 복원하고 권한·관찰·계획
+  상태를 초기화한다. no-persistence resume과 모든 fork는 새 session ID를 사용하며 fork에는
+  bounded 최근 message/compaction만 다시 기록한다. lifecycle 전환과 rewind는 agent
+  coordinator의 session maintenance lease를 소유해야 하며 그동안 새 run 획득도 차단한다.
+- 결과: 분기 세션은 parent의 run ID, permission, task, checkpoint 소유권을 얻지 않는다.
+  checkpoint rewind는 파일 복원이 완전한 뒤에만 기록을 제거하고 부분 실패를 유지한다. 결과는
+  workspace 파일만 대상으로 했음을 표시하며 shell, network와 MCP 부작용 복원을 주장하지 않는다.
+
+## D022 — 저장 transcript와 모델 context projection의 분리
+
+- 상태: 승인됨
+- 결정: append-only transcript를 source of truth로 두고 모델에는 bounded projection만 보낸다.
+  완전한 tool call/result 쌍은 하나의 unit으로 보존하고 최근 unit부터 선택한다. 현재 실행에서
+  신뢰해 주입한 system message만 system role을 유지하며 저장된 system text와 compact summary는
+  권한을 가진 지침으로 승격하지 않는다. model context window은 provider metadata, 사용자 설정,
+  unknown 순서로 결정한다.
+- 결과: 큰 과거 observation은 redaction된 제한형 preview가 되고 불완전한 tool exchange는 실행
+  문맥에서 제외된다. 신뢰된 system 지침을 잘라 모델 요청을 계속하지 않으며, context metadata가
+  없을 때 임의의 128k 기본값을 가정하지 않는다. compact 완료 record는 원문을 지우지 않는 새
+  projection 경계로만 작동한다.
+
+## D023 — 비재귀 compaction과 실패 시 원문 보존
+
+- 상태: 승인됨
+- 결정: manual과 auto compaction은 같은 single-pass service를 사용한다. service는 현재 run이
+  소유한 extension budget port에서 compaction·공통 recovery와 model request를 소비하고 같은
+  retry port와 signal을 provider에 전달한다. 도구 없는 provider stream을 직접 한 번 호출하며
+  agent loop를 재귀 호출하지 않는다.
+- 결과: 최근 완전한 tool exchange와 bounded continuity만 압축 입력·보존 구간에 포함된다. summary와
+  continuity는 historical data이며 system 권한을 얻지 않는다. 완료 후보가 실제로 context를 줄여
+  안전한 projection을 만들 때만 append-only 완료 경계를 기록한다. 모든 실패는 원문을 삭제하지
+  않는 명시적 stop이고, append 실패 뒤 경계 존재 여부를 확신할 수 없으면 `unknown`으로 드러낸다.
+
+## D024 — 세션 source of truth의 접근·전환 경계
+
+- 상태: 승인됨
+- 결정: sessionStore 전체를 일반 파일·foreground shell 도구의 sensitive 경로로 분류한다.
+  영구 기록을 메모리 세션으로 재개할 때도 source session maintenance lease를 소유하고,
+  metadata 시각은 기존 `updatedAt` 아래로 되돌리지 않는다. 저장·projection redaction은 지나치게
+  짧은 secret과 식별자·경고까지 같은 bounded 정책으로 다룬다.
+- 결과: 모델이 자기 transcript를 변조하거나 읽는 경로를 기본 도구로 얻지 않는다. 재개 snapshot과
+  활성 run이 교차하지 않고, 시계가 뒤로 가도 최신 revision의 시간 순서가 퇴행하지 않는다.
+  미완료 tool exchange는 실행 가능한 호출 대신 제한된 redacted notice로 보존한다.

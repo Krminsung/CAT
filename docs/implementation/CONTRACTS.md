@@ -11,7 +11,7 @@
 | 13개 provider와 SSE transport | `src/providers.ts`, `src/api.ts`, `src/http.ts` | `src/providers/*`, `src/transport/*` | P03 | IMPLEMENTED |
 | 권한과 기본 파일·foreground shell 도구 | `src/tools.ts`, `src/permissions.ts` | `src/security/*`, `src/tools/*` | P04 | IMPLEMENTED |
 | 단일 소유 bounded agent loop | `src/agent.ts` | `src/agent/*` | P05 | IMPLEMENTED |
-| JSONL 세션·컨텍스트·rewind | `src/sessions.ts`, `src/history.ts`, `src/checkpoints.ts` | `src/storage/*`, `src/context/*` | P06 | PLANNED |
+| JSONL 세션·컨텍스트·rewind | `src/sessions.ts`, `src/history.ts`, `src/checkpoints.ts` | `src/storage/*`, `src/context/*` | P06 | IMPLEMENTED |
 | pi-tui 화면과 입력 | `src/tui.ts` | `src/tui/*` | P07 | PLANNED |
 | CLI와 28개 slash 명령 | `src/cli.ts` | `src/cli/*`, `src/tui/commands/*` | P08 | PLANNED |
 | AGENTS·skills·markdown commands·8 hooks | `src/context.ts`, `src/extensions.ts`, `src/hooks.ts` | `src/context/*`, `src/extensions/*` | P09 | PLANNED |
