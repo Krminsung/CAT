@@ -15,7 +15,7 @@ P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 �
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
-| P11 public web | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
+| P11 public web | BLOCKED_VERIFY | FAIL (1/1) | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -227,4 +227,9 @@ P11.3은 `23bcbcf5ea905e8e9dd59e7776edc3cd7e317d02`에서 완료했다. 전체 �
 선별, 민감·금지·모호한 query 및 후속 prompt, 웹 응답 보류·host 제한 문구와 권한 거부 뒤 우회 차단을
 보완했다. 이 보완은 `74d6c1b367d5260ad0e9144167b80960c8d130ad`에서 확정했다. base부터 전체
 diff의 기능·의존성·권한·취소·secret·출력·정리 경계와 추적 파일을 대조했고 `origin/main`은 P11 기준
-SHA와 같다. 외부 URL, 앱·도구 runtime과 자동 검증은 실행하지 않았다.
+SHA와 같다. 외부 URL, 앱·도구 runtime은 실행하지 않았다. 사용자가 P11의 `npm run check` 1회를
+명시적으로 승인해 예약 commit `62705bd401fe209ae48343c535ee01a0dd9a2ab2`에서 실행한 검사는
+`src/app/application.ts:1824`의 capability 허용 타입에 `web`이 없는 TS2322와
+`src/web/evidence.ts:78`의 message narrowing 관련 TS2339·TS7006을 보고하고 종료 코드 2로
+실패했다. 추가 검사, source 수정, push, PR과 merge는 진행하지 않았으며 오류 수정과 P11 추가
+검증에는 사용자의 명시적 승인이 필요하다.
