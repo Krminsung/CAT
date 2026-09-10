@@ -118,4 +118,5 @@ paste·단축키·history controller와 일반 기록에서 분리된 masked sec
 P07은 검토 head `2f7df0ef1fb1b02277a16c9df537722104206070`을 PR #7에서 merge
 commit `4d91f4a4716831a488c3ebb4ed0d94e95cc06070`으로 병합했고 두 부모·tree·조상 관계와
 `origin/main` 포함을 확인했다. P08은 이 merge commit을 기준으로 bounded argv와
-text/json/stream-json 출력 경계를 구현하고 있다.
+text/json/stream-json 출력 경계를 `8e468a6b7c8326fbb70a215116f241d40fedc189`에서 구현했다.
+현재는 정확히 28개 명령 정의에서 capability 기반 help·완성·dispatch를 파생하고 있다.
