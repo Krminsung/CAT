@@ -260,3 +260,15 @@
 - 결과: 여러 줄 paste 자체가 submit이나 command dispatch가 되지 않는다. 일반 prompt만 제한된
   history에 들어가며 secret은 getter, transcript, history, clipboard로 노출하지 않고 제출 직후
   화면 redaction 목록에 등록한다. 화면 또는 overlay 종료 시 listener와 secret 보유 상태를 정리한다.
+
+## D027 — 증분 transcript 상태와 scroll 소유권
+
+- 상태: 승인됨
+- 결정: transcript는 전체 문자열 대신 제한된 항목 component, assistant message ID, run/call ID와
+  단일 현재 plan의 상태로 투영한다. delta와 tool·plan event는 해당 component만 갱신하고, restore는
+  bounded 저장 decoder를 통과한 최근 record만 화면 상태로 만든다. 표시 전후와 raw snapshot 모두
+  같은 redaction·terminal escape 제거 경계를 사용한다.
+- 결과: 항목 수·전체 byte·개별 stream/detail·복원 record·추적 run에 각각 상한이 있다. 새 event는
+  사용자의 `ScrollView` follow 상태를 강제로 바꾸지 않아 위로 올린 위치를 유지한다. 완료 전 stream은
+  화면 종료 시 redaction된 정적 text로 확정한 뒤 동적 secret 목록을 폐기하며, `/raw` 전환과 사용자가
+  요청한 clipboard write는 다음 하위 작업에서만 연결한다.

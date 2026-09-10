@@ -3,7 +3,6 @@ import {
   CURSOR_MARKER,
   ProcessTerminal,
   ScrollView,
-  Text,
   TuiAltScreen,
   VStack,
   truncateToWidth,
@@ -18,8 +17,10 @@ import {
 } from "@earendil-works/pi-tui";
 
 import { CancelledError } from "../core/errors.js";
+import type { AgentEvent } from "../core/events.js";
 import { PRODUCT_NAME, VERSION } from "../core/version.js";
 import { Redactor } from "../security/redaction.js";
+import type { StoredTranscriptRecord } from "../storage/sessions.js";
 import {
   BoundedEditor,
   TerminalInputController,
@@ -32,6 +33,11 @@ import {
   sanitizeTerminalText,
   type TerminalTextRedactor,
 } from "./terminal-text.js";
+import {
+  TerminalTranscript,
+  type RawTranscriptSnapshot,
+  type ResumeTranscriptDisplay,
+} from "./transcript.js";
 
 const DISABLE_MOUSE_REPORTING =
   "\u001B[?1000l\u001B[?1002l\u001B[?1003l\u001B[?1004l\u001B[?1006l\u001B[?1015l";
@@ -41,9 +47,6 @@ const EMERGENCY_TERMINAL_RESTORE =
 const MAX_RENDER_COLUMNS = 1_000;
 const MAX_RENDERED_LINE_BYTES = 64 * 1024;
 const MAX_COMPONENT_ROWS = 8_192;
-const MAX_TRANSCRIPT_ENTRY_BYTES = 64 * 1024;
-const MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024;
-const MAX_TRANSCRIPT_ENTRIES = 256;
 const MAX_REGISTERED_SECRETS = 32;
 const MAX_REGISTERED_SECRET_BYTES = 256 * 1024;
 
@@ -106,11 +109,6 @@ export interface CatTerminalScreenOptions {
   readonly diagnostics?: TerminalDiagnosticWriter;
   readonly redactor?: TerminalTextRedactor;
   readonly secrets?: readonly string[];
-}
-
-interface TranscriptComponent {
-  readonly component: Component;
-  readonly bytes: number;
 }
 
 interface ActiveSecretPrompt {
@@ -357,8 +355,8 @@ export class CatTerminalScreen {
   readonly #tui: NativeSelectionTui;
   readonly #header: BoundedSingleLine;
   readonly #status: BoundedSingleLine;
-  readonly #transcript = new Container();
-  readonly #transcriptComponents: TranscriptComponent[] = [];
+  readonly #transcript: Container;
+  readonly #transcriptModel: TerminalTranscript;
   readonly #scroll: ScrollView;
   readonly #editor: BoundedEditor;
   readonly #editorBoundary: FocusableComponentBoundary;
@@ -370,7 +368,6 @@ export class CatTerminalScreen {
   #startAttempted = false;
   #restorationAttempted = false;
   #exitResolved = false;
-  #transcriptBytes = 0;
   #inputController: TerminalInputController | undefined;
   #activeSecret: ActiveSecretPrompt | undefined;
 
@@ -381,6 +378,13 @@ export class CatTerminalScreen {
     this.#redactor = new ScreenRedactor(
       options.redactor ?? new Redactor(options.secrets ?? []),
     );
+    this.#transcript = new Container();
+    this.#transcriptModel = new TerminalTranscript(this.#transcript, {
+      sanitize: (text, maximumBytes, singleLine = false) => singleLine
+        ? safeTerminalLine(text, { maximumBytes, redactor: this.#redactor })
+        : sanitizeTerminalText(text, { maximumBytes, redactor: this.#redactor }).text,
+      onChange: () => this.requestRender(),
+    });
 
     const componentFailure: ComponentFailureHandler = (operation, label, error) => {
       this.#captureComponentFailure(operation, label, error);
@@ -514,6 +518,21 @@ export class CatTerminalScreen {
     this.#activeSecret?.cancel(new CancelledError("터미널 화면이 닫혀 비밀 입력을 취소했습니다."));
     this.#inputController?.dispose();
     this.#inputController = undefined;
+    try {
+      this.#transcriptModel.finalize();
+    } catch (error) {
+      if (!this.#failure) {
+        const detail = safeTerminalLine(failureMessage(error), {
+          maximumBytes: 4 * 1024,
+          redactor: this.#redactor,
+        });
+        this.#failure = new TerminalScreenError(
+          "screen_component_failed",
+          `종료 전 transcript를 확정하지 못했습니다: ${detail}`,
+          { cause: error },
+        );
+      }
+    }
     const restorationError = this.#restoreTerminal();
     if (restorationError && !this.#failure) {
       const detail = safeTerminalLine(failureMessage(restorationError), {
@@ -703,41 +722,65 @@ export class CatTerminalScreen {
 
   appendTranscriptText(text: string): void {
     if (this.#state === "stopped" || this.#state === "stopping") return;
-    const sanitized = sanitizeTerminalText(text, {
-      maximumBytes: MAX_TRANSCRIPT_ENTRY_BYTES,
-      redactor: this.#redactor,
-    });
-    if (!sanitized.text) return;
-    const textComponent = new Text(sanitized.text, 0, 0);
-    const component = new ComponentBoundary(
-      textComponent,
-      "대화 항목",
-      this.#redactor,
-      (operation, label, error) => this.#captureComponentFailure(operation, label, error),
-    );
-    const bytes = Buffer.byteLength(sanitized.text, "utf8");
-    this.#transcript.addChild(component);
-    this.#transcriptComponents.push({ component, bytes });
-    this.#transcriptBytes += bytes;
-    while (
-      this.#transcriptComponents.length > MAX_TRANSCRIPT_ENTRIES ||
-      this.#transcriptBytes > MAX_TRANSCRIPT_BYTES
-    ) {
-      const removed = this.#transcriptComponents.shift();
-      if (!removed) break;
-      this.#transcript.removeChild(removed.component);
-      this.#transcriptBytes -= removed.bytes;
+    this.#transcriptModel.addText(text);
+  }
+
+  addUserMessage(text: string): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    this.#transcriptModel.addUser(text);
+  }
+
+  addAssistantMessage(text: string): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    this.#transcriptModel.addAssistant(text);
+  }
+
+  consumeAgentEvent(event: AgentEvent): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    try {
+      this.#transcriptModel.consumeAgentEvent(event);
+    } catch (error) {
+      this.#captureComponentFailure("render", "agent event transcript", error);
     }
-    this.requestRender();
+  }
+
+  restoreTranscript(
+    records: readonly StoredTranscriptRecord[],
+    display: ResumeTranscriptDisplay,
+  ): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    try {
+      this.#transcriptModel.restore(records, display);
+    } catch (error) {
+      this.#captureComponentFailure("render", "세션 transcript 복원", error);
+    }
+  }
+
+  setDetailsExpanded(expanded: boolean): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    this.#transcriptModel.setDetailsExpanded(expanded);
+  }
+
+  toggleDetails(): boolean {
+    if (this.#state === "stopped" || this.#state === "stopping") return false;
+    return this.#transcriptModel.toggleDetails();
+  }
+
+  toggleToolDetails(runId: string, callId: string): boolean {
+    if (this.#state === "stopped" || this.#state === "stopping") return false;
+    return this.#transcriptModel.toggleTool(runId, callId);
+  }
+
+  rawTranscript(maximumBytes?: number): RawTranscriptSnapshot {
+    return maximumBytes === undefined
+      ? this.#transcriptModel.rawSnapshot()
+      : this.#transcriptModel.rawSnapshot(maximumBytes);
   }
 
   clearTranscript(): void {
     if (this.#state === "stopped" || this.#state === "stopping") return;
-    this.#transcript.clear();
-    this.#transcriptComponents.length = 0;
-    this.#transcriptBytes = 0;
+    this.#transcriptModel.clear();
     this.#scroll.scrollToEnd();
-    this.requestRender();
   }
 
   requestRender(force = false): void {
