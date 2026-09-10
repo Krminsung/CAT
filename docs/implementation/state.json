@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P09",
-  "currentStep": "P09.4",
+  "currentStep": "P09 static review fixes",
   "status": "IMPLEMENTING",
   "baseMainSha": "7d86fdd05dbb3387008e2c81ef8a25f0a0f3920f",
-  "lastCommitSha": "dd4851e591e985295f48df2209fe14bbd3abcd00",
+  "lastCommitSha": "ff9266770e3c01196c42e8965a92f38dc20b2cad",
   "verification": {
     "attemptsUsed": 0,
     "maximumAttempts": 1,
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Review and commit P09.4, then perform the full P09 static review",
+  "nextAction": "Commit P09 static review fixes without running verification",
   "blocker": null
 }

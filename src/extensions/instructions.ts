@@ -1,4 +1,6 @@
 import { open, realpath } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import type { Stats } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { ConfigurationError } from "../core/errors.js";
 import type { StoragePaths } from "../storage/paths.js";
@@ -8,6 +10,7 @@ export const MAX_INSTRUCTION_INCLUDE_DEPTH = 5;
 export const MAX_INSTRUCTION_FILES = 32;
 
 const MAX_CONFIGURED_INSTRUCTION_BYTES = 1024 * 1024;
+const MAX_INSTRUCTION_NOTICES = 256;
 const INSTRUCTION_NAMES = Object.freeze(["AGENTS.override.md", "AGENTS.md"] as const);
 const DEFAULT_FALLBACK_NAMES = Object.freeze(["SMILESERV.md", "CAGENT.md"] as const);
 const ALLOWED_INCLUDE_EXTENSIONS = new Set([".md", ".markdown", ".txt"]);
@@ -29,6 +32,7 @@ export interface InstructionNotice {
     | "include_outside_scope"
     | "include_type"
     | "include_invalid"
+    | "notice_limit"
     | "content_truncated";
   readonly message: string;
   readonly source?: string;
@@ -78,6 +82,20 @@ interface ExpansionState {
 function errnoCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
   return typeof error.code === "string" ? error.code : undefined;
+}
+
+function stableFile(left: Stats, right: Stats): boolean {
+  return right.isFile() &&
+    left.dev === right.dev &&
+    (process.platform === "win32" || left.ino === right.ino) &&
+    left.size === right.size &&
+    left.mtimeMs === right.mtimeMs &&
+    left.ctimeMs === right.ctimeMs;
+}
+
+function readFlags(): number {
+  const noFollow = process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0);
+  return fsConstants.O_RDONLY | noFollow | (fsConstants.O_NONBLOCK ?? 0);
 }
 
 function isInside(root: string, candidate: string): boolean {
@@ -186,7 +204,7 @@ async function readDocument(
   if (!isInside(boundary, canonical)) {
     throw new ConfigurationError(`프로젝트 지침 symlink가 허용 범위를 벗어났습니다: ${candidate}`);
   }
-  const handle = await open(canonical, "r");
+  const handle = await open(canonical, readFlags());
   try {
     const information = await handle.stat();
     if (!information.isFile()) return undefined;
@@ -199,6 +217,13 @@ async function readDocument(
       offset += result.bytesRead;
     }
     const bytes = buffer.subarray(0, offset);
+    if (!stableFile(information, await handle.stat())) {
+      throw new ConfigurationError(`프로젝트 지침을 읽는 동안 파일이 변경되었습니다: ${candidate}`);
+    }
+    const completedCanonical = await realpath(candidate);
+    if (completedCanonical !== canonical || !isInside(boundary, completedCanonical)) {
+      throw new ConfigurationError(`프로젝트 지침 경로가 읽는 동안 변경되었습니다: ${candidate}`);
+    }
     if (bytes.includes(0)) {
       throw new ConfigurationError(`프로젝트 지침에는 NUL 문자를 포함할 수 없습니다: ${candidate}`);
     }
@@ -257,6 +282,15 @@ function addNotice(
   state: ExpansionState,
   notice: InstructionNotice,
 ): void {
+  if (state.notices.length >= MAX_INSTRUCTION_NOTICES) return;
+  if (state.notices.length === MAX_INSTRUCTION_NOTICES - 1) {
+    state.truncated = true;
+    state.notices.push(Object.freeze({
+      code: "notice_limit",
+      message: `추가 지침 알림을 ${MAX_INSTRUCTION_NOTICES - 1}개 이후 생략했습니다.`,
+    }));
+    return;
+  }
   state.notices.push(Object.freeze(notice));
 }
 
@@ -435,10 +469,15 @@ export async function loadInstructions(
   }
 
   const selected: SelectedDocument[] = [];
+  let primarySelectionTruncated = false;
   const global = await firstDocument(catHome, catHome, names, maximumBytes);
   if (global) selected.push(Object.freeze({ ...global, scope: "global", boundary: catHome }));
   if (options.projectTrusted) {
     for (const directory of projectDirectories(projectRoot, workspace)) {
+      if (selected.length >= MAX_INSTRUCTION_FILES) {
+        primarySelectionTruncated = true;
+        break;
+      }
       const document = await firstDocument(directory, projectRoot, names, maximumBytes);
       if (document) {
         selected.push(Object.freeze({
@@ -457,6 +496,13 @@ export async function loadInstructions(
     files: [],
     notices: [],
   };
+  if (primarySelectionTruncated) {
+    state.truncated = true;
+    addNotice(state, {
+      code: "include_files",
+      message: `기본 지침 파일 선택이 ${MAX_INSTRUCTION_FILES}개 제한에 도달했습니다.`,
+    });
+  }
   const sections: InstructionSection[] = [];
   for (const document of selected) {
     if (state.remaining <= 0 || state.files.length >= MAX_INSTRUCTION_FILES) {

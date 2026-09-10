@@ -153,4 +153,8 @@ context, timeout·abort·process group 정리와 engine 재진입 차단을
 SessionStart/UserPromptSubmit context를 권한 없는 비신뢰 모델 입력으로 연결하고, 중앙 executor의
 Pre/Post hook, 공유 budget의 Stop continuation 1회, PreCompact와 세션 전환·종료 event를 조립하고 있다.
 `/init`과 `# instruction`은 canonical 파일 관찰·중앙 write 경계를 사용하며 `/reload`는 기존 인증과
-승인을 보존한 채 검증된 설정·지침·command·skill·hook만 교체한다.
+승인을 보존한 채 검증된 설정·지침·command·skill·hook만 교체한다. P09.4는
+`ff926674da37a39d7105298b8af37a6a26b6bde2`에서 완료했다. 전체 정적 검토에서는 기본 지침 선로딩과
+notice 수를 파일 32개·알림 256개 경계 안으로 제한하고, lazy extension을 catalog 시점과 같은
+device·inode·size·mtime·ctime의 파일로만 읽도록 보완하고 있다. 지침·extension read 전후의 canonical
+경로와 identity, `O_NOFOLLOW`를 재확인하며 긴 skill catalog는 완전한 이름 행만 모델에 제공한다.

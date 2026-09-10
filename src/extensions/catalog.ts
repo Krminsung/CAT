@@ -1,5 +1,6 @@
 import { lstat, open, opendir, realpath } from "node:fs/promises";
-import type { Dirent } from "node:fs";
+import { constants as fsConstants } from "node:fs";
+import type { Dirent, Stats } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { SLASH_COMMAND_NAMES } from "../commands/definitions.js";
 import { CancelledError, ConfigurationError } from "../core/errors.js";
@@ -71,6 +72,15 @@ interface ExtensionEntry {
   readonly descriptor: ExtensionDescriptor;
   readonly path: string;
   readonly boundary: string;
+  readonly identity: ExtensionFileIdentity;
+}
+
+interface ExtensionFileIdentity {
+  readonly device: number;
+  readonly inode: number;
+  readonly size: number;
+  readonly modifiedAt: number;
+  readonly changedAt: number;
 }
 
 interface ParsedHeader {
@@ -89,6 +99,33 @@ interface ScanState {
 function errnoCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
   return typeof error.code === "string" ? error.code : undefined;
+}
+
+function fileIdentity(information: Stats): ExtensionFileIdentity {
+  return Object.freeze({
+    device: information.dev,
+    inode: information.ino,
+    size: information.size,
+    modifiedAt: information.mtimeMs,
+    changedAt: information.ctimeMs,
+  });
+}
+
+function sameFileIdentity(
+  information: Stats,
+  expected: ExtensionFileIdentity,
+): boolean {
+  return information.isFile() &&
+    information.dev === expected.device &&
+    (process.platform === "win32" || information.ino === expected.inode) &&
+    information.size === expected.size &&
+    information.mtimeMs === expected.modifiedAt &&
+    information.ctimeMs === expected.changedAt;
+}
+
+function readFlags(): number {
+  const noFollow = process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0);
+  return fsConstants.O_RDONLY | noFollow | (fsConstants.O_NONBLOCK ?? 0);
 }
 
 function isInside(root: string, candidate: string): boolean {
@@ -166,6 +203,10 @@ async function extensionRoot(
   if (!isInside(boundary, canonical)) {
     throw new ConfigurationError(`${label} 경로가 허용 범위를 벗어났습니다.`);
   }
+  const requestedInformation = await lstat(requested);
+  if (requestedInformation.isSymbolicLink()) {
+    throw new ConfigurationError(`${label} 경로에는 symlink를 사용할 수 없습니다.`);
+  }
   const information = await lstat(canonical);
   if (!information.isDirectory()) {
     throw new ConfigurationError(`${label} 경로가 디렉터리가 아닙니다.`);
@@ -189,12 +230,17 @@ function decodeUtf8Prefix(bytes: Buffer): string {
 async function readPrefix(
   path: string,
   boundary: string,
-): Promise<{ readonly text: string; readonly bytes: number; readonly complete: boolean }> {
+): Promise<{
+  readonly text: string;
+  readonly bytes: number;
+  readonly complete: boolean;
+  readonly identity: ExtensionFileIdentity;
+}> {
   const canonical = await realpath(path);
   if (canonical !== path || !isInside(boundary, canonical)) {
     throw new ConfigurationError("확장 Markdown 경로가 discovery 이후 변경되었습니다.");
   }
-  const handle = await open(canonical, "r");
+  const handle = await open(canonical, readFlags());
   try {
     const information = await handle.stat();
     if (!information.isFile()) throw new ConfigurationError("확장 항목이 일반 파일이 아닙니다.");
@@ -211,10 +257,18 @@ async function readPrefix(
     }
     const bytes = buffer.subarray(0, offset);
     if (bytes.includes(0)) throw new ConfigurationError("확장 Markdown에 NUL 문자가 있습니다.");
+    const identity = fileIdentity(information);
+    if (!sameFileIdentity(await handle.stat(), identity)) {
+      throw new ConfigurationError("확장 Markdown이 catalog metadata를 읽는 동안 변경되었습니다.");
+    }
+    if (await realpath(path) !== canonical) {
+      throw new ConfigurationError("확장 Markdown 경로가 catalog metadata를 읽는 동안 변경되었습니다.");
+    }
     return Object.freeze({
       text: decodeUtf8Prefix(bytes),
       bytes: information.size,
       complete: information.size <= offset,
+      identity,
     });
   } finally {
     await handle.close();
@@ -237,11 +291,10 @@ async function readBody(
   if (canonical !== entry.path || !isInside(entry.boundary, canonical)) {
     throw new ConfigurationError(`확장 Markdown 경로가 변경되거나 범위를 벗어났습니다: ${entry.descriptor.source}`);
   }
-  const handle = await open(canonical, "r");
+  const handle = await open(canonical, readFlags());
   try {
     const information = await handle.stat();
-    if (!information.isFile()) throw new ConfigurationError("확장 항목이 일반 파일이 아닙니다.");
-    if (information.size !== entry.descriptor.bytes) {
+    if (!sameFileIdentity(information, entry.identity)) {
       throw new ConfigurationError(
         `확장 Markdown이 catalog 생성 뒤 변경되었습니다. /reload가 필요합니다: ${entry.descriptor.source}`,
       );
@@ -259,6 +312,16 @@ async function readBody(
     }
     const bytes = buffer.subarray(0, offset);
     if (bytes.includes(0)) throw new ConfigurationError("확장 Markdown에 NUL 문자가 있습니다.");
+    if (!sameFileIdentity(await handle.stat(), entry.identity)) {
+      throw new ConfigurationError(
+        `확장 Markdown이 읽는 동안 변경되었습니다. /reload가 필요합니다: ${entry.descriptor.source}`,
+      );
+    }
+    if (await realpath(entry.path) !== canonical) {
+      throw new ConfigurationError(
+        `확장 Markdown 경로가 읽는 동안 변경되었습니다. /reload가 필요합니다: ${entry.descriptor.source}`,
+      );
+    }
     let decoded: string;
     try {
       decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
@@ -493,7 +556,7 @@ async function descriptorFor(
     modelInvocable: header.modelInvocable,
     bytes: prefix.bytes,
   });
-  return Object.freeze({ descriptor, path, boundary });
+  return Object.freeze({ descriptor, path, boundary, identity: prefix.identity });
 }
 
 function extensionContent(raw: string): string {
@@ -517,6 +580,7 @@ function shellWords(value: string): readonly string[] {
   let word = "";
   let started = false;
   let quote: "'" | "\"" | undefined;
+  let fallback = false;
   for (let index = 0; index < value.length && words.length < 9; index += 1) {
     const character = value[index] ?? "";
     if (!quote && /\s/u.test(character)) {
@@ -538,6 +602,10 @@ function shellWords(value: string): readonly string[] {
     }
     if (character === "\\" && quote !== "'") {
       const next = value[index + 1];
+      if (next === undefined) {
+        fallback = true;
+        break;
+      }
       if (next !== undefined && (!quote || ["\"", "\\", "$", "`", "\n"].includes(next))) {
         word += next === "\n" ? "" : next;
         started = true;
@@ -547,6 +615,9 @@ function shellWords(value: string): readonly string[] {
     }
     word += character;
     started = true;
+  }
+  if (fallback || quote) {
+    return Object.freeze(value.split(/\s+/u).filter(Boolean).slice(0, 9));
   }
   if (started && words.length < 9) words.push(word);
   return Object.freeze(words);
@@ -594,9 +665,18 @@ function catalogText(entries: readonly ExtensionEntry[]): string {
   });
   const full = rows.join("\n");
   if ([...full].length <= MAX_CATALOG_CHARACTERS) return full;
-  const namesOnly = selected.map(({ descriptor }) => `- ${descriptor.name}`).join("\n");
+  const nameRows = selected.map(({ descriptor }) => `- ${descriptor.name}`);
+  const namesOnly = nameRows.join("\n");
   if ([...namesOnly].length >= MAX_CATALOG_CHARACTERS) {
-    return [...namesOnly].slice(0, MAX_CATALOG_CHARACTERS).join("");
+    const retained: string[] = [];
+    let characters = 0;
+    for (const row of nameRows) {
+      const increment = [...row].length + (retained.length > 0 ? 1 : 0);
+      if (characters + increment > MAX_CATALOG_CHARACTERS) break;
+      retained.push(row);
+      characters += increment;
+    }
+    return retained.join("\n");
   }
   const remaining = MAX_CATALOG_CHARACTERS - [...namesOnly].length - selected.length * 2;
   const each = Math.max(0, Math.floor(remaining / Math.max(1, selected.length)));
