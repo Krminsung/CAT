@@ -6,7 +6,11 @@ import {
   MissingCredentialError,
 } from "../core/errors.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
-import type { ConversationMessage } from "../core/messages.js";
+import type {
+  ConversationMessage,
+  SystemMessage,
+  UserMessage,
+} from "../core/messages.js";
 import type { ProviderUsage } from "../core/provider.js";
 import type { ToolExecutionResult } from "../core/tools.js";
 import {
@@ -59,7 +63,6 @@ import {
   validateApiKey,
   normalizeProfileName,
   type LoadedSettings,
-  type SessionHandle,
   type SessionMetadata,
   type StoragePaths,
   type StoredSessionRecord,
@@ -91,7 +94,10 @@ import type { CliOutput } from "../cli/output.js";
 import type { CliApplication } from "../cli/run.js";
 import { AuthService, type ResolvedProviderAuth } from "./auth-service.js";
 import { SessionCatalog } from "./session-catalog.js";
-import { SessionLifecycleService } from "./session-lifecycle.js";
+import {
+  SessionLifecycleService,
+  type SessionHandle,
+} from "./session-lifecycle.js";
 import {
   TerminalInteractionPort,
   TerminalOverlayController,
@@ -194,17 +200,23 @@ function jsonObjectSnapshot(value: unknown, label: string): JsonObject {
   return parsed as JsonObject;
 }
 
+function textMessage(role: "system", text: string, label: string): SystemMessage;
+function textMessage(role: "user", text: string, label: string): UserMessage;
 function textMessage(
   role: "system" | "user",
   text: string,
   label: string,
-): ConversationMessage {
-  return conversationMessageFromJson({
+): SystemMessage | UserMessage {
+  const message = conversationMessageFromJson({
     role,
     id: `${label}:${randomUUID()}`,
     createdAt: Date.now(),
     content: [{ type: "text", text }],
   });
+  if (message.role !== "system" && message.role !== "user") {
+    throw new ConfigurationError("텍스트 대화 message 역할이 올바르지 않습니다.");
+  }
+  return message;
 }
 
 function addUsage(total: ProviderUsage, increment: ProviderUsage): ProviderUsage {
@@ -1155,7 +1167,10 @@ class AgentApplicationRuntime {
     if (!ownership.acquired) {
       throw new ConfigurationError(`현재 세션에서 ${ownership.activeRunId} 실행이 끝나지 않았습니다.`);
     }
-    const journal = new AgentEventJournal(identity, (event) => this.#eventSink(event));
+    const journal = new AgentEventJournal(
+      identity,
+      (event: AgentEvent) => this.#eventSink(event),
+    );
     const callId = `call:${randomUUID()}`;
     let interactionLease: ReturnType<AgentInteractionHub["attach"]> | undefined;
     let started = false;

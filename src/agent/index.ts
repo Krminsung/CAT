@@ -1,4 +1,5 @@
 export * from "./budget.js";
+export * from "./events.js";
 export * from "./execution-records.js";
 export * from "./fallback-parser.js";
 export * from "./interactive.js";
