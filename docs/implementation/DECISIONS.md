@@ -347,3 +347,16 @@
   fetch 본문은 textual media type만 제한된 문자 decode와 HTML/control 정리를 거쳐 실행 불가능한
   비신뢰 데이터로 표시하며 실제 requested/final/source URL과 truncation을 보존한다. 이 redaction은
   모든 개인정보를 판별한다고 주장하지 않고 외부 요청 자체는 개발 단계에서 실행하지 않는다.
+
+## D034 — host 소유 web evidence와 단일 복구
+
+- 상태: 승인됨
+- 결정: 사용자의 원 prompt에서 web 금지·민감/로컬 context·최신 정보·명시적 검색·직접 URL을 먼저
+  분류하고, 첨부·hook·local command 본문은 공개 query 생성에 사용하지 않는다. 검색 입력은 host가
+  정리한 최소 query로 교체하고 fetch 후보는 사용자 URL, 실제 검색 결과와 열린 페이지의 제한된
+  link로만 확장한다. 동일 run에서 검색 한 번과 URL별 한 번을 강제한다.
+- 결과: 검색 snippet은 원문 근거가 아니며, 성공한 fetch의 관련 본문과 실제 final URL 인용이 함께
+  있어야 최신/명시적 web 완료를 공개한다. page 내용은 비신뢰 data role/delimiter로 모델 지침과
+  분리한다. 누락된 근거는 P05의 공통 recovery 예산에서 `web` 한 번만 사용해 보완하고 이후에는
+  host 제한 응답으로 끝낸다. 거부된 초안은 화면과 message transcript에 남기지 않으며, 위치 없는
+  날씨 요청은 host 정보를 추론하거나 외부로 보내지 않고 지역을 요청한다.

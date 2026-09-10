@@ -215,4 +215,10 @@ credential과 민감 environment를 갱신 가능한 public input guard에서 �
 중앙 public network 도구로 등록하고 있다. 결과에는 추출한 실제 source URL과 backend final URL을
 남기며 전체 provider 실패, 정상 응답의 결과 없음과 실제 결과를 서로 다른 상태로 보존한다. 앱 종료와
 조립 실패는 model transport와 별도로 public transport cleanup을 수행한다. 외부 요청과 자동 검증은
-실행하지 않았다.
+실행하지 않았다. P11.2는 `a0668271719e29471759d6adec74b1d88720f1a5`에서 완료했다. P11.3에서는
+원 prompt만 사용하는 최신 정보·명시적 검색·web 금지·민감/로컬 context 정책을 runner에 연결하고
+있다. host가 정리한 query와 사용자 URL·실제 검색 결과·페이지 link 후보만 외부 도구 입력으로 허용하며,
+검색 1회와 URL별 1회 경계를 둔다. 검색 snippet이 아니라 관련 `fetch_url` 원문과 실제 final URL 인용을
+완료 근거로 추적하고, 빠진 근거는 동일 run의 공통 예산에서 web 복구 한 번으로만 보완한다. 공개 page는
+비신뢰 data로 전달하며 근거 없는 초안은 노출·message 기록하지 않고, 복구 뒤에도 근거가 없으면 host
+제한 문구로 끝낸다. 위치 없는 날씨 요청은 host 위치를 추론하거나 외부 요청하지 않고 지역을 다시 묻는다.

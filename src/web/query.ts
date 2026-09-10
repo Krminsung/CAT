@@ -57,6 +57,15 @@ export class PublicWebInputGuard {
     this.#secrets = [...selected].sort((left, right) => right.length - left.length);
   }
 
+  containsProtectedData(value: string): boolean {
+    if (this.#redactionUnavailable) return true;
+    return this.#secrets.some((secret) => {
+      if (value.includes(secret)) return true;
+      const encoded = encodeURIComponent(secret);
+      return encoded !== secret && value.includes(encoded);
+    });
+  }
+
   normalizeSearchQuery(raw: string): string {
     if (this.#redactionUnavailable) {
       throw new PermissionDeniedError(
