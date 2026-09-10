@@ -193,4 +193,7 @@ annotation data를 가리키는 reference와 모호한 URI 인코딩을 차단�
 중앙 executor·승인 경계, 추적 파일과 `origin/main`을 대조했으며 자동 검증과 실제 MCP·앱 runtime은
 실행하지 않았다. 이전 예약 문서가 코드 commit과 `0 / 1`을 검사 대상으로 기록했지만, 기준 문서
 3.3의 선예약 규칙에 맞춰 명령 실행 전에 `1 / 1`로 정정하고 이 예약 정정 기록 commit 자체를 유일한
-검사 대상으로 삼는다. `npm run check`는 아직 실행하지 않았으며 P10 전용 실행 승인을 기다린다.
+검사 대상으로 삼았다. 사용자가 P10의 `npm run check` 1회를 승인해
+`c3ff9690bffec738a8c5b9553a844e025d28bca4`에서 실행한 검사는 `src/mcp/schema.ts`의
+Ajv 2020 import에 대해 TS2709와 TS2351을 보고하고 종료 코드 2로 실패했다. 추가 검사, source 수정,
+push, PR과 merge는 진행하지 않았으며 오류 수정과 P10 추가 검증에는 사용자의 명시적 승인이 필요하다.
