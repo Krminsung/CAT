@@ -16,11 +16,11 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { get } from "node:https";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { EnvHttpProxyAgent, request } from "undici";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const manifestPath = join(root, "packaging", "runtime-manifest.json");
@@ -43,6 +43,49 @@ const appInputs = [
 
 function packagingError(message) {
   return new Error(`[package] ${message}`);
+}
+
+function redactDiagnostic(value) {
+  return value.replace(
+    /\b([a-z][a-z0-9+.-]*:\/\/)([^/\s@]+)@/giu,
+    "$1[credentials-redacted]@",
+  );
+}
+
+function describeError(error, seen = new Set(), depth = 0) {
+  if (depth > 4) {
+    return "중첩 오류 깊이 제한 도달";
+  }
+  if (error === null || error === undefined) {
+    return "알 수 없는 오류";
+  }
+  if (typeof error !== "object") {
+    return redactDiagnostic(String(error)).slice(0, 2_000);
+  }
+  if (seen.has(error)) {
+    return "순환 오류 참조";
+  }
+  seen.add(error);
+
+  const name = typeof error.name === "string" && error.name.trim() !== "" ? error.name.trim() : "Error";
+  const message =
+    typeof error.message === "string" && error.message.trim() !== "" ? error.message.trim() : name;
+  const code = typeof error.code === "string" && error.code.trim() !== "" ? error.code.trim() : null;
+  const parts = [code !== null && !message.includes(code) ? `${message} (${code})` : message];
+
+  if ("cause" in error && error.cause !== undefined) {
+    parts.push(`cause: ${describeError(error.cause, seen, depth + 1)}`);
+  }
+  if (Array.isArray(error.errors)) {
+    for (const [index, nestedError] of error.errors.slice(0, 8).entries()) {
+      parts.push(`errors[${index}]: ${describeError(nestedError, seen, depth + 1)}`);
+    }
+    if (error.errors.length > 8) {
+      parts.push(`추가 중첩 오류 ${error.errors.length - 8}개 생략`);
+    }
+  }
+
+  return redactDiagnostic(parts.join("; ")).slice(0, 2_000);
 }
 
 function sha256(value) {
@@ -252,7 +295,7 @@ function parseRuntimeManifest(source) {
   return { developmentEngine, targets, version };
 }
 
-async function downloadRuntime(target, destination) {
+async function downloadRuntime(target, destination, dispatcher) {
   const runtimeUrl = new URL(target.url);
   if (
     runtimeUrl.protocol !== "https:" ||
@@ -265,30 +308,32 @@ async function downloadRuntime(target, destination) {
     throw packagingError(`허용되지 않은 runtime URL입니다: ${target.url}`);
   }
 
-  let deadlineTimer;
+  const abortController = new AbortController();
+  const deadlineTimer = setTimeout(() => {
+    abortController.abort(packagingError(`runtime 다운로드가 전체 제한을 넘었습니다: ${target.archive}`));
+  }, runtimeDownloadDeadlineMs);
   try {
-    const response = await new Promise((resolve, reject) => {
-      const request = get(
-        runtimeUrl,
-        {
-          headers: {
-            Accept: "application/octet-stream",
-            "User-Agent": "cat-agent-cli-packager/0.1",
-          },
+    let response;
+    try {
+      response = await request(runtimeUrl, {
+        bodyTimeout: 30_000,
+        dispatcher,
+        headers: {
+          Accept: "application/octet-stream",
+          "User-Agent": "cat-agent-cli-packager/0.1",
         },
-        resolve,
-      );
-      request.setTimeout(30_000, () => {
-        request.destroy(packagingError(`runtime 다운로드가 응답 제한을 넘었습니다: ${target.archive}`));
+        headersTimeout: 30_000,
+        method: "GET",
+        signal: abortController.signal,
       });
-      deadlineTimer = setTimeout(() => {
-        request.destroy(packagingError(`runtime 다운로드가 전체 제한을 넘었습니다: ${target.archive}`));
-      }, runtimeDownloadDeadlineMs);
-      request.once("error", reject);
-    });
+    } catch (error) {
+      throw packagingError(
+        `runtime 다운로드 요청이 실패했습니다: ${target.archive}: ${describeError(error)}`,
+      );
+    }
 
     if (response.statusCode !== 200) {
-      response.destroy();
+      response.body.destroy();
       throw packagingError(
         `runtime 다운로드 HTTP 상태가 올바르지 않습니다: ${target.archive} (${response.statusCode ?? "unknown"})`,
       );
@@ -296,7 +341,7 @@ async function downloadRuntime(target, destination) {
 
     const contentLength = Number(response.headers["content-length"] ?? 0);
     if (!Number.isSafeInteger(contentLength) || contentLength <= 0 || contentLength > maximumRuntimeBytes) {
-      response.destroy();
+      response.body.destroy();
       throw packagingError(`runtime Content-Length가 허용 범위를 벗어났습니다: ${target.archive}`);
     }
 
@@ -315,10 +360,12 @@ async function downloadRuntime(target, destination) {
     });
 
     try {
-      await pipeline(response, meter, createWriteStream(destination, { flags: "wx", mode: 0o600 }));
+      await pipeline(response.body, meter, createWriteStream(destination, { flags: "wx", mode: 0o600 }));
     } catch (error) {
       await rm(destination, { force: true });
-      throw error;
+      throw packagingError(
+        `runtime 다운로드 stream이 실패했습니다: ${target.archive}: ${describeError(error)}`,
+      );
     }
 
     if (receivedBytes !== contentLength) {
@@ -331,9 +378,7 @@ async function downloadRuntime(target, destination) {
       throw packagingError(`runtime SHA-256이 manifest와 다릅니다: ${target.archive}`);
     }
   } finally {
-    if (deadlineTimer !== undefined) {
-      clearTimeout(deadlineTimer);
-    }
+    clearTimeout(deadlineTimer);
   }
 }
 
@@ -466,11 +511,16 @@ async function main() {
     await copyApplication(applicationStage);
 
     const downloadedRuntimes = new Map();
-    for (const target of runtime.targets) {
-      const destination = join(downloadStage, target.archive);
-      process.stdout.write(`[package] Node.js ${runtime.version} ${target.architecture} 다운로드 및 검증\n`);
-      await downloadRuntime(target, destination);
-      downloadedRuntimes.set(target.architecture, destination);
+    const runtimeDispatcher = new EnvHttpProxyAgent();
+    try {
+      for (const target of runtime.targets) {
+        const destination = join(downloadStage, target.archive);
+        process.stdout.write(`[package] Node.js ${runtime.version} ${target.architecture} 다운로드 및 검증\n`);
+        await downloadRuntime(target, destination, runtimeDispatcher);
+        downloadedRuntimes.set(target.architecture, destination);
+      }
+    } finally {
+      await runtimeDispatcher.close();
     }
 
     const checksumLines = [];
@@ -526,7 +576,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
+  process.stderr.write(`${describeError(error)}\n`);
   process.exitCode = 1;
 });
