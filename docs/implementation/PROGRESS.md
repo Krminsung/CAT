@@ -345,3 +345,11 @@ root lockfile의 전후 hash가 다르면 게시하지 않는다. 고정 Node ar
 installer 및 checksum을 모두 임시 경로에 만든 뒤 기존 `artifacts/`가 없을 때만 디렉터리 단위로
 게시하도록 구성하고 있다. packager 안에는 build/typecheck/test/app 실행이 없으며 아직 packager,
 의존성 staging, 다운로드, tar, 앱과 검증 명령을 실행하지 않았다.
+P14.2는 `5fa11970dd9f2ede7a799e626000f148a629886c`에서 완료했다. P14.3에서는 installer가
+root/sudo 실행을 거부하고 `CAT_INSTALL_DIR`과 `CAT_BIN_DIR`을 현재 사용자가 소유한 HOME 아래의
+비중첩 canonical 경로로 제한한다. installer architecture, 내장 payload, 공식 Node archive를 commit
+전에 확인하며 Node와 앱은 실행하지 않는다. 기존 경로는 관리 표식·package 이름·launcher가 모두
+맞거나 빈 디렉터리일 때만 backup으로 이동하고 staging rename 뒤 오류가 나면 이전 설치와 새로 만든
+링크를 복구한다. `cat-tui`는 기본 user-bin link이고 `cat`은 `CAT_INSTALL_CAT_COMMAND=1`인 경우에만
+시도하며 기존 파일·다른 link는 덮어쓰지 않고 안내하도록 구성하고 있다. profile, sudo, OS package
+manager, 시스템 `cat`, installer, 앱과 검증 명령은 실행하지 않았다.
