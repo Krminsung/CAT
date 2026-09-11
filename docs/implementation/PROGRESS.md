@@ -369,3 +369,7 @@ incoming package를 확인하고, 설치·명령·기존/staged 디렉터리 ide
 `mv -T`와 선예약된 transaction 상태로 signal 사이에도 다른 경로를 중첩 이동하거나 이전 설치를 잃지
 않도록 rollback을 보완했다. `origin/main`은 P14 base와 같고 base가 현재 detached 작업의 조상이며 diff
 형식은 깨끗하다. build, dependency staging, download, tar, packager, installer와 앱은 실행하지 않았다.
+정적 검토 보완은 `b7f18d8b7abc8f36c3550ba80be148de692b2ab8`에서 확정했다. `origin/main`이
+P14 base와 동일하고 `artifacts/`와 `dist/`는 없으며 고정 lockfile의 `node_modules`는 준비된 상태다.
+P14의 유일한 `npm run build`를 명령 실행 전에 `1 / 1`로 예약하고 이 예약 commit 자체를 검사 대상으로
+삼는다. 사용자 승인 전에는 build, packager와 installer를 실행하지 않는다.
