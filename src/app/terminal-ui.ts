@@ -10,6 +10,7 @@ import type {
   ProviderDefinition,
   ProviderModel,
 } from "../providers/catalog.js";
+import type { BackgroundTaskOverview } from "../process/index.js";
 import { PROVIDER_CATALOG } from "../providers/catalog.js";
 import type {
   ApprovalPromptPort,
@@ -96,6 +97,7 @@ export interface TerminalStatusSummary {
   readonly permissionMode: PermissionMode;
   readonly responseId?: string;
   readonly usage: ProviderUsage;
+  readonly backgroundTasks: BackgroundTaskOverview;
   readonly contextTokens?: number;
   readonly contextWindow?: number;
 }
@@ -369,6 +371,12 @@ export class TerminalOverlayController {
         `Model        ${summary.model}\n` +
         `Permission   ${summary.permissionMode}\n` +
         `Directory    ${summary.workspace}\n` +
+        `Tasks        ${summary.backgroundTasks.active} active / ` +
+        `${summary.backgroundTasks.total} recorded${
+          summary.backgroundTasks.unconfirmed > 0
+            ? ` · ${summary.backgroundTasks.unconfirmed} unconfirmed`
+            : ""
+        }${summary.backgroundTasks.scanTruncated ? " · scan truncated" : ""}\n` +
         `Input        ${tokenText(knownTokenCount(summary.usage.inputTokens, "입력"))}\n` +
         `Output       ${tokenText(knownTokenCount(summary.usage.outputTokens, "출력"))}\n` +
         `Context      ${context}`,

@@ -257,3 +257,10 @@ worktree만 기록하고 있다. 생성은 registry 예약 뒤 path·branch·fil
 전달하고, stdout/stderr의 OSC·DCS류 문자열을 bounded parser로 제거한 뒤 제한된 OSC52 write만
 처리한다. clipboard read는 응답하지 않으며 canonical base64·UTF-8·크기·횟수·queue deadline과
 owned process group 종료 상한을 적용한다. 실제 SSH/PTTY, clipboard와 앱은 실행하지 않았다.
+P12.3은 `d6c9e36cfa740891c51adf361b1371376308b71f`에서 완료했다. P12.4에서는 `/tasks` 목록·출력·중지를
+중앙 task 도구와 permission 경계로 연결하고 `! command &`가 foreground timeout 대신 background
+deadline만 사용하도록 고쳤다. session별 active·unconfirmed 개요와 bounded 변경 listener로 header와
+`/status`를 갱신하며 non-terminal task는 제한된 compaction continuity에만 남긴다. 목록 command와
+오류, 상세 output은 별도 표시 상한을 사용한다. 종료 중 다른 service나 session 기록이 실패해도 현재
+manager 소유 task cleanup을 이어가고 미확정 상태를 성공으로 숨기지 않는다. 실제 task, shell, 앱과
+검증 명령은 실행하지 않았다.

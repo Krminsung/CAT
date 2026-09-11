@@ -44,6 +44,7 @@ const MAX_RUNNING_TASKS = 8;
 const MAX_SESSION_TASKS = 64;
 const MAX_MANAGED_TASKS = 128;
 const MAX_RESTORED_TASKS = 256;
+const MAX_CHANGE_LISTENERS = 8;
 const MAX_DIRECTORY_ENTRIES = 4_096;
 const MAX_MANIFEST_BYTES = 128 * 1024;
 const DEFAULT_DEADLINE_SECONDS = 3_600;
@@ -98,6 +99,15 @@ export interface BackgroundTaskCloseResult {
   readonly complete: boolean;
   readonly failures: readonly string[];
 }
+
+export interface BackgroundTaskOverview {
+  readonly total: number;
+  readonly active: number;
+  readonly unconfirmed: number;
+  readonly scanTruncated: boolean;
+}
+
+export type BackgroundTaskChangeListener = (sessionId: string) => void;
 
 interface PersistedTaskManifest {
   readonly schemaVersion: 1;
@@ -416,6 +426,7 @@ export class BackgroundTaskManager {
   readonly #now: () => number;
   readonly #idFactory: () => string;
   readonly #tasks = new Map<string, BackgroundTaskRecord>();
+  readonly #changeListeners = new Set<BackgroundTaskChangeListener>();
   #scanTruncated = false;
   #closed = false;
 
@@ -466,6 +477,37 @@ export class BackgroundTaskManager {
 
   get scanTruncated(): boolean {
     return this.#scanTruncated;
+  }
+
+  overview(sessionId: string): BackgroundTaskOverview {
+    assertSessionId(sessionId);
+    const tasks = [...this.#tasks.values()].filter((task) => task.sessionId === sessionId);
+    return Object.freeze({
+      total: tasks.length,
+      active: tasks.filter(statusIsActive).length,
+      unconfirmed: tasks.filter((task) =>
+        task.status === "stale" ||
+        task.status === "unknown" ||
+        (!statusIsActive(task) && !task.terminationConfirmed)
+      ).length,
+      scanTruncated: this.#scanTruncated,
+    });
+  }
+
+  subscribe(listener: BackgroundTaskChangeListener): () => void {
+    if (this.#closed) {
+      throw new StorageError("닫힌 background task manager의 변경을 구독할 수 없습니다.");
+    }
+    if (this.#changeListeners.size >= MAX_CHANGE_LISTENERS) {
+      throw new StorageError("background task 변경 listener 상한에 도달했습니다.");
+    }
+    this.#changeListeners.add(listener);
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      this.#changeListeners.delete(listener);
+    };
   }
 
   start(request: BackgroundTaskStartRequest): JsonObject {
@@ -539,6 +581,7 @@ export class BackgroundTaskManager {
       const remaining = Math.max(1, deadlineMs - this.#now());
       task.deadlineTimer = setTimeout(() => this.#deadline(task), remaining);
       task.deadlineTimer.unref();
+      this.#notify(task.sessionId);
       return this.#snapshot(task);
     } catch (error) {
       task.outputError = boundedError(`background task를 시작하지 못했습니다: ${errorMessage(error)}`);
@@ -553,6 +596,7 @@ export class BackgroundTaskManager {
         this.#sendSignal(task, "SIGKILL");
       }
       this.#tryPersist(task);
+      this.#notify(task.sessionId);
       throw new StorageError("background task 프로세스를 시작하지 못했습니다.", { cause: error });
     }
   }
@@ -686,6 +730,7 @@ export class BackgroundTaskManager {
         failures.push(errorMessage(error));
       }
     }
+    this.#changeListeners.clear();
     return Object.freeze({
       complete: failures.length === 0,
       failures: Object.freeze(failures),
@@ -838,12 +883,14 @@ export class BackgroundTaskManager {
         if (task.status === "starting") task.status = "running";
         this.#tryPersist(task);
       }
+      this.#notify(task.sessionId);
     });
     child.once("error", (error) => {
       if (task.child !== child || task.closed) return;
       task.outputError ??= boundedError(`background task process 오류: ${errorMessage(error)}`);
       if (!child.pid) task.status = "failed";
       this.#tryPersist(task);
+      this.#notify(task.sessionId);
     });
     child.once("exit", (code, signal) => {
       if (task.child !== child || task.closed) return;
@@ -853,6 +900,7 @@ export class BackgroundTaskManager {
         task.status = code === 0 && signal === null ? "completed" : "failed";
       }
       this.#tryPersist(task);
+      this.#notify(task.sessionId);
     });
     child.once("close", (code, signal) => {
       if (task.child !== child || task.closed) return;
@@ -871,6 +919,7 @@ export class BackgroundTaskManager {
       this.#tryPersist(task);
       for (const waiter of task.closeWaiters) waiter();
       task.closeWaiters.clear();
+      this.#notify(task.sessionId);
     });
   }
 
@@ -982,6 +1031,7 @@ export class BackgroundTaskManager {
       task.status = "stopped";
     }
     this.#tryPersist(task);
+    this.#notify(task.sessionId);
     const child = task.child;
     if (!child || !child.pid || child.pid !== task.pid) return false;
     const sent = this.#sendSignal(task, "SIGTERM");
@@ -1000,6 +1050,7 @@ export class BackgroundTaskManager {
           this.#tryPersist(task);
           for (const waiter of task.closeWaiters) waiter();
           task.closeWaiters.clear();
+          this.#notify(task.sessionId);
         }, KILL_GRACE_MS);
         task.forceTimer.unref();
       }, TERMINATE_GRACE_MS);
@@ -1140,6 +1191,16 @@ export class BackgroundTaskManager {
     }
   }
 
+  #notify(sessionId: string): void {
+    for (const listener of this.#changeListeners) {
+      try {
+        listener(sessionId);
+      } catch {
+        // 화면 같은 observer 실패가 task 소유권이나 종료 상태를 바꾸지 않게 격리한다.
+      }
+    }
+  }
+
   #activeCount(): number {
     return [...this.#tasks.values()].filter(statusIsActive).length;
   }
@@ -1186,6 +1247,7 @@ export class BackgroundTaskManager {
       }
     }
     this.#tasks.delete(task.id);
+    this.#notify(task.sessionId);
   }
 
   #closeOutput(task: BackgroundTaskRecord): void {

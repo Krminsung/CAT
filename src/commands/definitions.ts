@@ -83,8 +83,8 @@ const RAW_DEFINITIONS: readonly SlashCommandDefinition[] = [
   { name: "sessions", description: "저장된 현재 workspace 세션 목록 표시", usage: "/sessions", capability: "session", unavailableReason: "세션 선택 경로가 연결되지 않았습니다." },
   { name: "rewind", description: "현재 세션의 마지막 관리 파일 변경 복원", usage: "/rewind", capability: "session", unavailableReason: "checkpoint rewind 경로가 연결되지 않았습니다." },
   { name: "status", description: "세션·provider·model·workspace 상태 표시", usage: "/status", capability: "configuration", unavailableReason: "상태 표시 경로가 연결되지 않았습니다." },
-  { name: "tasks", description: "현재 세션 소유 background 작업 관리", usage: "/tasks [task-id|stop task-id]", capability: "tasks", unavailableReason: "background 작업은 P12에서 활성화됩니다." },
-  { name: "worktree", description: "관리되는 격리 worktree 정보 표시", usage: "/worktree", capability: "worktree", unavailableReason: "worktree 기능은 P12에서 활성화됩니다." },
+  { name: "tasks", description: "현재 세션 소유 background 작업 관리", usage: "/tasks [task-id|stop task-id]", capability: "tasks", unavailableReason: "background task manager가 연결되지 않았습니다." },
+  { name: "worktree", description: "관리되는 격리 worktree 정보 표시", usage: "/worktree", capability: "worktree", unavailableReason: "managed worktree 정보가 연결되지 않았습니다." },
 ];
 
 function stableDefinitions(): readonly SlashCommandDefinition[] {

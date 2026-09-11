@@ -404,3 +404,16 @@
   queue deadline을 통과한 write만 로컬/host OSC writer로 전달된다. OpenSSH 옵션은 shell 문자열이 아닌
   argv로 전달하고 최소 environment 및 검증된 agent socket만 사용하며 credential·key path는 기록하지
   않는다. 실제 terminal, SSH, clipboard 동작은 개발 단계에서 실행하지 않는다.
+
+## D038 — 중앙 task UI와 실패 독립 종료 정리
+
+- 상태: 승인됨
+- 결정: `/tasks`와 사용자 직접 background shell도 별도 manager 우회 경로를 만들지 않고 등록된
+  task 도구와 중앙 permission·workspace identity를 통과한다. UI는 manager의 session별 bounded
+  overview와 상태 변경 알림만 구독하고 command·output은 제한된 도구 결과에서 표시한다. foreground
+  timeout과 background deadline은 입력 객체에서도 동시에 존재하지 않게 한다.
+- 결과: active·unconfirmed 작업 수는 header와 상태 overlay에 갱신되고, 긴 목록과 출력은 화면·도구
+  상한 안에 머문다. compaction에는 제한된 non-terminal snapshot만 비신뢰 continuity로 보존한다.
+  session 기록이나 다른 service 종료 실패는 background manager close를 건너뛰게 하지 않으며, 같은
+  process가 소유하지 않은 stale PID에는 신호를 보내지 않는다. 실제 task와 앱은 개발 단계에서
+  실행하지 않는다.

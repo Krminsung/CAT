@@ -28,6 +28,8 @@ const DEFAULT_BACKGROUND_DEADLINE_SECONDS = 3_600;
 const MAX_BACKGROUND_DEADLINE_SECONDS = 86_400;
 const DEFAULT_TASK_READ_BYTES = 60_000;
 const MAX_TASK_READ_BYTES = 96 * 1024;
+const MAX_TASK_LIST_COMMAND_BYTES = 1_024;
+const MAX_TASK_LIST_ERROR_BYTES = 512;
 
 export interface CommandToolOptions {
   paths: StoragePaths;
@@ -94,6 +96,32 @@ async function assertWorkspaceUnchanged(
 
 function cleanCapturedText(value: string): string {
   return value.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/gu, "�");
+}
+
+function taskListText(value: string, maximumBytes: number, omitted: string): string {
+  return Buffer.byteLength(value, "utf8") <= maximumBytes ? value : omitted;
+}
+
+function taskListSnapshot(task: JsonObject): JsonObject {
+  const command = task.command;
+  const outputError = task.output_error;
+  const commandPreview = typeof command === "string"
+    ? taskListText(command, MAX_TASK_LIST_COMMAND_BYTES, "[긴 command 생략]")
+    : undefined;
+  const errorPreview = typeof outputError === "string"
+    ? taskListText(outputError, MAX_TASK_LIST_ERROR_BYTES, "[긴 오류 상세 생략]")
+    : undefined;
+  return {
+    ...task,
+    ...(commandPreview === undefined ? {} : { command: commandPreview }),
+    ...(errorPreview === undefined ? {} : { output_error: errorPreview }),
+    ...(commandPreview !== undefined && commandPreview !== command
+      ? { command_truncated: true }
+      : {}),
+    ...(errorPreview !== undefined && errorPreview !== outputError
+      ? { output_error_truncated: true }
+      : {}),
+  };
 }
 
 function commandDetails(
@@ -461,7 +489,7 @@ export async function registerCommandTools(
       outputLimitBytes: TASK_TOOL_OUTPUT_BYTES,
       handler: async (_input, context) => {
         await assertWorkspaceUnchanged(workspace, context);
-        const tasks = options.tasks.list(context.sessionId);
+        const tasks = options.tasks.list(context.sessionId).map(taskListSnapshot);
         return {
           status: "success",
           output: {
