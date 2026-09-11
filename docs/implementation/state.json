@@ -3,7 +3,7 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P12",
-  "currentStep": "P12.VERIFY",
+  "currentStep": "P12.PUBLISH",
   "status": "VERIFIED",
   "baseMainSha": "05a02e75e795e8079b318b2168fc372c50025c7b",
   "lastCommitSha": "4468b45a4313d790895923864936d3b5a210785f",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Record the successful additional check, verify docs-only drift, then create the P12 branch",
+  "nextAction": "Create and publish cat/p12-worktree-tasks, then review and merge its PR",
   "blocker": null
 }
