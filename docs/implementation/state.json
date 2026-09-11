@@ -3,17 +3,17 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.VERIFY",
-  "status": "VERIFYING",
+  "currentStep": "P14.PUBLISH",
+  "status": "VERIFIED",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "288a99c98866321c5f6668594059cfb9bb0d4121",
+  "lastCommitSha": "437710e0fcc55e625acb8e7d53266e61e646c77a",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
     "command": "npm run build",
-    "targetCommitSha": null,
-    "result": "NOT_RUN",
-    "exitCode": null
+    "targetCommitSha": "437710e0fcc55e625acb8e7d53266e61e646c77a",
+    "result": "PASS",
+    "exitCode": 0
   },
   "publication": {
     "branch": "cat/p14-packaging",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Run the explicitly approved additional npm run build exactly once, then retry packaging exactly once if it passes",
+  "nextAction": "Create cat/p14-packaging, push it, open the P14 pull request, review metadata and diff, then merge",
   "blocker": null
 }

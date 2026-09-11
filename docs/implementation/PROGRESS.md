@@ -18,7 +18,7 @@ P14 기준 main은 `7d1cc7809871bb09bf704daab71a73299233f7c3`이다. 구현은 �
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
 | P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
 | P13 통합·이관·문서 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #13 / MERGED `7d1cc78` |
-| P14 배포·설치본 | VERIFYING | BUILD 1차 PASS, 2차 NOT_RUN (2/2 예약); PACKAGE 1차 FAIL | NOT_PUBLISHED |
+| P14 배포·설치본 | VERIFIED | BUILD 1차 PASS, 2차 PASS (2/2); PACKAGE 1차 FAIL, 2차 PASS | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
 `cfed67a6e8cf5e3de36983773a51414a4ca209d8`, P01.3은
@@ -386,4 +386,11 @@ PR과 merge를 진행하지 않는다. 사용자가 P14 오류 수정과 `npm ru
 `undici@7.29.1`의 `EnvHttpProxyAgent`를 요청별로 사용해 환경 proxy/NO_PROXY를 존중하고, 공식 URL·
 길이·SHA-256과 download 제한은 유지하도록 `288a99c98866321c5f6668594059cfb9bb0d4121`에서
 수정했다. 중첩 network cause/errors는 제한된 길이로 출력하되 URL credential을 가린다. 추가 build
-1회를 예약했으며 아직 build나 packaging을 다시 실행하지 않았다.
+예약 commit `437710e0fcc55e625acb8e7d53266e61e646c77a`에서 약 2.04초 뒤 종료 코드 0으로 통과했다.
+이 checkout의 `dist/`를 사용한 승인된 packaging 재시도도 약 5.13초 뒤 종료 코드 0으로 통과했다.
+Linux arm64 installer는 44,350,829 bytes / SHA-256
+`471902e07c0951474882751e5dd7e1fa21d5e25ff07341468736d4aa5e280b25`, x64 installer는
+45,767,649 bytes / SHA-256 `fa6817a8ded3006a50ef418f3c835d27ed8dc43ffdd193e72478549301eb94e1`이다.
+통합 `SHA256SUMS`로 두 파일을 다시 확인해 모두 일치했다. 임시 stage가 남지 않았고 tracked source와
+root lockfile은 바뀌지 않았다. 설치본, bundled Node와 앱 runtime은 실행하지 않았으며 artifact는
+Git에 추가하지 않는다.
