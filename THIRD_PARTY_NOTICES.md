@@ -2,8 +2,9 @@
 
 `cat-agent-cli` 자체 코드는 공개 license가 부여되지 않은 `UNLICENSED` 상태다. 이 문서는 독립적인
 권리 허가가 아니라 standalone 설치본에 포함되는 고정 third-party 구성요소의 package metadata와
-license 위치를 기록한다. 실제 설치본은 각 npm package가 배포한 license 파일을 `node_modules` 안에
-그대로 포함하며, 공식 Node.js 배포본의 `LICENSE`도 `.runtime/node/LICENSE`에 포함한다.
+license 위치를 기록한다. 실제 설치본은 npm package가 제공한 `LICENSE` 파일을 있는 그대로
+`node_modules` 안에 포함하고, 별도 파일이 없는 package의 MIT metadata/notice는 이 문서에 보존한다.
+공식 Node.js 배포본의 `LICENSE`도 `.runtime/node/LICENSE`에 포함한다.
 
 ## Production npm dependency
 

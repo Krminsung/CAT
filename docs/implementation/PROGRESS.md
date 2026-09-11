@@ -360,3 +360,12 @@ rollback 정책을 정리한다. production dependency closure와 Node archive l
 `UNLICENSED` 상태임을 `LICENSE`와 provenance에 명시한다. 고정 source/build/package 입력과 비재귀
 생성 순서, host tool에 따른 bit-for-bit 재현 한계, checksum이 배포자 신원을 증명하지 않는 경계도
 문서화하고 있다. 설치본, app/runtime, compiler, packager와 검증 명령은 실행하지 않았다.
+P14.4는 `233112132c5d8389eb197454c20328238709746d`에서 완료했다. P14 전체 정적 검토에서는
+wrapper가 host와 embedded Node의 정확한 numeric semver를 확인하도록 하고, packager가 현재 TS source의
+`.js`/`.js.map`/`.d.ts` 집합과 symlink 없는 `dist/`를 요구하도록 보완했다. package engine/bin/lifecycle,
+manifest 역할을 대조하고 production stage에서 script metadata를 제거하며 npm symlink를 상대 형태로
+보존한다. runtime 다운로드에는 5분 전체 제한을 추가했다. installer는 필수 `chmod`와 direct dependency,
+incoming package를 확인하고, 설치·명령·기존/staged 디렉터리 identity를 commit 직전에 다시 대조한다.
+`mv -T`와 선예약된 transaction 상태로 signal 사이에도 다른 경로를 중첩 이동하거나 이전 설치를 잃지
+않도록 rollback을 보완했다. `origin/main`은 P14 base와 같고 base가 현재 detached 작업의 조상이며 diff
+형식은 깨끗하다. build, dependency staging, download, tar, packager, installer와 앱은 실행하지 않았다.

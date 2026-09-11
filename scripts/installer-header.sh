@@ -25,7 +25,7 @@ fail() {
     exit 1
 }
 
-for required_tool in base64 dirname find grep id ln mkdir mktemp mv readlink realpath rm sed sha256sum stat tar tr uname; do
+for required_tool in base64 chmod dirname find grep id ln mkdir mktemp mv readlink realpath rm sed sha256sum stat tar tr uname; do
     command -v "$required_tool" >/dev/null 2>&1 || fail "필수 도구가 없습니다: $required_tool"
 done
 
@@ -61,6 +61,10 @@ normalize_user_path() {
         *) fail "$path_label 경로는 사용자 HOME 아래여야 합니다: $normalized_path" ;;
     esac
     printf '%s\n' "$normalized_path"
+}
+
+path_identity() {
+    stat -c '%d:%i:%u:%F' -- "$1"
 }
 
 cat_install_input=${CAT_INSTALL_DIR:-"$HOME/.local/lib/cat-agent-cli"}
@@ -102,8 +106,11 @@ mkdir -p -- "$cat_install_parent" "$cat_bin_dir"
 [ ! -L "$cat_bin_dir" ] || fail "명령 경로가 심볼릭 링크일 수 없습니다."
 [ "$(stat -c '%u' -- "$cat_install_parent")" = "$installer_uid" ] || fail "현재 사용자가 설치 부모 경로를 소유하지 않습니다."
 [ "$(stat -c '%u' -- "$cat_bin_dir")" = "$installer_uid" ] || fail "현재 사용자가 명령 경로를 소유하지 않습니다."
+install_parent_identity=$(path_identity "$cat_install_parent")
+bin_dir_identity=$(path_identity "$cat_bin_dir")
 
 existing_install=0
+existing_install_identity=
 install_action=설치
 if [ -L "$cat_install_dir" ]; then
     fail "설치 경로가 심볼릭 링크일 수 없습니다: $cat_install_dir"
@@ -111,6 +118,7 @@ elif [ -e "$cat_install_dir" ]; then
     [ -d "$cat_install_dir" ] || fail "설치 경로에 디렉터리가 아닌 항목이 있습니다: $cat_install_dir"
     [ "$(stat -c '%u' -- "$cat_install_dir")" = "$installer_uid" ] || fail "현재 사용자가 기존 설치 경로를 소유하지 않습니다."
     existing_install=1
+    existing_install_identity=$(path_identity "$cat_install_dir")
     if [ -n "$(find "$cat_install_dir" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
         managed_marker=$cat_install_dir/.cat-agent-cli-managed
         [ -f "$managed_marker" ] && [ ! -L "$managed_marker" ] || {
@@ -142,6 +150,8 @@ esac
 install_succeeded=0
 previous_moved=0
 new_install_committed=0
+staged_install_identity=
+cat_stage=
 cat_tui_link_created=0
 cat_link_created=0
 previous_install=$cat_work_dir/previous
@@ -161,21 +171,40 @@ finish_installation() {
     rollback_ok=1
 
     if [ "$install_succeeded" -ne 1 ]; then
-        if [ "$cat_link_created" -eq 1 ] && link_is_managed "$cat_bin_dir/cat"; then
-            rm -f -- "$cat_bin_dir/cat" || rollback_ok=0
+        if [ ! -L "$cat_bin_dir" ] && [ "$(path_identity "$cat_bin_dir" 2>/dev/null)" = "$bin_dir_identity" ]; then
+            if [ "$cat_link_created" -eq 1 ] && link_is_managed "$cat_bin_dir/cat"; then
+                rm -f -- "$cat_bin_dir/cat" || rollback_ok=0
+            fi
+            if [ "$cat_tui_link_created" -eq 1 ] && link_is_managed "$cat_bin_dir/cat-tui"; then
+                rm -f -- "$cat_bin_dir/cat-tui" || rollback_ok=0
+            fi
+        elif [ "$cat_link_created" -eq 1 ] || [ "$cat_tui_link_created" -eq 1 ]; then
+            warn "명령 경로 identity가 바뀌어 생성 link를 자동 제거하지 않습니다: $cat_bin_dir"
+            rollback_ok=0
         fi
-        if [ "$cat_tui_link_created" -eq 1 ] && link_is_managed "$cat_bin_dir/cat-tui"; then
-            rm -f -- "$cat_bin_dir/cat-tui" || rollback_ok=0
-        fi
-        if [ "$new_install_committed" -eq 1 ] && { [ -e "$cat_install_dir" ] || [ -L "$cat_install_dir" ]; }; then
-            if ! mv -- "$cat_install_dir" "$failed_install"; then
+
+        current_install_identity=$(path_identity "$cat_install_dir" 2>/dev/null || printf '')
+        remaining_stage_identity=$(path_identity "$cat_stage" 2>/dev/null || printf '')
+        if [ "$new_install_committed" -eq 1 ] && [ ! -L "$cat_install_dir" ] && \
+            [ "$current_install_identity" = "$staged_install_identity" ]; then
+            if ! mv -T -- "$cat_install_dir" "$failed_install"; then
                 warn "실패한 새 설치본을 격리하지 못했습니다: $cat_install_dir"
                 rollback_ok=0
             fi
+        elif [ "$new_install_committed" -eq 1 ] && [ "$remaining_stage_identity" != "$staged_install_identity" ]; then
+            warn "새 설치본 identity를 확인할 수 없어 자동 이동하지 않습니다: $cat_install_dir"
+            rollback_ok=0
         fi
+
         if [ "$previous_moved" -eq 1 ]; then
-            if [ ! -e "$cat_install_dir" ] && mv -- "$previous_install" "$cat_install_dir"; then
-                warn "이전 관리 설치본을 복구했습니다."
+            previous_identity=$(path_identity "$previous_install" 2>/dev/null || printf '')
+            current_install_identity=$(path_identity "$cat_install_dir" 2>/dev/null || printf '')
+            if [ ! -L "$cat_install_dir" ] && [ "$current_install_identity" = "$existing_install_identity" ]; then
+                :
+            elif [ ! -L "$previous_install" ] && [ "$previous_identity" = "$existing_install_identity" ] && \
+                [ ! -e "$cat_install_dir" ] && [ ! -L "$cat_install_dir" ] && \
+                mv -T -- "$previous_install" "$cat_install_dir"; then
+                    warn "이전 관리 설치본을 복구했습니다."
             else
                 warn "이전 설치본 자동 복구에 실패했습니다: $previous_install"
                 rollback_ok=0
@@ -215,7 +244,13 @@ runtime_archive=$payload_root/runtime/$node_archive_name
 [ -d "$cat_stage" ] && [ ! -L "$cat_stage" ] || fail "payload application 경로가 손상되었습니다."
 [ -f "$cat_stage/bin/cat" ] && [ ! -L "$cat_stage/bin/cat" ] || fail "payload launcher가 없습니다."
 [ -f "$cat_stage/dist/cli/main.js" ] && [ ! -L "$cat_stage/dist/cli/main.js" ] || fail "payload 진입점이 없습니다."
-[ -d "$cat_stage/node_modules/@earendil-works/pi-tui" ] || fail "payload TUI dependency가 없습니다."
+[ -f "$cat_stage/package.json" ] && [ ! -L "$cat_stage/package.json" ] || fail "payload package manifest가 없습니다."
+grep -Eq '"name"[[:space:]]*:[[:space:]]*"cat-agent-cli"' "$cat_stage/package.json" || {
+    fail "payload package 이름이 올바르지 않습니다."
+}
+for direct_dependency in @earendil-works/pi-tui ajv undici; do
+    [ -d "$cat_stage/node_modules/$direct_dependency" ] || fail "payload production dependency가 없습니다: $direct_dependency"
+done
 [ -f "$cat_stage/LICENSE" ] && [ ! -L "$cat_stage/LICENSE" ] || fail "payload license 자료가 없습니다."
 [ -f "$cat_stage/THIRD_PARTY_NOTICES.md" ] && [ ! -L "$cat_stage/THIRD_PARTY_NOTICES.md" ] || {
     fail "payload third-party notice가 없습니다."
@@ -241,18 +276,35 @@ mv -- "$node_source" "$cat_stage/.runtime/node"
 chmod 755 "$cat_stage/bin/cat" "$cat_stage/.runtime/node/bin/node"
 printf 'cat-agent-cli:v1\nversion=%s\nruntime=%s\narchitecture=%s\n' \
     "$package_version" "$node_version" "$target_architecture" > "$cat_stage/.cat-agent-cli-managed"
+staged_install_identity=$(path_identity "$cat_stage")
 
 log "사용자 영역 $install_action 준비"
+[ ! -L "$cat_install_parent" ] && [ "$(path_identity "$cat_install_parent")" = "$install_parent_identity" ] || {
+    fail "설치 부모 경로 identity가 staging 중 변경되었습니다."
+}
+[ ! -L "$cat_bin_dir" ] && [ "$(path_identity "$cat_bin_dir")" = "$bin_dir_identity" ] || {
+    fail "명령 경로 identity가 staging 중 변경되었습니다."
+}
 if [ "$existing_install" -eq 1 ]; then
-    mv -- "$cat_install_dir" "$previous_install" || fail "기존 설치본을 backup으로 옮길 수 없습니다."
     previous_moved=1
+    [ ! -L "$cat_install_dir" ] && [ "$(path_identity "$cat_install_dir")" = "$existing_install_identity" ] || {
+        fail "기존 설치 경로 identity가 staging 중 변경되었습니다."
+    }
+    mv -T -- "$cat_install_dir" "$previous_install" || fail "기존 설치본을 backup으로 옮길 수 없습니다."
+    [ "$(path_identity "$previous_install")" = "$existing_install_identity" ] || fail "기존 설치 backup identity가 다릅니다."
+else
+    [ ! -e "$cat_install_dir" ] && [ ! -L "$cat_install_dir" ] || fail "설치 경로가 staging 중 새로 생겼습니다."
 fi
-mv -- "$cat_stage" "$cat_install_dir" || fail "staging 설치본을 최종 경로로 옮길 수 없습니다."
 new_install_committed=1
+mv -T -- "$cat_stage" "$cat_install_dir" || fail "staging 설치본을 최종 경로로 옮길 수 없습니다."
+[ ! -L "$cat_install_dir" ] && [ "$(path_identity "$cat_install_dir")" = "$staged_install_identity" ] || {
+    fail "최종 설치 경로 identity가 staging과 다릅니다."
+}
 
 create_command_link() {
     command_name=$1
     command_path=$cat_bin_dir/$command_name
+    [ ! -L "$cat_bin_dir" ] && [ "$(path_identity "$cat_bin_dir")" = "$bin_dir_identity" ] || return 1
     if [ -L "$command_path" ]; then
         if link_is_managed "$command_path"; then
             return 3

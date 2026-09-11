@@ -23,8 +23,11 @@ runtime manifest는 Node.js v24.21.0의 다음 공식 archive를 고정한다.
 1. 모든 source와 packaging 입력을 고정한 뒤 `npm run build`를 한 번만 실행한다.
 2. 성공한 같은 checkout에서 `npm run package:installer`를 한 번 실행한다.
 3. packager는 build/typecheck/test/app/help/version을 호출하지 않고 기존 `dist/`를 복사한다.
+   `src/**/*.ts`에서 예상한 `.js`/`.js.map`/`.d.ts`와 정확히 일치하지 않거나 symlink가 섞인 `dist/`는
+   거부한다.
 4. production dependency는 stage에서 같은 lockfile과
    `npm ci --ignore-scripts --omit=dev --no-audit --no-fund` 한 번으로만 설치한다.
+   설치 뒤 payload용 package manifest의 script entry는 제거한다.
 5. 두 Node archive를 공식 고정 URL에서 받고 SHA-256을 확인한다.
 6. GNU tar의 이름 정렬, epoch mtime, 숫자 owner/group 고정 옵션으로 architecture별 payload를 만들고,
    installer 및 sidecar/통합 checksum을 임시 경로에 모두 만든 뒤 `artifacts/`로 rename한다.

@@ -7,7 +7,7 @@ Node.js v24.21.0 runtime, 컴파일된 JavaScript, 고정 production dependency,
 license 자료가 포함된다. glibc·terminal·배포판별 실제 호환성, 앱 실행과 설치/rollback 흐름은 아직
 runtime으로 검증하지 않았다.
 
-필요한 host 도구는 POSIX `/bin/sh`와 GNU 계열 `base64`, `find`, `grep`, `realpath`, `sha256sum`,
+필요한 host 도구는 POSIX `/bin/sh`와 GNU 계열 `base64`, `chmod`, `find`, `grep`, `realpath`, `sha256sum`,
 `stat`, `tar`(gzip/xz 지원), `tr`, 그리고 일반 파일 도구다. installer는 누락 도구를 자동 설치하거나
 `sudo`, apt/dnf/yum, 전역 npm을 사용하지 않는다.
 

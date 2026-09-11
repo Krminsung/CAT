@@ -11,6 +11,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rename,
   rm,
   writeFile,
@@ -26,6 +27,7 @@ const manifestPath = join(root, "packaging", "runtime-manifest.json");
 const installerTemplatePath = join(root, "scripts", "installer-header.sh");
 const artifactsPath = join(root, "artifacts");
 const maximumRuntimeBytes = 128 * 1024 * 1024;
+const runtimeDownloadDeadlineMs = 5 * 60 * 1000;
 
 const appInputs = [
   "dist",
@@ -56,6 +58,71 @@ async function pathExists(path) {
       return false;
     }
     throw error;
+  }
+}
+
+async function listRegularTree(directory, label, relativeDirectory = "") {
+  const entries = await readdir(join(directory, relativeDirectory), { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const relativePath = relativeDirectory === "" ? entry.name : join(relativeDirectory, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw packagingError(`${label}에 심볼릭 링크가 있습니다: ${relativePath}`);
+    }
+    if (entry.isDirectory()) {
+      files.push(...(await listRegularTree(directory, label, relativePath)));
+      continue;
+    }
+    if (!entry.isFile()) {
+      throw packagingError(`${label}에 일반 파일이 아닌 항목이 있습니다: ${relativePath}`);
+    }
+    files.push(relativePath);
+  }
+  return files;
+}
+
+async function assertSafeInput(source, label) {
+  let metadata;
+  try {
+    metadata = await lstat(source);
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      throw packagingError(`필수 packaging 입력이 없습니다: ${label}`);
+    }
+    throw error;
+  }
+  if (metadata.isSymbolicLink()) {
+    throw packagingError(`packaging 입력 자체가 심볼릭 링크입니다: ${label}`);
+  }
+  if (metadata.isDirectory()) {
+    await listRegularTree(source, label);
+    return;
+  }
+  if (!metadata.isFile()) {
+    throw packagingError(`packaging 입력이 일반 파일이나 디렉터리가 아닙니다: ${label}`);
+  }
+}
+
+async function validateCompilerOutput() {
+  const sourceFiles = (await listRegularTree(join(root, "src"), "src"))
+    .filter((path) => path.endsWith(".ts") && !path.endsWith(".d.ts"))
+    .sort();
+  const expected = sourceFiles
+    .flatMap((path) => {
+      const stem = path.slice(0, -3);
+      return [`${stem}.d.ts`, `${stem}.js`, `${stem}.js.map`];
+    })
+    .sort();
+  const actual = (await listRegularTree(join(root, "dist"), "dist")).sort();
+  if (expected.length !== actual.length || expected.some((path, index) => path !== actual[index])) {
+    const expectedSet = new Set(expected);
+    const actualSet = new Set(actual);
+    const missing = expected.filter((path) => !actualSet.has(path)).slice(0, 5);
+    const unexpected = actual.filter((path) => !expectedSet.has(path)).slice(0, 5);
+    throw packagingError(
+      `dist가 현재 TypeScript 입력의 정확한 출력 집합이 아닙니다 (누락: ${missing.join(", ") || "없음"}; ` +
+        `추가: ${unexpected.join(", ") || "없음"}).`,
+    );
   }
 }
 
@@ -116,6 +183,18 @@ function parseRuntimeManifest(source) {
   }
 
   const runtime = requireObject(manifest.bundleRuntime, "bundleRuntime");
+  const developmentRuntime = requireObject(manifest.developmentRuntime, "developmentRuntime");
+  const developmentEngine = requireString(
+    developmentRuntime.packageEngine,
+    "developmentRuntime.packageEngine",
+    /^>=\d+\.\d+\.\d+$/u,
+  );
+  if (developmentRuntime.bundledRuntimeRequired !== false) {
+    throw packagingError("development runtime과 bundle runtime 구분이 고정 계약과 다릅니다.");
+  }
+  if (runtime.project !== "Node.js" || runtime.releaseStatus !== "LTS") {
+    throw packagingError("bundle runtime project 또는 유지보수 상태가 고정 계약과 다릅니다.");
+  }
   const version = requireString(runtime.version, "bundleRuntime.version", /^v\d+\.\d+\.\d+$/u);
   const releaseIndexUrl = requireString(
     runtime.releaseIndexUrl,
@@ -170,7 +249,7 @@ function parseRuntimeManifest(source) {
   if (expectedArchitectures.size !== 0) {
     throw packagingError("필수 runtime architecture가 빠졌습니다.");
   }
-  return { manifest, targets, version };
+  return { developmentEngine, targets, version };
 }
 
 async function downloadRuntime(target, destination) {
@@ -186,65 +265,75 @@ async function downloadRuntime(target, destination) {
     throw packagingError(`허용되지 않은 runtime URL입니다: ${target.url}`);
   }
 
-  const response = await new Promise((resolve, reject) => {
-    const request = get(
-      runtimeUrl,
-      {
-        headers: {
-          Accept: "application/octet-stream",
-          "User-Agent": "cat-agent-cli-packager/0.1",
-        },
-      },
-      resolve,
-    );
-    request.setTimeout(30_000, () => {
-      request.destroy(packagingError(`runtime 다운로드가 응답 제한을 넘었습니다: ${target.archive}`));
-    });
-    request.once("error", reject);
-  });
-
-  if (response.statusCode !== 200) {
-    response.resume();
-    throw packagingError(
-      `runtime 다운로드 HTTP 상태가 올바르지 않습니다: ${target.archive} (${response.statusCode ?? "unknown"})`,
-    );
-  }
-
-  const contentLength = Number(response.headers["content-length"] ?? 0);
-  if (!Number.isSafeInteger(contentLength) || contentLength <= 0 || contentLength > maximumRuntimeBytes) {
-    response.destroy();
-    throw packagingError(`runtime Content-Length가 허용 범위를 벗어났습니다: ${target.archive}`);
-  }
-
-  const digest = createHash("sha256");
-  let receivedBytes = 0;
-  const meter = new Transform({
-    transform(chunk, _encoding, callback) {
-      receivedBytes += chunk.length;
-      if (receivedBytes > maximumRuntimeBytes) {
-        callback(packagingError(`runtime 다운로드 크기 제한을 넘었습니다: ${target.archive}`));
-        return;
-      }
-      digest.update(chunk);
-      callback(null, chunk);
-    },
-  });
-
+  let deadlineTimer;
   try {
-    await pipeline(response, meter, createWriteStream(destination, { flags: "wx", mode: 0o600 }));
-  } catch (error) {
-    await rm(destination, { force: true });
-    throw error;
-  }
+    const response = await new Promise((resolve, reject) => {
+      const request = get(
+        runtimeUrl,
+        {
+          headers: {
+            Accept: "application/octet-stream",
+            "User-Agent": "cat-agent-cli-packager/0.1",
+          },
+        },
+        resolve,
+      );
+      request.setTimeout(30_000, () => {
+        request.destroy(packagingError(`runtime 다운로드가 응답 제한을 넘었습니다: ${target.archive}`));
+      });
+      deadlineTimer = setTimeout(() => {
+        request.destroy(packagingError(`runtime 다운로드가 전체 제한을 넘었습니다: ${target.archive}`));
+      }, runtimeDownloadDeadlineMs);
+      request.once("error", reject);
+    });
 
-  if (receivedBytes !== contentLength) {
-    await rm(destination, { force: true });
-    throw packagingError(`runtime 다운로드 길이가 Content-Length와 다릅니다: ${target.archive}`);
-  }
-  const actualChecksum = digest.digest("hex");
-  if (actualChecksum !== target.checksum) {
-    await rm(destination, { force: true });
-    throw packagingError(`runtime SHA-256이 manifest와 다릅니다: ${target.archive}`);
+    if (response.statusCode !== 200) {
+      response.destroy();
+      throw packagingError(
+        `runtime 다운로드 HTTP 상태가 올바르지 않습니다: ${target.archive} (${response.statusCode ?? "unknown"})`,
+      );
+    }
+
+    const contentLength = Number(response.headers["content-length"] ?? 0);
+    if (!Number.isSafeInteger(contentLength) || contentLength <= 0 || contentLength > maximumRuntimeBytes) {
+      response.destroy();
+      throw packagingError(`runtime Content-Length가 허용 범위를 벗어났습니다: ${target.archive}`);
+    }
+
+    const digest = createHash("sha256");
+    let receivedBytes = 0;
+    const meter = new Transform({
+      transform(chunk, _encoding, callback) {
+        receivedBytes += chunk.length;
+        if (receivedBytes > maximumRuntimeBytes) {
+          callback(packagingError(`runtime 다운로드 크기 제한을 넘었습니다: ${target.archive}`));
+          return;
+        }
+        digest.update(chunk);
+        callback(null, chunk);
+      },
+    });
+
+    try {
+      await pipeline(response, meter, createWriteStream(destination, { flags: "wx", mode: 0o600 }));
+    } catch (error) {
+      await rm(destination, { force: true });
+      throw error;
+    }
+
+    if (receivedBytes !== contentLength) {
+      await rm(destination, { force: true });
+      throw packagingError(`runtime 다운로드 길이가 Content-Length와 다릅니다: ${target.archive}`);
+    }
+    const actualChecksum = digest.digest("hex");
+    if (actualChecksum !== target.checksum) {
+      await rm(destination, { force: true });
+      throw packagingError(`runtime SHA-256이 manifest와 다릅니다: ${target.archive}`);
+    }
+  } finally {
+    if (deadlineTimer !== undefined) {
+      clearTimeout(deadlineTimer);
+    }
   }
 }
 
@@ -269,14 +358,13 @@ async function copyApplication(stage) {
   for (const relativePath of appInputs) {
     const source = join(root, relativePath);
     const destination = join(stage, relativePath);
-    if (!(await pathExists(source))) {
-      throw packagingError(`필수 packaging 입력이 없습니다: ${relativePath}`);
-    }
+    await assertSafeInput(source, relativePath);
     await mkdir(dirname(destination), { recursive: true });
     await cp(source, destination, {
       errorOnExist: true,
       force: false,
       recursive: true,
+      verbatimSymlinks: true,
     });
   }
 
@@ -296,6 +384,14 @@ async function copyApplication(stage) {
       },
     },
   );
+
+  const deployedPackagePath = join(stage, "package.json");
+  const deployedPackage = requireObject(JSON.parse(await readFile(deployedPackagePath, "utf8")), "staged package");
+  deployedPackage.scripts = {};
+  await writeFile(deployedPackagePath, `${JSON.stringify(deployedPackage, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o644,
+  });
 }
 
 async function createPayloadArchive(payloadRoot, destination) {
@@ -331,11 +427,33 @@ async function main() {
   if (packageManifest.name !== "cat-agent-cli") {
     throw packagingError("예상한 package 이름이 아닙니다.");
   }
+  const packageEngines = requireObject(packageManifest.engines, "package.json engines");
+  const packageBin = requireObject(packageManifest.bin, "package.json bin");
+  const packageScripts = requireObject(packageManifest.scripts, "package.json scripts");
 
   const lockPath = join(root, "package-lock.json");
   const lockChecksumBefore = sha256(await readFile(lockPath));
   const runtimeSource = await readFile(manifestPath, "utf8");
   const runtime = parseRuntimeManifest(runtimeSource);
+  if (packageEngines.node !== runtime.developmentEngine) {
+    throw packagingError("package engine과 runtime manifest의 development engine이 다릅니다.");
+  }
+  if (packageBin["cat-tui"] !== "bin/cat" || Object.keys(packageBin).length !== 1) {
+    throw packagingError("기본 package bin은 cat-tui -> bin/cat 하나여야 합니다.");
+  }
+  if (
+    packageScripts.build !== "tsc -p tsconfig.json" ||
+    packageScripts.check !== "tsc -p tsconfig.json --noEmit" ||
+    packageScripts["package:installer"] !== "node scripts/package-installer.mjs" ||
+    "prebuild" in packageScripts ||
+    "postbuild" in packageScripts ||
+    "prepackage:installer" in packageScripts ||
+    "postpackage:installer" in packageScripts
+  ) {
+    throw packagingError("build/package script 경계 또는 lifecycle 설정이 고정 계약과 다릅니다.");
+  }
+  await validateCompilerOutput();
+  await assertSafeInput(installerTemplatePath, "scripts/installer-header.sh");
   const installerTemplate = await readFile(installerTemplatePath, "utf8");
   const temporary = await mkdtemp(join(root, ".cat-package-"));
   const publishStage = join(temporary, "publish");
@@ -361,7 +479,7 @@ async function main() {
       const payloadApp = join(payloadRoot, "app");
       const payloadRuntime = join(payloadRoot, "runtime");
       await mkdir(payloadRuntime, { recursive: true });
-      await cp(applicationStage, payloadApp, { recursive: true });
+      await cp(applicationStage, payloadApp, { recursive: true, verbatimSymlinks: true });
       await copyFile(downloadedRuntimes.get(target.architecture), join(payloadRuntime, target.archive));
       await writeFile(join(payloadRoot, "runtime-manifest.json"), runtimeSource, {
         encoding: "utf8",

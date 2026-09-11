@@ -42,7 +42,7 @@ node_is_compatible() {
     [ -x "$candidate" ] || return 1
     version=$("$candidate" --version 2>/dev/null) || return 1
     case "$version" in
-        v[0-9]*.[0-9]*.[0-9]*) ;;
+        v*.*.*) ;;
         *) return 1 ;;
     esac
 
@@ -50,8 +50,13 @@ node_is_compatible() {
     major=${version%%.*}
     remainder=${version#*.}
     minor=${remainder%%.*}
-    case "$major$minor" in
-        *[!0-9]*) return 1 ;;
+    patch=${remainder#*.}
+    case "$patch" in
+        *.*) return 1 ;;
+    esac
+    case "$major:$minor:$patch" in
+        *[!0-9:]*) return 1 ;;
+        :*|*::*|*:) return 1 ;;
     esac
     [ "$major" -gt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -ge 19 ]; }
 }
@@ -59,6 +64,10 @@ node_is_compatible() {
 bundled_node=$install_root/.runtime/node/bin/node
 if [ -x "$bundled_node" ]; then
     node_bin=$bundled_node
+    if ! node_is_compatible "$node_bin"; then
+        printf '%s\n' 'cat: 포함된 Node.js runtime이 호환되지 않습니다.' >&2
+        exit 1
+    fi
 elif command -v node >/dev/null 2>&1; then
     node_bin=$(command -v node)
     if ! node_is_compatible "$node_bin"; then
