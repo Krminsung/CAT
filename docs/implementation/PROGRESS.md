@@ -17,7 +17,7 @@ P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 �
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
 | P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
-| P13 통합·이관·문서 | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
+| P13 통합·이관·문서 | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
@@ -317,5 +317,7 @@ release, profile 실패 credential 정리와 source read-only 경로에서 새 c
 단계 전체 정적 검토에서는 legacy 도구 설정을 실제 built-in 이름으로 제한하고 target provider catalog,
 공개 field의 API key 분리와 검증 오류 전 redaction 등록을 보완했다. source transcript를 새 wrapper에
 넣을 때의 깊이·node 여유, writer lock 획득 뒤 충돌 재확인, 특수 JSON field 복사와 `CAT_HOME` 제어
-문자·크기 제한도 함께 정리하고 있다. `origin/main`은 P13 base와 같고 diff 형식은 깨끗하다. 앱, 외부
-서비스, 실제 사용자 자료와 검증 명령은 실행하지 않았다.
+문자·크기 제한도 함께 정리해 `72bcd74bee47c9d4a4a9472ad179ae46eaa5b4f4`에서 확정했다.
+`origin/main`은 P13 base와 같고 diff 형식은 깨끗하다. 앱, 외부 서비스와 실제 사용자 자료는 실행하거나
+읽지 않았다. P13의 유일한 `npm run check`는 다음 예약 commit을 대상으로 1회 예약했으며 아직 실행하지
+않았다.
