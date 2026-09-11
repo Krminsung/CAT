@@ -270,5 +270,8 @@ multiplex/control 또는 stdio forwarding 옵션으로 bridge의 소유 PTY·종
 관리 option을 고정하고 충돌 인자를 거부한다. 이 보완은
 `1355e2063241a2454e7b51504a2db37b8bfa9060`에서 확정했고, `origin/main`이 P12 base와 같으며 base가
 현재 HEAD의 조상임을 확인했다. diff 형식 검사는 깨끗하다. 실제 process, Git worktree, SSH/PTY,
-clipboard와 앱은 실행하지 않았다. P12의 유일한 `npm run check`는 1/1로 예약했지만 아직 실행하지
-않았다.
+clipboard와 앱은 실행하지 않았다. 사용자가 승인한 P12의 유일한 `npm run check`를 예약 commit
+`e261ebd19f200f3628d7c14e576513dd317b99f3`에서 120초 제한으로 실행했고 약 1.65초 뒤 종료 코드 2로
+실패했다. `src/process/background-tasks.ts:624`에서 output tail의 `Buffer<ArrayBufferLike>`를
+`Buffer<ArrayBuffer>`에 대입할 수 없다는 TS2322 진단 1건이 발생했다. 추가 검사, source 수정, push,
+PR과 merge는 진행하지 않았다.

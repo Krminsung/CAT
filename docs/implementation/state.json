@@ -4,16 +4,16 @@
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P12",
   "currentStep": "P12.VERIFY",
-  "status": "VERIFYING",
+  "status": "BLOCKED_VERIFY",
   "baseMainSha": "05a02e75e795e8079b318b2168fc372c50025c7b",
-  "lastCommitSha": "1355e2063241a2454e7b51504a2db37b8bfa9060",
+  "lastCommitSha": "e261ebd19f200f3628d7c14e576513dd317b99f3",
   "verification": {
     "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": null,
-    "result": "NOT_RUN",
-    "exitCode": null
+    "targetCommitSha": "e261ebd19f200f3628d7c14e576513dd317b99f3",
+    "result": "FAIL",
+    "exitCode": 2
   },
   "publication": {
     "branch": "cat/p12-worktree-tasks",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Await explicit P12 approval, then run npm run check exactly once against this reservation commit",
-  "blocker": null
+  "nextAction": "Wait for explicit approval to fix P12 and run one additional npm run check",
+  "blocker": "The only reserved P12 check found one background output Buffer generic type diagnostic"
 }
