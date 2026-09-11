@@ -391,61 +391,70 @@ export function registerAgentControlTools(
     },
   });
 
-  if (options.interactions.supportsUserInput) {
-    registry.register({
-      definition: {
-        name: "request_user_input",
-        description: "Ask one necessary multiple-choice question when a material decision blocks progress.",
-        inputSchema: objectSchema(
-          {
-            question: { type: "string", minLength: 1, maxLength: 4_096 },
-            options: {
-              type: "array",
-              minItems: 2,
-              maxItems: 4,
-              items: objectSchema(
-                {
-                  label: { type: "string", minLength: 1, maxLength: 128 },
-                  description: { type: "string", minLength: 1, maxLength: 1_024 },
-                },
-                ["label", "description"],
-              ),
-            },
-          },
-          ["question", "options"],
-        ),
-        category: "read",
-        permission: { kind: "none" },
-        outputLimitBytes: CONTROL_TOOL_OUTPUT_BYTES,
-        handler: async (input, context) => {
-          const request = parseOptions(input);
-          try {
-            const answer = await options.interactions.requestUserInput(
-              context.runId,
-              request.question,
-              request.options,
-              context.signal,
-            );
-            return success({ question: request.question, answer });
-          } catch (error) {
-            if (context.signal.aborted || error instanceof CancelledError) {
-              return { status: "cancelled", reason: "사용자 입력 요청이 취소됐습니다." };
-            }
-            return {
-              status: "failure",
-              error: {
-                code: "user_input_failed",
-                message: error instanceof Error
-                  ? error.message
-                  : "사용자 입력을 받지 못했습니다.",
-                retryable: false,
+  registry.register({
+    definition: {
+      name: "request_user_input",
+      description: "Ask one necessary multiple-choice question when a material decision blocks progress.",
+      inputSchema: objectSchema(
+        {
+          question: { type: "string", minLength: 1, maxLength: 4_096 },
+          options: {
+            type: "array",
+            minItems: 2,
+            maxItems: 4,
+            items: objectSchema(
+              {
+                label: { type: "string", minLength: 1, maxLength: 128 },
+                description: { type: "string", minLength: 1, maxLength: 1_024 },
               },
-              execution: "not_started",
-            };
-          }
+              ["label", "description"],
+            ),
+          },
         },
+        ["question", "options"],
+      ),
+      category: "read",
+      permission: { kind: "none" },
+      outputLimitBytes: CONTROL_TOOL_OUTPUT_BYTES,
+      handler: async (input, context) => {
+        const request = parseOptions(input);
+        if (!options.interactions.supportsUserInput) {
+          return {
+            status: "failure",
+            error: {
+              code: "user_input_unavailable",
+              message: "비대화형 실행에서는 사용자 입력을 요청할 수 없습니다.",
+              retryable: false,
+            },
+            execution: "not_started",
+          };
+        }
+        try {
+          const answer = await options.interactions.requestUserInput(
+            context.runId,
+            request.question,
+            request.options,
+            context.signal,
+          );
+          return success({ question: request.question, answer });
+        } catch (error) {
+          if (context.signal.aborted || error instanceof CancelledError) {
+            return { status: "cancelled", reason: "사용자 입력 요청이 취소됐습니다." };
+          }
+          return {
+            status: "failure",
+            error: {
+              code: "user_input_failed",
+              message: error instanceof Error
+                ? error.message
+                : "사용자 입력을 받지 못했습니다.",
+              retryable: false,
+            },
+            execution: "not_started",
+          };
+        }
       },
-    });
-  }
+    },
+  });
   return plans;
 }

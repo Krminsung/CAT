@@ -73,6 +73,7 @@ import {
   type StoredTranscriptRecord,
 } from "../storage/index.js";
 import {
+  BUILTIN_TOOL_NAMES,
   CentralToolExecutor,
   digestBytes,
   type FileObservationStore,
@@ -99,6 +100,7 @@ import {
   type TerminalInputController,
 } from "../tui/index.js";
 import {
+  SLASH_COMMAND_NAMES,
   SlashCommandRegistry,
   type SlashCommandInvocation,
 } from "../commands/index.js";
@@ -172,6 +174,21 @@ const PERMISSION_ORDER: readonly PermissionMode[] = Object.freeze([
   "full-auto",
   "plan",
 ]);
+
+function assertExactFeatureNames(
+  label: string,
+  actual: readonly string[],
+  expected: readonly string[],
+): void {
+  if (
+    actual.length !== expected.length ||
+    actual.some((name, index) => name !== expected[index])
+  ) {
+    throw new ConfigurationError(
+      `${label} 연결이 완전하지 않습니다. 예상: ${expected.join(", ")}; 실제: ${actual.join(", ")}`,
+    );
+  }
+}
 
 function isMcpDynamicToolName(name: string): boolean {
   return name.length <= 128 && MCP_DYNAMIC_TOOL_NAME.test(name);
@@ -2029,7 +2046,7 @@ class AgentApplicationRuntime {
   }
 
   #createCommands(): SlashCommandRegistry<AgentApplicationRuntime> {
-    return new SlashCommandRegistry({
+    const commands = new SlashCommandRegistry({
       capabilities: IMPLEMENTED_CAPABILITIES,
       handlers: {
         help: async (invocation, runtime) => await runtime.#commandHelp(invocation),
@@ -2062,6 +2079,12 @@ class AgentApplicationRuntime {
         worktree: async (invocation, runtime) => await runtime.#commandWorktree(invocation),
       },
     });
+    assertExactFeatureNames(
+      "slash 명령",
+      commands.activeDefinitions().map((definition) => definition.name),
+      SLASH_COMMAND_NAMES,
+    );
+    return commands;
   }
 
   #createHookEngine(settings: LoadedSettings): HookEngine {
@@ -2888,6 +2911,7 @@ async function composeRuntime(
     });
     registerAgentControlTools(registry, { interactions });
     const implemented = registry.implementedNames();
+    assertExactFeatureNames("built-in 도구", implemented, BUILTIN_TOOL_NAMES);
     const enabledTools = configuredToolNames(settings.values.tools, implemented);
     const allowedTools = validateConfiguredToolList(
       settings.values.allowedTools,

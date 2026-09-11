@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P12",
-  "currentStep": "P12.PUBLISH",
-  "status": "VERIFIED",
-  "baseMainSha": "05a02e75e795e8079b318b2168fc372c50025c7b",
-  "lastCommitSha": "4468b45a4313d790895923864936d3b5a210785f",
+  "currentPhase": "P13",
+  "currentStep": "P13.1",
+  "status": "IMPLEMENTING",
+  "baseMainSha": "c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859",
+  "lastCommitSha": "c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859",
   "verification": {
-    "attemptsUsed": 2,
-    "maximumAttempts": 2,
+    "attemptsUsed": 0,
+    "maximumAttempts": 1,
     "command": "npm run check",
-    "targetCommitSha": "4468b45a4313d790895923864936d3b5a210785f",
-    "result": "PASS",
-    "exitCode": 0
+    "targetCommitSha": null,
+    "result": "NOT_RUN",
+    "exitCode": null
   },
   "publication": {
-    "branch": "cat/p12-worktree-tasks",
+    "branch": "cat/p13-integration",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Create and publish cat/p12-worktree-tasks, then review and merge its PR",
+  "nextAction": "Commit P13.1, then implement explicit non-destructive legacy import",
   "blocker": null
 }

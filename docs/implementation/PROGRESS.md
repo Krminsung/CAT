@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P12 기준 main은 `05a02e75e795e8079b318b2168fc372c50025c7b`이다. 구현은 이 커밋에서
+P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -16,8 +16,8 @@ P12 기준 main은 `05a02e75e795e8079b318b2168fc372c50025c7b`이다. 구현은 �
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
-| P12 tasks·worktree·clipboard | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
-| P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
+| P13 통합·이관·문서 | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
@@ -280,3 +280,12 @@ PR과 merge는 진행하지 않았다. 이후 사용자가 P12 오류 수정과 
 마지막 승인 검사를 예약 commit `4468b45a4313d790895923864936d3b5a210785f`에서 실행했고 약 1.65초 뒤
 종료 코드 0으로 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 process, Git
 worktree, SSH, clipboard와 앱 runtime은 실행하지 않았다.
+P12는 검토 head `63e094ef314690731fb4c504d91ce4616487e655`를 PR #12에서 merge commit
+`c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`로 병합했다. merge의 두 부모, phase head와 merge의
+동일 tree, phase head 조상 관계와 `origin/main` 포함을 확인했으며 병합 뒤 검사는 반복하지 않았다.
+P13은 이 merge commit을 기준으로 시작했다. P13.1에서 18개 built-in, 28개 slash, 13개 provider,
+CLI 옵션과 관리 dispatch, 8개 hook event, MCP 2개 protocol의 상수·registry·handler·entrypoint를
+한 차례 대조했다. 비대화형 모드에서 빠져 있던 `request_user_input` 등록을 보완해 항상 18개를
+구성하고, 입력 port가 없는 경우 `user_input_unavailable` 실패로 명시한다. 제품 조립 시 built-in
+18개와 active slash handler 28개를 기준 상수와 대조해 누락 연결을 fail closed하도록 보완하고 있다.
+실제 도구, 앱, TUI, hook, MCP와 검증 명령은 실행하지 않았다.
