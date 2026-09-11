@@ -1,0 +1,10 @@
+cat-agent-cli — No License Granted
+
+The project-authored source code and documentation in this repository are
+provided without a public license. No permission to copy, modify, distribute,
+sublicense, or sell those project-authored materials is granted by this file.
+
+Third-party components are not covered by this notice. They remain available
+under their respective licenses as identified in THIRD_PARTY_NOTICES.md and in
+the license files shipped with those components. The bundled Node.js runtime is
+likewise governed by the license material in its official distribution.

@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.3",
+  "currentStep": "P14.4",
   "status": "IMPLEMENTING",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "5fa11970dd9f2ede7a799e626000f148a629886c",
+  "lastCommitSha": "8cc52845d1c59038789cb8c7c0ad0b91a0522bba",
   "verification": {
     "attemptsUsed": 0,
     "maximumAttempts": 1,
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Commit P14.3, then finalize release, license, and reproducibility documentation",
+  "nextAction": "Commit P14.4, then perform the single P14 static review before reserving the build",
   "blocker": null
 }

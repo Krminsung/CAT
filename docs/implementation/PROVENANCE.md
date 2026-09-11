@@ -53,3 +53,17 @@ profile, session schema 사이의 명시적 변환으로 분리했다.
 - 설치 방식: `--save-exact --ignore-scripts --no-audit --no-fund`를 사용한 1회 설치
 - 사용 범위: MCP가 제공한 JSON Schema 2020-12의 host-side compile·validation. 원격 schema
   load와 사용자 정의 keyword·format은 사용하지 않는다.
+
+## P14 runtime과 배포 dependency
+
+2026-09-11 Node.js 공식 release/lifecycle 자료에서 v24.21.0(Krypton)이 LTS이고 Linux x64/arm64
+`tar.xz`가 제공되는 것을 확인했다. exact release URL과 공식 `SHASUMS256.txt`의 두 SHA-256은
+`packaging/runtime-manifest.json`에 고정했다. installer payload에는 checksum을 통과한 공식 archive를
+변형 없이 넣고, 설치 staging에서 다시 검증한 뒤 archive의 전체 Node 배포 디렉터리를 푼다. Node
+실행 파일이나 앱을 개발 중 실행해 확인하지 않았다.
+
+standalone production dependency closure는 `package-lock.json`의 `dev: true`가 아닌 package로
+한정하며, 정확한 이름·버전·license metadata는 `THIRD_PARTY_NOTICES.md`에 기록했다. `npm ci
+--ignore-scripts --omit=dev`가 package가 배포한 license 파일을 포함한 채 stage를 구성하고, Node 공식
+archive의 `LICENSE`도 설치본에 남긴다. 새 프로젝트 자체에는 공개 license를 부여하지 않았으며 원본
+archive의 MIT metadata를 cat에 승계한 것으로 표현하지 않는다.

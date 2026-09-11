@@ -353,3 +353,10 @@ root/sudo 실행을 거부하고 `CAT_INSTALL_DIR`과 `CAT_BIN_DIR`을 현재 �
 링크를 복구한다. `cat-tui`는 기본 user-bin link이고 `cat`은 `CAT_INSTALL_CAT_COMMAND=1`인 경우에만
 시도하며 기존 파일·다른 link는 덮어쓰지 않고 안내하도록 구성하고 있다. profile, sudo, OS package
 manager, 시스템 `cat`, installer, 앱과 검증 명령은 실행하지 않았다.
+P14.3은 `8cc52845d1c59038789cb8c7c0ad0b91a0522bba`에서 완료했다. P14.4에서는 README와
+`docs/release/`에 source/standalone 설치, Linux x64/arm64, 기본 `cat-tui`와 선택적 `cat`, 충돌·update·
+rollback 정책을 정리한다. production dependency closure와 Node archive license를
+`THIRD_PARTY_NOTICES.md`에 기록하고 프로젝트 자체는 원본의 license metadata를 승계하지 않는
+`UNLICENSED` 상태임을 `LICENSE`와 provenance에 명시한다. 고정 source/build/package 입력과 비재귀
+생성 순서, host tool에 따른 bit-for-bit 재현 한계, checksum이 배포자 신원을 증명하지 않는 경계도
+문서화하고 있다. 설치본, app/runtime, compiler, packager와 검증 명령은 실행하지 않았다.

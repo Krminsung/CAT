@@ -10,8 +10,12 @@
   "files": [
     "dist",
     "bin",
-    "assets",
-    "README.md"
+    "scripts",
+    "packaging",
+    "docs/release",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "engines": {
     "node": ">=22.19.0"

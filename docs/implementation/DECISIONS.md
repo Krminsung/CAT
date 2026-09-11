@@ -435,3 +435,16 @@
   만든 `legacy_*` ID로 닫힌 상태에 가져오며, 실제 model history message만 새 schema로 바꾸고 나머지
   record는 실행되지 않는 legacy event로 보존한다. target index나 transcript가 이미 있으면 writer lock
   안에서도 다시 확인해 덮어쓰지 않으며 실제 사용자 HOME과 이관 runtime은 개발 중 실행하지 않는다.
+
+## D040 — 비재귀·사용자 영역 standalone packaging
+
+- 상태: 승인됨
+- 결정: compiler는 P14의 `npm run build` 한 번만 소유하며 installer packager는 이미 존재하는 `dist/`를
+  소비한다. production dependency staging도 같은 lockfile의 ignore-scripts/omit-dev 설치 한 번으로
+  제한한다. Node LTS archive는 exact version·architecture·공식 URL·SHA-256으로 고정하고 x64/arm64
+  payload를 임시 경로에서 모두 완성한 뒤 기존 artifact를 덮어쓰지 않는 directory rename으로 게시한다.
+- 결과: installer는 root/sudo와 HOME 밖·중첩·비관리 경로를 거부하고 payload/runtime checksum 확인,
+  기존 관리 설치본 backup, staging commit과 실패 rollback만 수행한다. 기본 user-bin 이름은
+  `cat-tui`이며 `cat`은 명시적 opt-in일 때만 시도하고 충돌은 보존한다. shell profile, system `cat`, OS
+  package manager와 global npm을 바꾸거나 설치 후 app/version smoke를 실행하지 않는다. checksum은
+  무결성 자료이지 배포자 신원 증명으로 과장하지 않고 실제 installer/runtime 동작은 미검증으로 남긴다.

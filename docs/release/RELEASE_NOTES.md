@@ -1,0 +1,20 @@
+# cat-agent-cli 0.1.0 배포 기록
+
+## 포함 범위
+
+- API-key-only 13개 provider profile과 Responses/Chat streaming adapter
+- bounded agent loop, permission/trust/path/secret 경계와 18개 built-in 도구
+- JSONL session, compaction, checkpoint/rewind, full-screen TUI와 28개 slash 명령
+- AGENTS/skills/markdown command/hooks, stdio MCP, 제한된 public web evidence 흐름
+- background task, managed Git worktree, SSH/OSC52 clipboard와 명시적 legacy import
+- Linux x64/arm64용 고정 Node.js v24.21.0 standalone installer 구성
+
+## 배포 상태와 제한
+
+이 release 입력은 npm publish 또는 GitHub Release를 자동 생성하지 않는다. 프로젝트 자체는
+`UNLICENSED`이고 공개 사용·재배포 권한이 부여됐다고 해석하면 안 된다. third-party와 Node.js의
+license는 `THIRD_PARTY_NOTICES.md`와 bundle 내부 자료를 따른다.
+
+지정된 TypeScript 정적 검사와 최종 컴파일 외에 앱, TUI, provider, web, MCP, shell/process,
+worktree, SSH/clipboard, legacy import, installer 또는 bundled Node runtime을 실행해 검증하지 않았다.
+artifact 생성 성공도 실환경 설치·운영 준비나 보안 검증 완료를 뜻하지 않는다.
