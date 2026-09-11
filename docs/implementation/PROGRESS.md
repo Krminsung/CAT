@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P10 기준 main은 `e38ef6fa490d8e337042c289f167a5bb438b7fad`이다. 구현은 이 커밋에서
+P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -14,8 +14,8 @@ P10 기준 main은 `e38ef6fa490d8e337042c289f167a5bb438b7fad`이다. 구현은 �
 | P07 TUI core | DONE | PASS (1/1) | PR #7 / MERGED `4d91f4a` |
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
-| P10 stdio MCP | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P11 public web | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
+| P11 public web | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -202,3 +202,38 @@ push, PR과 merge는 진행하지 않았다. 이후 사용자가 P10 오류 수�
 마지막 승인 검사를 `0faa676b25c301924aaab63191ddacfe0ba09a48`에서 실행했고 종료 코드 0으로
 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 MCP server·앱·TUI와 원본
 script·test runtime은 실행하지 않았다.
+P10은 검토 head `1f1c5d5427dd58f655a9ca4477f1a71d91026ed4`를 PR #10에서 merge commit
+`5af2be849c07b8a2752772ce73c090c662a9e008`로 병합했다. merge의 두 부모, tree, phase head
+조상 관계와 `origin/main` 포함을 확인했다. P11은 이 merge commit을 기준으로 인증된 model HTTP와
+분리된 public web transport를 구현하고 있다. URL·DNS 결과·redirect와 실제 socket remote address를
+확인하고, 검증한 주소만 반환하는 per-hop lookup을 사용한다. 환경 proxy는 fail closed하며 전체
+deadline, wire·해제 body, header·chunk·동시 요청과 종료 cleanup 상한을 P11.1에 둔다.
+P11.1은 `bef6aebfa5b85730529ba72ac093c1db1f91c3c5`에서 완료했다. P11.2에서는 알려진
+credential과 민감 environment를 갱신 가능한 public input guard에서 제거하고, 민감 query parameter가
+포함된 fetch URL은 fail closed한다. 원본의 Bing reader→DuckDuckGo reader→Bing HTML 순서를 각각 한
+번만 시도하는 `web_search`와 textual response를 실행 불가능한 제한형 텍스트로 만드는 `fetch_url`을
+중앙 public network 도구로 등록하고 있다. 결과에는 추출한 실제 source URL과 backend final URL을
+남기며 전체 provider 실패, 정상 응답의 결과 없음과 실제 결과를 서로 다른 상태로 보존한다. 앱 종료와
+조립 실패는 model transport와 별도로 public transport cleanup을 수행한다. 외부 요청과 자동 검증은
+실행하지 않았다. P11.2는 `a0668271719e29471759d6adec74b1d88720f1a5`에서 완료했다. P11.3에서는
+원 prompt만 사용하는 최신 정보·명시적 검색·web 금지·민감/로컬 context 정책을 runner에 연결하고
+있다. host가 정리한 query와 사용자 URL·실제 검색 결과·페이지 link 후보만 외부 도구 입력으로 허용하며,
+검색 1회와 URL별 1회 경계를 둔다. 검색 snippet이 아니라 관련 `fetch_url` 원문과 실제 final URL 인용을
+완료 근거로 추적하고, 빠진 근거는 동일 run의 공통 예산에서 web 복구 한 번으로만 보완한다. 공개 page는
+비신뢰 data로 전달하며 근거 없는 초안은 노출·message 기록하지 않고, 복구 뒤에도 근거가 없으면 host
+제한 문구로 끝낸다. 위치 없는 날씨 요청은 host 위치를 추론하거나 외부 요청하지 않고 지역을 다시 묻는다.
+P11.3은 `23bcbcf5ea905e8e9dd59e7776edc3cd7e317d02`에서 완료했다. 전체 정적 검토에서는 TLS
+인증서 identity와 body abort, 반복 percent encoding secret, HTML·검색 parser 총량, 실제 검색 source
+선별, 민감·금지·모호한 query 및 후속 prompt, 웹 응답 보류·host 제한 문구와 권한 거부 뒤 우회 차단을
+보완했다. 이 보완은 `74d6c1b367d5260ad0e9144167b80960c8d130ad`에서 확정했다. base부터 전체
+diff의 기능·의존성·권한·취소·secret·출력·정리 경계와 추적 파일을 대조했고 `origin/main`은 P11 기준
+SHA와 같다. 외부 URL, 앱·도구 runtime은 실행하지 않았다. 사용자가 P11의 `npm run check` 1회를
+명시적으로 승인해 예약 commit `62705bd401fe209ae48343c535ee01a0dd9a2ab2`에서 실행한 검사는
+`src/app/application.ts:1824`의 capability 허용 타입에 `web`이 없는 TS2322와
+`src/web/evidence.ts:78`의 message narrowing 관련 TS2339·TS7006을 보고하고 종료 코드 2로
+실패했다. 추가 검사, source 수정, push, PR과 merge는 진행하지 않았다. 이후 사용자가 P11 오류
+수정과 `npm run check` 추가 1회를 명시적으로 승인해, 보고된 capability와 message narrowing 진단만
+`ebc48788ee8bd5672b7367bc36ef480a57d27671`에서 수정했다. 첫 실패 기록을 보존한 채 두 번째이자
+마지막 승인 검사를 `4ff679eab63a88805392e62d5cb51d1230cab295`에서 실행했고 종료 코드 0으로
+통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 외부 검색·URL, 앱·TUI와 web
+도구 runtime은 실행하지 않았다.

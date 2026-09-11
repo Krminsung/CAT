@@ -320,3 +320,47 @@
 - 결과: 저장·제거·reload는 stale 연결을 닫지만 자동 재연결하지 않는다. 재연결은 전체 deadline을 가지며
   identity 변경과 종료 확인 실패 시 시작된 소유 process를 정리하고 중단한다. session 전환·종료도
   manager cleanup 결과를 포함하고, 실제 stdio 서버 동작은 개발 단계에서 실행해 검증하지 않는다.
+
+## D032 — 공개 웹 DNS 고정과 direct-only transport
+
+- 상태: 승인됨
+- 결정: 공개 웹 요청은 인증된 model transport와 dispatcher를 공유하지 않는다. 각 URL과 redirect의
+  HTTP(S) scheme·userinfo·hostname을 확인하고 OS DNS 결과 전체에서 비공개·예약·link-local·multicast·
+  unspecified·IPv4-mapped 주소를 거부한다. 검증한 주소만 반환하는 per-hop lookup을 Undici connector에
+  주입하고 socket 연결 뒤 실제 remote address가 그 집합 안인지 다시 확인한다. TLS 검증은 프로세스
+  기본값과 무관하게 켜며 SNI와 인증서 identity 확인에는 원래 URL hostname 또는 공개 IP를 유지한다.
+- 결과: DNS 사전 확인 뒤 일반 fetch가 재조회하는 TOCTOU 경로를 두지 않는다. 환경 proxy가 설정되면
+  검증한 연결 주소를 보장할 수 없다고 보고 fail closed하며, redirect마다 새 dispatcher와 DNS 검증을
+  사용한다. 전체 20초 deadline, redirect 5회, wire·해제 본문 1MiB, header·chunk·동시 요청 상한을
+  적용하고 transport 종료 시 소유 요청을 취소한다. 실제 외부 요청은 개발 단계에서 실행하지 않는다.
+
+## D033 — 최소 공개 query와 실제 web source
+
+- 상태: 승인됨
+- 결정: 공개 검색은 저장·model·MCP credential과 민감 environment 값을 갱신 가능한 별도 input guard가
+  먼저 제거한 최소 query만 사용한다. percent encoding은 bounded 횟수로 반복 해제해 secret과 민감
+  query 이름을 검사하고, 안전하게 완전히 검사할 수 없는 중첩은 fail closed한다. 직접 fetch URL에
+  알려진 secret 또는 credential/signature 계열 query parameter가 있으면 대상의 의미를 임의로
+  바꾸지 않고 요청 전체를 거부한다. 검색은 원본의
+  두 reader backend와 direct HTML fallback을 각각 최대 한 번만 사용하며 모든 요청은 D032 transport를
+  거친다.
+- 결과: 검색 결과는 backend 문서에서 추출하고 public URL 형식을 통과한 실제 title·URL·snippet·source만
+  반환한다. backend 전체 실패는 합성 결과나 빈 성공으로 숨기지 않고 정상 응답의 결과 없음과 구분한다.
+  fetch 본문은 textual media type만 제한된 문자 decode와 HTML/control 정리를 거쳐 실행 불가능한
+  비신뢰 데이터로 표시하며 실제 requested/final/source URL과 truncation을 보존한다. 이 redaction은
+  모든 개인정보를 판별한다고 주장하지 않고 외부 요청 자체는 개발 단계에서 실행하지 않는다.
+
+## D034 — host 소유 web evidence와 단일 복구
+
+- 상태: 승인됨
+- 결정: 사용자의 원 prompt에서 web 금지·민감/로컬 context·최신 정보·명시적 검색·직접 URL을 먼저
+  분류하고, 첨부·hook·local command 본문은 공개 query 생성에 사용하지 않는다. 검색 입력은 host가
+  정리한 최소 query로 교체하고 fetch 후보는 사용자 URL, 실제 검색 결과와 열린 페이지의 제한된
+  link로만 확장한다. 동일 run에서 검색 한 번과 URL별 한 번을 강제한다.
+- 결과: 검색 snippet은 원문 근거가 아니며, 성공한 fetch의 관련 본문과 실제 final URL 인용이 함께
+  있어야 최신/명시적 web 완료를 공개한다. page 내용은 비신뢰 data role/delimiter로 모델 지침과
+  분리한다. 누락된 근거는 P05의 공통 recovery 예산에서 `web` 한 번만 사용해 보완하고 이후에는
+  host 제한 응답으로 끝낸다. 모델이 작성한 제한·질문 문구에 미검증 주장이 섞여도 그대로 공개하지
+  않고 host 문구로 교체한다. 거부·취소된 웹 권한은 같은 run의 다른 웹 경로로 우회하지 않는다.
+  거부된 초안은 화면과 message transcript에 남기지 않으며, 위치 없는 날씨 요청은 host 정보를
+  추론하거나 외부로 보내지 않고 지역을 요청한다.
