@@ -15,7 +15,7 @@ P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 �
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
-| P11 public web | VERIFYING | 1차 FAIL, 2차 NOT_RUN (2/2 예약) | NOT_PUBLISHED |
+| P11 public web | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -234,4 +234,6 @@ SHA와 같다. 외부 URL, 앱·도구 runtime은 실행하지 않았다. 사용
 실패했다. 추가 검사, source 수정, push, PR과 merge는 진행하지 않았다. 이후 사용자가 P11 오류
 수정과 `npm run check` 추가 1회를 명시적으로 승인해, 보고된 capability와 message narrowing 진단만
 `ebc48788ee8bd5672b7367bc36ef480a57d27671`에서 수정했다. 첫 실패 기록을 보존한 채 두 번째이자
-마지막 승인 검사를 2/2로 예약했다.
+마지막 승인 검사를 `4ff679eab63a88805392e62d5cb51d1230cab295`에서 실행했고 종료 코드 0으로
+통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 외부 검색·URL, 앱·TUI와 web
+도구 runtime은 실행하지 않았다.
