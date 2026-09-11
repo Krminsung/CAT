@@ -402,8 +402,10 @@
 - 결과: SSH 양쪽 output stream의 OSC와 DCS/SOS/PM/APC 문자열은 bounded parser가 제거하므로 nested
   passthrough로 clipboard 권한을 우회할 수 없다. 허용 selection, canonical base64, UTF-8, 크기·횟수와
   queue deadline을 통과한 write만 로컬/host OSC writer로 전달된다. OpenSSH 옵션은 shell 문자열이 아닌
-  argv로 전달하고 최소 environment 및 검증된 agent socket만 사용하며 credential·key path는 기록하지
-  않는다. 실제 terminal, SSH, clipboard 동작은 개발 단계에서 실행하지 않는다.
+  argv로 전달하고 최소 environment 및 검증된 agent socket만 사용한다. PTY·stdin·session과 control
+  master 설정은 bridge가 고정하며 이를 무력화하는 background/multiplex/stdio 옵션은 거부한다.
+  credential·key path는 기록하지 않고 실제 terminal, SSH, clipboard 동작은 개발 단계에서 실행하지
+  않는다.
 
 ## D038 — 중앙 task UI와 실패 독립 종료 정리
 
@@ -415,5 +417,6 @@
 - 결과: active·unconfirmed 작업 수는 header와 상태 overlay에 갱신되고, 긴 목록과 출력은 화면·도구
   상한 안에 머문다. compaction에는 제한된 non-terminal snapshot만 비신뢰 continuity로 보존한다.
   session 기록이나 다른 service 종료 실패는 background manager close를 건너뛰게 하지 않으며, 같은
-  process가 소유하지 않은 stale PID에는 신호를 보내지 않는다. 실제 task와 앱은 개발 단계에서
-  실행하지 않는다.
+  process가 소유하지 않은 stale PID에는 신호를 보내지 않는다. 직접 셸 local context는 알려진 secret을
+  제거한 뒤 model 입력에 합치고, 세션 전환 뒤 이전 owned child를 숨기지 않으며, 중복 shutdown 호출은
+  같은 cleanup 결과를 기다린다. 실제 task와 앱은 개발 단계에서 실행하지 않는다.

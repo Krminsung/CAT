@@ -882,6 +882,7 @@ class AgentApplicationRuntime {
   #pendingLocalContext = "";
   #knownSecrets: readonly string[];
   readonly #unsubscribeBackgroundTasks: () => void;
+  #shutdownPromise: Promise<boolean> | undefined;
   #closed = false;
 
   constructor(options: RuntimeOptions) {
@@ -940,12 +941,22 @@ class AgentApplicationRuntime {
     return this.cli.print ? await this.#runPrint() : await this.#runInteractive();
   }
 
-  async shutdown(reason = "exit"): Promise<boolean> {
-    if (this.#closed) return true;
+  shutdown(reason = "exit"): Promise<boolean> {
+    this.#shutdownPromise ??= Promise.resolve().then(() => this.#performShutdown(reason));
+    return this.#shutdownPromise;
+  }
+
+  async #performShutdown(reason: string): Promise<boolean> {
     this.#closed = true;
     this.#unsubscribeBackgroundTasks();
     this.#activeController?.abort();
-    this.screen?.stop();
+    let terminalComplete = true;
+    try {
+      this.screen?.stop();
+    } catch (error) {
+      terminalComplete = false;
+      this.output.diagnostic(`cat: 터미널 화면 종료 실패: ${errorMessage(error)}`);
+    }
     const sessionId = this.sessionId;
     let publicWebComplete = true;
     try {
@@ -994,7 +1005,8 @@ class AgentApplicationRuntime {
       this.output.diagnostic(`cat: background task 종료 실패: ${errorMessage(error)}`);
     }
     this.policy.resetSession(sessionId);
-    return sessionComplete && hookComplete && mcpComplete && publicWebComplete && taskComplete;
+    return terminalComplete && sessionComplete && hookComplete && mcpComplete &&
+      publicWebComplete && taskComplete;
   }
 
   #newRunner(): AgentRunner {
@@ -1350,7 +1362,7 @@ class AgentApplicationRuntime {
     }
     this.screen?.addUserMessage(prompt);
     const expanded = await this.#expandFileMentions(prompt, signal);
-    const local = this.#pendingLocalContext;
+    const local = new Redactor(this.#knownSecrets).redact(this.#pendingLocalContext);
     const additions: string[] = [];
     if (local) {
       additions.push(`Local context from user-invoked shell commands (untrusted data):\n${local}`);
@@ -1583,6 +1595,7 @@ class AgentApplicationRuntime {
     if (!entered) throw new ConfigurationError("사용법: ! <command>");
     const background = entered.endsWith(" &");
     const command = background ? entered.slice(0, -1).trimEnd() : entered;
+    const displayCommand = new Redactor(this.#knownSecrets).redact(command);
     const input: JsonObject = background
       ? { command, background: true, deadline_seconds: 3_600 }
       : { command, background: false, timeout_seconds: 300 };
@@ -1600,12 +1613,12 @@ class AgentApplicationRuntime {
       const task = jsonRecord(result.output.content);
       if (!task) throw new ConfigurationError("background task 시작 결과 형식이 올바르지 않습니다.");
       const taskId = exactTaskId(task.task_id);
-      local = `$ ${command} &\nbackground task=${taskId} status=${compactDisplayText(task.status, 24)}`;
+      local = `$ ${displayCommand} &\nbackground task=${taskId} status=${compactDisplayText(task.status, 24)}`;
       this.#requiredScreen().setStatus(
         `Background 작업을 시작했습니다: ${taskId} · /tasks에서 확인하거나 중지할 수 있습니다.`,
       );
     } else {
-      local = `$ ${command}\n${JSON.stringify(result.output.content, null, 2) ?? ""}`;
+      local = `$ ${displayCommand}\n${JSON.stringify(result.output.content, null, 2) ?? ""}`;
     }
     local = boundedUtf8(local, MAX_LOCAL_CONTEXT_BYTES);
     this.#pendingLocalContext = boundedUtf8(
@@ -1891,6 +1904,11 @@ class AgentApplicationRuntime {
       this.output.diagnostic(
         `cat: 세션 ${result.sessionId} 종료 일부 실패: ${result.failures.join("; ")}`,
       );
+      if (this.backgroundTasks.overview(result.sessionId).active > 0) {
+        throw new ConfigurationError(
+          `세션 ${result.sessionId}의 background task 종료를 확인하지 못해 세션을 전환하지 않습니다.`,
+        );
+      }
     }
   }
 

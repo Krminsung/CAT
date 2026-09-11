@@ -35,6 +35,35 @@ const TERMINAL_RESTORE =
 const SAFE_OSC52_SELECTIONS = new Set(["", "c", "p", "pc", "cp"]);
 const ESC_DISCARDED_STRING_STARTERS = new Set(["P", "X", "^", "_", "k"]);
 const C1_DISCARDED_STRING_STARTERS = new Set(["\u0090", "\u0098", "\u009e", "\u009f"]);
+const SSH_OPTIONS_WITH_VALUE = new Set([
+  "B", "b", "c", "D", "E", "e", "F", "I", "i", "J", "L", "l", "m", "O", "o",
+  "p", "Q", "R", "S", "W", "w",
+]);
+const SSH_OPTIONS_WITHOUT_VALUE = new Set([
+  "4", "6", "A", "a", "C", "f", "G", "g", "K", "k", "M", "N", "n", "q", "s",
+  "T", "t", "V", "v", "X", "x", "Y", "y",
+]);
+const SSH_BRIDGE_FORBIDDEN_OPTIONS = new Set([
+  "f", "G", "M", "N", "n", "O", "Q", "S", "T", "V", "W",
+]);
+const SSH_BRIDGE_MANAGED_CONFIG = new Set([
+  "controlmaster",
+  "controlpath",
+  "controlpersist",
+  "forkafterauthentication",
+  "requesttty",
+  "sessiontype",
+  "stdinnull",
+]);
+const SSH_BRIDGE_OPTIONS = Object.freeze([
+  "-o", "ControlMaster=no",
+  "-o", "ControlPath=none",
+  "-o", "ControlPersist=no",
+  "-o", "ForkAfterAuthentication=no",
+  "-o", "SessionType=default",
+  "-o", "StdinNull=no",
+  "-tt",
+]);
 
 type StringSequence = "osc" | "discard";
 
@@ -84,6 +113,59 @@ function safeSshArguments(args: readonly string[]): readonly string[] {
     result.push(argument);
   }
   return Object.freeze(result);
+}
+
+function sshConfigKeyword(value: string): string {
+  const selected = value.trim().replace(/^=+/u, "");
+  return (selected.split(/[=\s]/u, 1)[0] ?? "").toLowerCase();
+}
+
+function assertInteractiveSshArguments(args: readonly string[]): void {
+  let destinationFound = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index] ?? "";
+    if (argument === "--") {
+      destinationFound = args[index + 1] !== undefined;
+      break;
+    }
+    if (argument === "-" || !argument.startsWith("-")) {
+      destinationFound = true;
+      break;
+    }
+    if (argument.startsWith("--")) {
+      throw new ConfigurationError("SSH bridge는 OpenSSH의 한 글자 옵션만 지원합니다.");
+    }
+
+    const flags = argument.slice(1);
+    for (let offset = 0; offset < flags.length; offset += 1) {
+      const option = flags[offset] ?? "";
+      if (SSH_BRIDGE_FORBIDDEN_OPTIONS.has(option)) {
+        throw new ConfigurationError(
+          `SSH -${option} 옵션은 소유한 대화형 PTY bridge의 종료 계약과 함께 사용할 수 없습니다.`,
+        );
+      }
+      if (SSH_OPTIONS_WITH_VALUE.has(option)) {
+        const attached = flags.slice(offset + 1);
+        const value = attached || args[index + 1];
+        if (value === undefined) {
+          throw new ConfigurationError(`SSH -${option} 옵션에 값이 필요합니다.`);
+        }
+        if (!attached) index += 1;
+        if (option === "o" && SSH_BRIDGE_MANAGED_CONFIG.has(sshConfigKeyword(value))) {
+          throw new ConfigurationError(
+            `SSH ${sshConfigKeyword(value)} 설정은 PTY bridge가 직접 관리합니다.`,
+          );
+        }
+        break;
+      }
+      if (!SSH_OPTIONS_WITHOUT_VALUE.has(option)) {
+        throw new ConfigurationError(`SSH bridge에서 알 수 없는 OpenSSH 옵션입니다: -${option}`);
+      }
+    }
+  }
+  if (!destinationFound) {
+    throw new ConfigurationError("SSH bridge에 접속할 destination이 필요합니다.");
+  }
 }
 
 async function resolveExecutable(
@@ -557,6 +639,7 @@ export async function runSshClipboardBridge(
     throw new ConfigurationError("SSH clipboard bridge는 원격 서버 안이 아니라 접속하는 PC에서 실행하세요.");
   }
   const args = safeSshArguments(rawArguments);
+  assertInteractiveSshArguments(args);
   const executable = await resolveExecutable("ssh", sourceEnvironment);
   if (!executable) throw new ConfigurationError("OpenSSH ssh 실행 파일을 찾을 수 없습니다.");
   const environment = sshEnvironment(sourceEnvironment);
@@ -571,7 +654,7 @@ export async function runSshClipboardBridge(
 
   let child: ChildProcessByStdio<null, Readable, Readable>;
   try {
-    child = spawn(executable, ["-tt", ...args], {
+    child = spawn(executable, [...SSH_BRIDGE_OPTIONS, ...args], {
       detached: true,
       env: environment,
       shell: false,

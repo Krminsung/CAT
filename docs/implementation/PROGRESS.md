@@ -263,4 +263,9 @@ deadline만 사용하도록 고쳤다. session별 active·unconfirmed 개요와 
 `/status`를 갱신하며 non-terminal task는 제한된 compaction continuity에만 남긴다. 목록 command와
 오류, 상세 output은 별도 표시 상한을 사용한다. 종료 중 다른 service나 session 기록이 실패해도 현재
 manager 소유 task cleanup을 이어가고 미확정 상태를 성공으로 숨기지 않는다. 실제 task, shell, 앱과
+검증 명령은 실행하지 않았다. P12.4는 `51fa1be5a66b51c31498415e07caab0aff6c9223`에서 완료했다.
+전체 정적 검토에서는 직접 셸 local context의 known-secret 재제거, 세션 전환 중 owned task 잔존 차단,
+재진입 shutdown의 동일 cleanup 결과 공유를 보완하고 있다. SSH는 사용자가 `-T`, background,
+multiplex/control 또는 stdio forwarding 옵션으로 bridge의 소유 PTY·종료 계약을 무력화하지 못하도록
+관리 option을 고정하고 충돌 인자를 거부한다. 실제 process, Git worktree, SSH/PTY, clipboard, 앱과
 검증 명령은 실행하지 않았다.

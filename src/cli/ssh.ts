@@ -11,6 +11,7 @@ export function sshHelp(): string {
     "SSH 인증, host key 확인과 옵션 의미는 시스템 OpenSSH가 처리합니다.\n" +
     "원격 OSC52 쓰기는 크기·횟수를 제한해 PC clipboard로 전달하지만 읽기 요청은 차단합니다.\n" +
     "원격 OSC/DCS/APC 문자열은 터미널에 그대로 전달하지 않으며 옵션·key 경로는 로그에 남기지 않습니다.\n\n" +
+    "PTY, stdin 또는 소유 process 종료를 우회하는 -T/-N/-n/-f 및 multiplex·stdio 제어 옵션은 사용할 수 없습니다.\n\n" +
     "example:\n" +
     "  cat-tui ssh -i ~/.ssh/id_ed25519 -p 2222 user@example.com\n";
 }

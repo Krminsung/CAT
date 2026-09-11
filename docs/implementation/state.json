@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P12",
-  "currentStep": "P12.4",
+  "currentStep": "P12.static-review",
   "status": "IMPLEMENTING",
   "baseMainSha": "05a02e75e795e8079b318b2168fc372c50025c7b",
-  "lastCommitSha": "d6c9e36cfa740891c51adf361b1371376308b71f",
+  "lastCommitSha": "51fa1be5a66b51c31498415e07caab0aff6c9223",
   "verification": {
     "attemptsUsed": 0,
     "maximumAttempts": 1,
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Finish the P12.4 static review and commit, then reserve the single P12 check",
+  "nextAction": "Commit the bundled P12 static-review corrections, verify the base, then reserve the single P12 check",
   "blocker": null
 }
