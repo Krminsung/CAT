@@ -18,7 +18,7 @@ P14 기준 main은 `7d1cc7809871bb09bf704daab71a73299233f7c3`이다. 구현은 �
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
 | P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
 | P13 통합·이관·문서 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #13 / MERGED `7d1cc78` |
-| P14 배포·설치본 | BLOCKED_VERIFY | BUILD PASS (1/1), PACKAGE FAIL (1회) | NOT_PUBLISHED |
+| P14 배포·설치본 | VERIFYING | BUILD 1차 PASS, 2차 NOT_RUN (2/2 예약); PACKAGE 1차 FAIL | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
 `cfed67a6e8cf5e3de36983773a51414a4ca209d8`, P01.3은
@@ -381,4 +381,9 @@ timeout되며, packager가 환경 proxy 사용을 활성화하지 않은 것이 
 상세 진단도 출력되지 않았다. 임시 stage는 정리됐고 `artifacts/`는 게시되지 않았으며 tracked source와
 root lockfile은 바뀌지 않았다. proxy-aware 다운로드와 중첩 오류 출력을 수정하고 추가 build 1회 및
 packaging 재시도 1회를 수행하려면 P14 전용 사용자 승인이 필요하다. 승인 전에는 수정, 재실행, push,
-PR과 merge를 진행하지 않는다.
+PR과 merge를 진행하지 않는다. 사용자가 P14 오류 수정과 `npm run build` 및
+`npm run package:installer` 추가 1회씩을 명시적으로 승인했다. 고정 direct dependency
+`undici@7.29.1`의 `EnvHttpProxyAgent`를 요청별로 사용해 환경 proxy/NO_PROXY를 존중하고, 공식 URL·
+길이·SHA-256과 download 제한은 유지하도록 `288a99c98866321c5f6668594059cfb9bb0d4121`에서
+수정했다. 중첩 network cause/errors는 제한된 길이로 출력하되 URL credential을 가린다. 추가 build
+1회를 예약했으며 아직 build나 packaging을 다시 실행하지 않았다.
