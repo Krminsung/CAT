@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P12 기준 main은 `05a02e75e795e8079b318b2168fc372c50025c7b`이다. 구현은 이 커밋에서
+P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -16,8 +16,8 @@ P12 기준 main은 `05a02e75e795e8079b318b2168fc372c50025c7b`이다. 구현은 �
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
-| P12 tasks·worktree·clipboard | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
-| P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
+| P13 통합·이관·문서 | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
@@ -280,3 +280,52 @@ PR과 merge는 진행하지 않았다. 이후 사용자가 P12 오류 수정과 
 마지막 승인 검사를 예약 commit `4468b45a4313d790895923864936d3b5a210785f`에서 실행했고 약 1.65초 뒤
 종료 코드 0으로 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 process, Git
 worktree, SSH, clipboard와 앱 runtime은 실행하지 않았다.
+P12는 검토 head `63e094ef314690731fb4c504d91ce4616487e655`를 PR #12에서 merge commit
+`c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`로 병합했다. merge의 두 부모, phase head와 merge의
+동일 tree, phase head 조상 관계와 `origin/main` 포함을 확인했으며 병합 뒤 검사는 반복하지 않았다.
+P13은 이 merge commit을 기준으로 시작했다. P13.1에서 18개 built-in, 28개 slash, 13개 provider,
+CLI 옵션과 관리 dispatch, 8개 hook event, MCP 2개 protocol의 상수·registry·handler·entrypoint를
+한 차례 대조했다. 비대화형 모드에서 빠져 있던 `request_user_input` 등록을 보완해 항상 18개를
+구성하고, 입력 port가 없는 경우 `user_input_unavailable` 실패로 명시한다. 제품 조립 시 built-in
+18개와 active slash handler 28개를 기준 상수와 대조해 누락 연결을 fail closed하도록 보완하고 있다.
+실제 도구, 앱, TUI, hook, MCP와 검증 명령은 실행하지 않았다.
+P13.1은 `367ae2d3198e17893526fd96f49b27f314b5c879`에서 완료했다. P13.2에서는
+`cat-tui migrate`라는 사용자 실행형 진입점과 절대 `--source`, credential 파일 내용을 읽기 위한 별도
+`--include-credentials` 동의를 추가하고 있다. source와 `CAT_HOME`의 중첩을 거부하고 source identity,
+소유권, non-symlink 일반 파일·디렉터리, private mode, JSON/JSONL 형식과 page·line·record·전체 byte
+상한을 확인한다. 대상 settings가 있거나 profile 이름, 결정적 `legacy_*` session ID와 transcript가
+충돌하면 덮어쓰지 않고 건너뛴다. 안전한 설정 subset, opt-in HTTPS API-key profile, closed session과
+변환한 message/비실행 legacy event만 새 저장소에 기록한다. trust·approval·permission mode·자동 허용,
+hook과 MCP 실행 설정은 자동 이관하지 않고 source에는 쓰기·rename·chmod·삭제를 하지 않는다. 외부 API,
+실제 사용자 HOME, 이관 command와 앱 runtime, 검증 명령은 실행하지 않았다.
+P13.2는 `e75d6f04f2d4939f20f4816c7c67a36dfa1c9c4e`에서 완료했다. P13.3에서는 루트
+`README.md`에 소스 checkout 기준 설치·실행, masked API-key-only profile, 13개 provider, agent CLI와
+5개 관리 진입점, TUI 단축키·slash 28개, built-in 18개를 실제 상수·help와 대조해 한국어로 정리하고
+있다. 권한 모드별 자동 허용 범위와 계속 적용되는 trust/path/secret 경계, 설정 precedence와 `CAT_HOME`
+자료, 명시적 legacy 이관, 자주 만나는 오류를 설명한다. npm 없는 설치본은 P14 전에는 없다고 구분하고,
+“정적 검사만 수행했고 런타임은 미검증”이라는 제한과 provider/MCP/web/rewind/process/clipboard의
+미검증 범위를 명시했다. 문서 작성 중 앱, 외부 서비스, 사용자 자료와 검증 명령은 실행하지 않았다.
+P13.3은 `56a55f57fd220e79b8e30433c75139764a1dff75`에서 완료했다. P13.4에서는 제품 source의
+제품명·단계 문자열, secret 형태 fixture, stub, 기준 registry와 P13 cleanup을 한 차례 검색했다.
+과거 P09가 아직 활성화 전이라고 표시하던 slash fallback과 tool/budget 주석을 현재 의미로 바꾸고,
+관리 명령 union·Set의 중복 이름은 `CLI_MANAGEMENT_COMMANDS` 단일 tuple에서 파생하도록 정리했다.
+secret fixture와 새 제품을 Smile Code로 표시하는 경로는 발견되지 않았고, legacy import·민감 경로·환경
+호환에 필요한 `.smileserv`, 기존 이름·환경변수·fallback 파일명은 출처 표식으로 보존한다. P13 writer
+release, profile 실패 credential 정리와 source read-only 경로에서 새 cleanup 누락이나 빈 성공 handler는
+발견되지 않았다. 보안 우선 이관 결정을 `DECISIONS.md`, 호환 문자열 범위를 `PROVENANCE.md`에 기록했고
+`7e11a5c2727e68d91611f7c2886983827c9ffaf4`에서 P13.4를 완료했다.
+단계 전체 정적 검토에서는 legacy 도구 설정을 실제 built-in 이름으로 제한하고 target provider catalog,
+공개 field의 API key 분리와 검증 오류 전 redaction 등록을 보완했다. source transcript를 새 wrapper에
+넣을 때의 깊이·node 여유, writer lock 획득 뒤 충돌 재확인, 특수 JSON field 복사와 `CAT_HOME` 제어
+문자·크기 제한도 함께 정리해 `72bcd74bee47c9d4a4a9472ad179ae46eaa5b4f4`에서 확정했다.
+`origin/main`은 P13 base와 같고 diff 형식은 깨끗하다. 앱, 외부 서비스와 실제 사용자 자료는 실행하거나
+읽지 않았다. P13의 유일한 `npm run check`를 예약 commit
+`1decd9645f3e67e019b0a955b5a920ba0d0a75bd`에서 120초 제한으로 실행했고 약 1.55초 뒤 종료 코드
+2로 실패했다. `src/app/application.ts:2054–2081`의 slash handler 28곳에서 지역 registry의 generic
+문맥이 없어 `runtime`이 `unknown`으로 추론된 TS18046 진단이 발생했다. 추가 검사, source 수정, push,
+PR과 merge는 진행하지 않았다. 이후 사용자가 P13 오류 수정과 `npm run check` 추가 1회를 명시적으로
+승인해 `SlashCommandRegistry<AgentApplicationRuntime>` context generic을
+`91288df89c51d109faa412d6c7c0d33f22340386`에서 명시했다. 첫 실패 기록을 보존한 채 두 번째이자
+마지막 승인 검사를 예약 commit `b64c284288f47b4e4483492a80bf6caf3e8aee05`에서 실행했고 약
+1.59초 뒤 종료 코드 0으로 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 앱,
+이관 command, provider, MCP, hook, 도구와 사용자 자료 runtime은 실행하지 않았다.

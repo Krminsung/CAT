@@ -7,7 +7,7 @@ import { readJsonObject, writeJsonObjectAtomic } from "./json-file.js";
 
 const CREDENTIAL_SCHEMA_VERSION = 1;
 const MAX_CREDENTIAL_BYTES = 64 * 1024;
-const MAX_CREDENTIALS = 64;
+export const MAX_STORED_CREDENTIALS = 64;
 const REDACTION_MARKER = "[REDACTED]";
 const PROVIDER_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REFERENCE_PATTERN = /^cred_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -120,7 +120,7 @@ export class CredentialStore {
     }
     const credentials = object(document.credentials, "API key 저장소 credentials");
     const entries = Object.entries(credentials);
-    if (entries.length > MAX_CREDENTIALS) {
+    if (entries.length > MAX_STORED_CREDENTIALS) {
       throw new ConfigurationError("API key 저장소의 credential 수가 너무 많습니다.");
     }
     const result = new Map<string, StoredCredential>();
@@ -183,7 +183,7 @@ export class CredentialStore {
     const origin = normalizeOrigin(input.origin, "Credential origin");
     const apiKey = validateApiKey(input.apiKey);
     const records = await this.#read();
-    if (records.size >= MAX_CREDENTIALS) {
+    if (records.size >= MAX_STORED_CREDENTIALS) {
       throw new ConfigurationError("저장 가능한 credential 수를 초과했습니다.");
     }
     const id = `cred_${randomUUID()}`;

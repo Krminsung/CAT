@@ -130,6 +130,16 @@ function exposesApiKey(value: string | undefined, apiKey: string): boolean {
   return candidate.includes(apiKey);
 }
 
+export function assertApiKeySeparatedFromValues(
+  apiKey: string,
+  values: readonly (string | undefined)[],
+  label: string,
+): void {
+  if (values.some((value) => exposesApiKey(value, apiKey))) {
+    throw new ConfigurationError(`API key를 ${label}에 저장할 수 없습니다.`);
+  }
+}
+
 export class AuthService {
   constructor(
     readonly credentials: CredentialStore,
@@ -153,11 +163,11 @@ export class AuthService {
       input.generationPath.trim(),
       input.model?.trim(),
     ];
-    if (publicProfileValues.some((value) => exposesApiKey(value, apiKey))) {
-      throw new ConfigurationError(
-        "API key를 provider profile의 공개 필드에 저장할 수 없습니다.",
-      );
-    }
+    assertApiKeySeparatedFromValues(
+      apiKey,
+      publicProfileValues,
+      "provider profile의 공개 필드",
+    );
     const before = await this.profiles.load();
     const replaced = before.profiles.get(profileName);
     const credential = await this.credentials.save({

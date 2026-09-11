@@ -79,7 +79,7 @@ export interface ToolHookPort {
   afterTool(request: ToolBoundaryRequest, result: ToolExecutionResult): Promise<void>;
 }
 
-/** P09 전까지 hook 실행을 가장하지 않는 명시적인 빈 port다. */
+/** Hook이 설정되지 않았음을 드러내면서 기본 실행을 유지하는 명시적인 빈 port다. */
 export class NoopToolHookPort implements ToolHookPort {
   readonly implementation = "none" as const;
 
@@ -297,7 +297,7 @@ export class ToolRegistry {
     const definition = registration.definition;
     assertCommonDefinition(definition);
     if (!BUILTIN_ORDER.has(definition.name)) {
-      throw new Error(`현재 단계의 built-in registry에는 ${definition.name} 도구를 등록할 수 없습니다.`);
+      throw new Error(`고정 built-in registry에는 ${definition.name} 도구를 등록할 수 없습니다.`);
     }
     assertSupportedToolSchema(definition.inputSchema, definition.name);
     const registered = contents(this);

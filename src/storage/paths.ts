@@ -31,13 +31,22 @@ export function resolveCatHome(
   environment: NodeJS.ProcessEnv = process.env,
   userHome: string = homedir(),
 ): string {
-  if (!isAbsolute(userHome) || userHome.includes("\0")) {
+  if (
+    !isAbsolute(userHome) ||
+    /[\u0000-\u001f\u007f]/u.test(userHome) ||
+    Buffer.byteLength(userHome, "utf8") > 4_096
+  ) {
     throw new ConfigurationError("사용자 홈 경로는 유효한 절대 경로여야 합니다.");
   }
   const configured = environment.CAT_HOME?.trim();
   if (!configured) return join(userHome, ".cat");
-  if (configured.includes("\0")) {
-    throw new ConfigurationError("CAT_HOME에 NUL 문자를 포함할 수 없습니다.");
+  if (
+    /[\u0000-\u001f\u007f]/u.test(configured) ||
+    Buffer.byteLength(configured, "utf8") > 4_096
+  ) {
+    throw new ConfigurationError(
+      "CAT_HOME은 제어 문자가 없는 4096 bytes 이내 경로여야 합니다.",
+    );
   }
   if (!isAbsolute(configured)) {
     throw new ConfigurationError("CAT_HOME은 절대 경로여야 합니다.");

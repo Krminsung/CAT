@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P12",
-  "currentStep": "P12.PUBLISH",
+  "currentPhase": "P13",
+  "currentStep": "P13.VERIFY",
   "status": "VERIFIED",
-  "baseMainSha": "05a02e75e795e8079b318b2168fc372c50025c7b",
-  "lastCommitSha": "4468b45a4313d790895923864936d3b5a210785f",
+  "baseMainSha": "c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859",
+  "lastCommitSha": "b64c284288f47b4e4483492a80bf6caf3e8aee05",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
     "command": "npm run check",
-    "targetCommitSha": "4468b45a4313d790895923864936d3b5a210785f",
+    "targetCommitSha": "b64c284288f47b4e4483492a80bf6caf3e8aee05",
     "result": "PASS",
     "exitCode": 0
   },
   "publication": {
-    "branch": "cat/p12-worktree-tasks",
+    "branch": "cat/p13-integration",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Create and publish cat/p12-worktree-tasks, then review and merge its PR",
+  "nextAction": "Record the successful additional check, verify docs-only drift, then create the P13 branch",
   "blocker": null
 }
