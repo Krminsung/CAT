@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P13",
-  "currentStep": "P13.2",
+  "currentStep": "P13.3",
   "status": "IMPLEMENTING",
   "baseMainSha": "c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859",
-  "lastCommitSha": "367ae2d3198e17893526fd96f49b27f314b5c879",
+  "lastCommitSha": "e75d6f04f2d4939f20f4816c7c67a36dfa1c9c4e",
   "verification": {
     "attemptsUsed": 0,
     "maximumAttempts": 1,
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Commit P13.2, then write the Korean usage and verification-limit documentation",
+  "nextAction": "Commit P13.3, then perform the one-time integration scope cleanup",
   "blocker": null
 }

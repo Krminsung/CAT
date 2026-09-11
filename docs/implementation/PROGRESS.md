@@ -298,3 +298,10 @@ P13.1은 `367ae2d3198e17893526fd96f49b27f314b5c879`에서 완료했다. P13.2에
 변환한 message/비실행 legacy event만 새 저장소에 기록한다. trust·approval·permission mode·자동 허용,
 hook과 MCP 실행 설정은 자동 이관하지 않고 source에는 쓰기·rename·chmod·삭제를 하지 않는다. 외부 API,
 실제 사용자 HOME, 이관 command와 앱 runtime, 검증 명령은 실행하지 않았다.
+P13.2는 `e75d6f04f2d4939f20f4816c7c67a36dfa1c9c4e`에서 완료했다. P13.3에서는 루트
+`README.md`에 소스 checkout 기준 설치·실행, masked API-key-only profile, 13개 provider, agent CLI와
+5개 관리 진입점, TUI 단축키·slash 28개, built-in 18개를 실제 상수·help와 대조해 한국어로 정리하고
+있다. 권한 모드별 자동 허용 범위와 계속 적용되는 trust/path/secret 경계, 설정 precedence와 `CAT_HOME`
+자료, 명시적 legacy 이관, 자주 만나는 오류를 설명한다. npm 없는 설치본은 P14 전에는 없다고 구분하고,
+“정적 검사만 수행했고 런타임은 미검증”이라는 제한과 provider/MCP/web/rewind/process/clipboard의
+미검증 범위를 명시했다. 문서 작성 중 앱, 외부 서비스, 사용자 자료와 검증 명령은 실행하지 않았다.
