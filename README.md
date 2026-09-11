@@ -264,6 +264,11 @@ cat-tui migrate --source /absolute/path/to/.smileserv --include-credentials
 project approval, hook과 MCP 실행 설정은 자동 이관하지 않는다. source는 수정·권한 변경·삭제하지 않으며
 실제 provider key 확인 요청도 보내지 않는다.
 
+`tools`와 기존 `deniedTools` 값은 현재 내장 도구 18개의 정확한 이름만 남긴다. 함께 가져오지 않는 MCP
+설정에 속한 동적 도구나 알 수 없는 도구 이름은 새 설정에서 제외한다. credential 이관을 선택하면 API
+key 후보를 오류 출력 redaction에 먼저 등록하고, 새 provider catalog와 공개 profile·설정 field 분리
+규칙을 통과한 HTTPS profile만 저장한다.
+
 원본 디렉터리와 credential/session 자료는 현재 사용자 소유와 private mode를 만족해야 한다. 손상되거나
 상한을 넘는 transcript record는 원본에 남기고 결과에 경고·생략 수를 표시한다. 가져온 세션은 closed
 상태이며 원본 ID 대신 충돌을 피하는 결정적 `legacy_*` ID를 쓴다.

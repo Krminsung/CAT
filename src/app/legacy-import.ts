@@ -18,6 +18,7 @@ import {
 import {
   defaultProviderEndpoint,
   requireProviderDefinition,
+  validateProviderProfileCatalog,
 } from "../providers/catalog.js";
 import { normalizeProviderBaseUrl } from "../security/endpoints.js";
 import {
@@ -47,6 +48,8 @@ import {
   type StoragePaths,
   type TranscriptAppendRequest,
 } from "../storage/index.js";
+import { BUILTIN_TOOL_NAMES } from "../tools/runtime.js";
+import { assertApiKeySeparatedFromValues } from "./auth-service.js";
 
 const LEGACY_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
 const MAX_SOURCE_SESSION_INDEX_BYTES = 256 * 1024 * 1024;
@@ -61,6 +64,7 @@ const MAX_IMPORTED_EVENT_BYTES = 3 * 1024 * 1024;
 const MAX_IMPORTED_MESSAGE_BYTES = 1536 * 1024;
 const MAX_REPORTED_MAPPINGS = 32;
 const DUMMY_CREDENTIAL_ID = "cred_00000000-0000-4000-8000-000000000000";
+const BUILTIN_TOOL_NAME_SET = new Set<string>(BUILTIN_TOOL_NAMES);
 
 const SAFE_LEGACY_SETTING_KEYS = Object.freeze([
   "model",
@@ -219,6 +223,34 @@ function cloneJson(value: JsonValue): JsonValue {
   return structuredClone(value);
 }
 
+function credentialSecretCandidates(
+  providersDocument: JsonObject | undefined,
+  credentialDocument: JsonObject | undefined,
+): readonly string[] {
+  const values: string[] = [];
+  const add = (value: JsonValue | undefined): void => {
+    if (typeof value !== "string") return;
+    const selected = value.trim();
+    const bytes = Buffer.byteLength(selected, "utf8");
+    if (bytes >= 8 && bytes <= 8 * 1024) values.push(selected);
+  };
+  const profiles = providersDocument?.profiles;
+  if (
+    typeof profiles === "object" &&
+    profiles !== null &&
+    !Array.isArray(profiles) &&
+    Object.keys(profiles).length <= MAX_STORED_PROFILES
+  ) {
+    for (const value of Object.values(profiles)) {
+      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        add(value.apiKey);
+      }
+    }
+  }
+  add(credentialDocument?.apiKey);
+  return Object.freeze([...new Set(values)]);
+}
+
 function planSettings(document: JsonObject | undefined): PlannedSettings | undefined {
   if (!document) return undefined;
   const selected: JsonObject = {};
@@ -239,12 +271,56 @@ function planSettings(document: JsonObject | undefined): PlannedSettings | undef
     "version",
     "schemaVersion",
   ]);
-  const omittedKeys = Object.keys(document).filter((key) => !recognized.has(key)).length;
+  let omittedKeys = Object.keys(document).filter((key) => !recognized.has(key)).length;
+  const overrides = parseSettingsValues(selected, "기존 Smile Code 사용자 설정", false);
+  const omitImportedKey = (key: string): void => {
+    const index = importedKeys.indexOf(key);
+    if (index >= 0) importedKeys.splice(index, 1);
+  };
+  const configuredTools = overrides.tools;
+  if (configuredTools !== undefined && configuredTools !== "default") {
+    const requested = [...new Set(
+      configuredTools.split(",").map((item) => item.trim()).filter(Boolean),
+    )];
+    const supported = requested.filter((name) => BUILTIN_TOOL_NAME_SET.has(name));
+    if (supported.length !== requested.length) omittedKeys += 1;
+    if (supported.length === 0) {
+      delete overrides.tools;
+      omitImportedKey("tools");
+    } else {
+      overrides.tools = supported.join(",");
+    }
+  }
+  const configuredDenials = overrides.disallowedTools;
+  if (configuredDenials !== undefined) {
+    const supported = configuredDenials.filter(
+      (name) => BUILTIN_TOOL_NAME_SET.has(name),
+    );
+    if (supported.length !== configuredDenials.length) omittedKeys += 1;
+    if (supported.length === 0) {
+      delete overrides.disallowedTools;
+      omitImportedKey("deniedTools→disallowedTools");
+    } else {
+      overrides.disallowedTools = supported;
+    }
+  }
   return Object.freeze({
-    overrides: parseSettingsValues(selected, "기존 Smile Code 사용자 설정", false),
+    overrides,
     importedKeys: Object.freeze(importedKeys),
     omittedKeys,
   });
+}
+
+function settingsPublicValues(
+  plan: PlannedSettings | undefined,
+): readonly (string | undefined)[] {
+  if (!plan) return Object.freeze([]);
+  return Object.freeze([
+    plan.overrides.model,
+    plan.overrides.tools,
+    ...(plan.overrides.disallowedTools ?? []),
+    ...(plan.overrides.projectDocFallbackFilenames ?? []),
+  ]);
 }
 
 function relativeApiPath(baseUrl: string, endpointUrl: string, fallback: string): string {
@@ -355,6 +431,19 @@ function planCredential(
     },
     endpointSource,
   });
+  validateProviderProfileCatalog(validated);
+  assertApiKeySeparatedFromValues(
+    apiKey,
+    [
+      validated.name,
+      validated.provider,
+      validated.baseUrl,
+      validated.modelsPath,
+      validated.generationPath,
+      validated.model,
+    ],
+    "기존 provider profile의 공개 필드",
+  );
   return Object.freeze({
     legacyProfile: profile,
     provider: definition.id,
@@ -698,10 +787,9 @@ function transcriptRequest(
     }
   }
 
-  const legacyData: JsonObject = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (key !== "type" && key !== "timestamp") legacyData[key] = cloneJson(value);
-  }
+  const legacyData = cloneJson(raw) as JsonObject;
+  delete legacyData.type;
+  delete legacyData.timestamp;
   const usage = type === "usage"
     ? importedUsageEvent(raw, timestamp.milliseconds, id)
     : undefined;
@@ -786,12 +874,29 @@ export class LegacyImportService {
     await assertDisjointRoots(source, this.#paths.catHome);
 
     const settingsPlan = planSettings(await readLegacySettings(source));
+    const providersDocument = request.includeCredentials
+      ? await readLegacyProviderCredentials(source)
+      : undefined;
+    const credentialDocument = request.includeCredentials
+      ? await readLegacyCredentials(source)
+      : undefined;
+    if (request.includeCredentials) {
+      request.onSecrets?.(credentialSecretCandidates(
+        providersDocument,
+        credentialDocument,
+      ));
+    }
     const credentialPlan: PlannedCredentials = request.includeCredentials
-      ? planCredentials(
-          await readLegacyProviderCredentials(source),
-          await readLegacyCredentials(source),
-        )
+      ? planCredentials(providersDocument, credentialDocument)
       : Object.freeze({ profiles: Object.freeze([]) });
+    const importedSettingValues = settingsPublicValues(settingsPlan);
+    for (const profile of credentialPlan.profiles) {
+      assertApiKeySeparatedFromValues(
+        profile.apiKey,
+        importedSettingValues,
+        "이관할 사용자 설정",
+      );
+    }
     if (request.includeCredentials) {
       request.onSecrets?.(credentialPlan.profiles.map((profile) => profile.apiKey));
     }
@@ -919,6 +1024,16 @@ export class LegacyImportService {
       const writer = await sessionStore.acquireTranscriptWriter(targetId);
       let released = false;
       try {
+        if (await existingPath(writer.targetPath)) {
+          released = await writer.release();
+          if (!released) {
+            throw new StorageError(
+              `충돌한 대상 세션 ${targetId}의 writer lock을 해제하지 못했습니다.`,
+            );
+          }
+          sessionConflicts += 1;
+          continue;
+        }
         await writer.append({
           kind: "lifecycle",
           createdAt: legacy.updatedAt,

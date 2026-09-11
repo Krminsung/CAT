@@ -430,7 +430,8 @@
   않는다. 기존 HTTP profile, trust, approval, 자동 허용·hook·MCP 실행 설정은 호환성보다 새 보안 경계를
   우선해 자동 이관하지 않는다.
 - 결과: 안전한 설정 subset과 검증한 HTTPS API-key profile만 기존 target과 이름이 충돌하지 않을 때
-  저장한다. 세션은 source identity와 원본 ID에서 만든 `legacy_*` ID로 닫힌 상태에 가져오며, 실제 model
-  history message만 새 schema로 바꾸고 나머지 record는 실행되지 않는 legacy event로 보존한다. target
-  index나 transcript가 이미 있으면 덮어쓰지 않으며 실제 사용자 HOME과 이관 runtime은 개발 중 실행하지
-  않는다.
+  저장한다. 설정의 도구 이름은 실제 built-in만 남기고, credential 후보는 오류 redactor에 먼저 등록한
+  뒤 target provider catalog와 공개 field 분리 규칙을 적용한다. 세션은 source identity와 원본 ID에서
+  만든 `legacy_*` ID로 닫힌 상태에 가져오며, 실제 model history message만 새 schema로 바꾸고 나머지
+  record는 실행되지 않는 legacy event로 보존한다. target index나 transcript가 이미 있으면 writer lock
+  안에서도 다시 확인해 덮어쓰지 않으며 실제 사용자 HOME과 이관 runtime은 개발 중 실행하지 않는다.

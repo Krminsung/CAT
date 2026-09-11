@@ -306,11 +306,16 @@ P13.2는 `e75d6f04f2d4939f20f4816c7c67a36dfa1c9c4e`에서 완료했다. P13.3에
 “정적 검사만 수행했고 런타임은 미검증”이라는 제한과 provider/MCP/web/rewind/process/clipboard의
 미검증 범위를 명시했다. 문서 작성 중 앱, 외부 서비스, 사용자 자료와 검증 명령은 실행하지 않았다.
 P13.3은 `56a55f57fd220e79b8e30433c75139764a1dff75`에서 완료했다. P13.4에서는 제품 source의
-제품명·단계 문자열, secret 형태 fixture, stub, 기준 registry와 P13 cleanup을 한 차례 검색하고 있다.
+제품명·단계 문자열, secret 형태 fixture, stub, 기준 registry와 P13 cleanup을 한 차례 검색했다.
 과거 P09가 아직 활성화 전이라고 표시하던 slash fallback과 tool/budget 주석을 현재 의미로 바꾸고,
 관리 명령 union·Set의 중복 이름은 `CLI_MANAGEMENT_COMMANDS` 단일 tuple에서 파생하도록 정리했다.
 secret fixture와 새 제품을 Smile Code로 표시하는 경로는 발견되지 않았고, legacy import·민감 경로·환경
 호환에 필요한 `.smileserv`, 기존 이름·환경변수·fallback 파일명은 출처 표식으로 보존한다. P13 writer
 release, profile 실패 credential 정리와 source read-only 경로에서 새 cleanup 누락이나 빈 성공 handler는
-발견되지 않았다. 보안 우선 이관 결정을 `DECISIONS.md`, 호환 문자열 범위를 `PROVENANCE.md`에 기록했으며
-앱, 외부 서비스, 실제 사용자 자료와 검증 명령은 실행하지 않았다.
+발견되지 않았다. 보안 우선 이관 결정을 `DECISIONS.md`, 호환 문자열 범위를 `PROVENANCE.md`에 기록했고
+`7e11a5c2727e68d91611f7c2886983827c9ffaf4`에서 P13.4를 완료했다.
+단계 전체 정적 검토에서는 legacy 도구 설정을 실제 built-in 이름으로 제한하고 target provider catalog,
+공개 field의 API key 분리와 검증 오류 전 redaction 등록을 보완했다. source transcript를 새 wrapper에
+넣을 때의 깊이·node 여유, writer lock 획득 뒤 충돌 재확인, 특수 JSON field 복사와 `CAT_HOME` 제어
+문자·크기 제한도 함께 정리하고 있다. `origin/main`은 P13 base와 같고 diff 형식은 깨끗하다. 앱, 외부
+서비스, 실제 사용자 자료와 검증 명령은 실행하지 않았다.

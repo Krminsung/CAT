@@ -105,19 +105,24 @@ private mode와 읽는 동안 identity·크기 변경을 확인한다. 원본 �
 
 - 사용자 설정은 대상 `~/.cat/settings.json`이 없을 때만 새로 쓴다. model, budget, context,
   verbose, 도구 선택, 문서 크기·fallback과 더 제한적인 `deniedTools→disallowedTools`만 변환한다.
+  도구 선택과 차단 목록은 현재 built-in 18개의 정확한 이름만 남기며, 함께 이관하지 않는 MCP의 동적
+  도구와 알 수 없는 이름은 제외한다.
   `permissionMode`, `allowedTools`, 기존 승인, hooks, MCP 실행 설정과 알 수 없는 key는 자동 이관하지
   않는다.
 - `providers.json`과 `credentials.json`의 내용은 `--include-credentials`가 있을 때만 읽는다. 모든
-  profile·API key·HTTPS endpoint·protocol·크기를 먼저 검증하고, 대상과 같은 profile 이름은 덮어쓰지
-  않고 건너뛴다. 새 credential 저장 뒤 profile 저장이 실패하면 그 호출에서 만든 credential만
+  API key 후보는 오류 출력 redactor에 먼저 등록한다. 모든 profile·API key·HTTPS endpoint·protocol·
+  target provider catalog와 공개 field의 secret 분리를 저장 전에 검증하고, 대상과 같은 profile 이름은
+  덮어쓰지 않고 건너뛴다. 새 credential 저장 뒤 profile 저장이 실패하면 그 호출에서 만든 credential만
   정리한다. 외부 API 확인 요청은 하지 않는다.
 - 세션 index는 page/record/전체 byte 상한 안에서 두 legacy field 표기를 읽고 최신 record를 선택한다.
   target ID는 source identity와 원본 ID의 hash로 만든 `legacy_*` ID라 기존 ID를 덮어쓰지 않으며,
-  target index나 transcript 경로가 이미 있으면 건너뛴다. 가져온 session은 closed 상태로 기록한다.
+  target index나 transcript 경로가 이미 있으면 건너뛴다. transcript writer lock을 얻은 뒤에도 경로를
+  다시 확인해 정상 writer 사이의 검사-사용 간 충돌을 막는다. 가져온 session은 closed 상태로 기록한다.
 - 실제 model history에 전달됐던 user/assistant transcript만 새 message schema로 변환한다. 숨김·미전달
   record와 도구 사용 중간 assistant 응답을 포함한 나머지는 실행되지 않는 `legacy_record` agent event로
-  보존한다. line·session·전체 byte/record 상한과 secret redaction을 적용하며 손상·초과 record는 원본을
-  유지한 채 집계해 알린다.
+  보존한다. source JSON의 깊이·node 상한은 새 transcript wrapper의 상한보다 작게 두고, line·session·
+  전체 byte/record 상한과 secret redaction을 적용한다. 손상·초과 record는 원본을 유지한 채 집계해
+  알린다.
 - `trusted-workspaces.json`, project approval과 자동 허용 상태는 읽어 새 trust/approval로 만들지 않는다.
   실행 결과는 이 두 항목이 이관되지 않았고 원본이 변경되지 않았음을 명시한다.
 
@@ -131,7 +136,8 @@ provider, hook, MCP protocol은 기존 기준 상수와 조립 시 exact 대조�
 새 제품을 Smile Code로 표시하는 경로와 secret fixture는 발견되지 않았다. 남아 있는 Smile Code 이름,
 `.smileserv`, 기존 환경변수·provider alias·지침 파일명은 P13.2 이관, 민감 경로 차단과 출처 보존에
 필요한 legacy 호환 표식이라 삭제하지 않았다. P13 변경의 writer와 credential 실패 정리 경로를 다시
-확인했으며 실행되지 않는 성공 handler나 새 누락 cleanup은 발견되지 않았다.
+확인했으며 실행되지 않는 성공 handler나 새 누락 cleanup은 발견되지 않았다. 이후 단계 전체 정적
+검토에서 이관 설정·provider·secret·transcript 경계와 `CAT_HOME` 검증의 불일치를 보완했다.
 
 ## 검증 한계
 

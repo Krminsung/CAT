@@ -279,8 +279,8 @@ export async function readLegacyTranscriptPage(
     label: `기존 Smile Code 세션 ${sessionId} transcript`,
     maxLineBytes: LEGACY_JSONL_LINE_BYTES,
     maxScanBytes: LEGACY_JSONL_SCAN_BYTES,
-    maxDepth: 40,
-    maxNodes: 40_000,
+    maxDepth: 32,
+    maxNodes: 38_000,
     requireOwner: true,
     requirePrivateMode: true,
   });
