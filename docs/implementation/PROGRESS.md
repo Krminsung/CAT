@@ -274,4 +274,7 @@ clipboard와 앱은 실행하지 않았다. 사용자가 승인한 P12의 유일
 `e261ebd19f200f3628d7c14e576513dd317b99f3`에서 120초 제한으로 실행했고 약 1.65초 뒤 종료 코드 2로
 실패했다. `src/process/background-tasks.ts:624`에서 output tail의 `Buffer<ArrayBufferLike>`를
 `Buffer<ArrayBuffer>`에 대입할 수 없다는 TS2322 진단 1건이 발생했다. 추가 검사, source 수정, push,
-PR과 merge는 진행하지 않았다.
+PR과 merge는 진행하지 않았다. 이후 사용자가 P12 오류 수정과 `npm run check` 추가 1회를 명시적으로
+승인해, 지역 output 변수가 tail reader의 일반 Node Buffer 반환 타입을 수용하도록 1줄을
+`d20dd49285e99e7006085a4a3d1b514f8f12ac7e`에서 수정했다. 첫 실패 기록을 보존한 채 두 번째이자
+마지막 승인 검사를 예약했으며 아직 실행하지 않았다.
