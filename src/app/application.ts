@@ -109,12 +109,14 @@ import {
   type AuthSecretPromptPort,
 } from "../cli/auth.js";
 import { McpManagementController } from "../cli/mcp.js";
+import { LegacyMigrationController } from "../cli/legacy.js";
 import { SshManagementController } from "../cli/ssh.js";
 import { WorktreeManagementController } from "../cli/worktree.js";
 import type { CliManagementCommand, CliOptions } from "../cli/args.js";
 import type { CliOutput } from "../cli/output.js";
 import type { CliApplication } from "../cli/run.js";
 import { AuthService, type ResolvedProviderAuth } from "./auth-service.js";
+import { LegacyImportService } from "./legacy-import.js";
 import { SessionCatalog } from "./session-catalog.js";
 import {
   SessionLifecycleService,
@@ -3170,6 +3172,11 @@ export class CatCliApplication implements CliApplication {
     }
     const workspace = await canonicalWorkspace(this.#initialCwd);
     const paths = await resolveStoragePaths(workspace, this.#environment);
+    if (command === "migrate") {
+      return await new LegacyMigrationController({
+        service: new LegacyImportService(paths),
+      }).run(args, output);
+    }
     if (command === "mcp") {
       const projectTrusted = await new TrustStore(paths.trustStore).isTrusted(workspace);
       const credentials = new CredentialStore(paths.credentialStore);

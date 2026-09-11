@@ -2,7 +2,7 @@ import { ConfigurationError } from "../core/errors.js";
 import type { PermissionMode } from "../security/permissions.js";
 
 export type CliOutputFormat = "text" | "json" | "stream-json";
-export type CliManagementCommand = "auth" | "mcp" | "worktree" | "ssh";
+export type CliManagementCommand = "auth" | "mcp" | "worktree" | "ssh" | "migrate";
 export type CliToolSelection = "default" | readonly string[];
 
 export interface CliOptions {
@@ -49,7 +49,13 @@ const MAX_ARG_BYTES = 512 * 1024;
 const MAX_PROMPT_BYTES = 512 * 1024;
 const MAX_SYSTEM_PROMPT_BYTES = 64 * 1024;
 const MAX_LIST_ITEMS = 256;
-const MANAGEMENT_COMMANDS = new Set<string>(["auth", "mcp", "worktree", "ssh"]);
+const MANAGEMENT_COMMANDS = new Set<string>([
+  "auth",
+  "mcp",
+  "worktree",
+  "ssh",
+  "migrate",
+]);
 const VALUE_OPTIONS = new Set<string>([
   "-C",
   "--cwd",
@@ -132,7 +138,8 @@ export function cliHelp(): string {
     "  cat-tui auth <setup|status|use|remove> ...\n" +
     "  cat-tui mcp <list|get|add|remove> ...\n" +
     "  cat-tui worktree <add|list|remove> ...\n" +
-    "  cat-tui ssh [OpenSSH options] user@host [remote command]\n";
+    "  cat-tui ssh [OpenSSH options] user@host [remote command]\n" +
+    "  cat-tui migrate [--source DIRECTORY] [--include-credentials]\n";
 }
 
 function byteLength(value: string): number {

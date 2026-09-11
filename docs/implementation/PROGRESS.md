@@ -289,3 +289,12 @@ CLI 옵션과 관리 dispatch, 8개 hook event, MCP 2개 protocol의 상수·reg
 구성하고, 입력 port가 없는 경우 `user_input_unavailable` 실패로 명시한다. 제품 조립 시 built-in
 18개와 active slash handler 28개를 기준 상수와 대조해 누락 연결을 fail closed하도록 보완하고 있다.
 실제 도구, 앱, TUI, hook, MCP와 검증 명령은 실행하지 않았다.
+P13.1은 `367ae2d3198e17893526fd96f49b27f314b5c879`에서 완료했다. P13.2에서는
+`cat-tui migrate`라는 사용자 실행형 진입점과 절대 `--source`, credential 파일 내용을 읽기 위한 별도
+`--include-credentials` 동의를 추가하고 있다. source와 `CAT_HOME`의 중첩을 거부하고 source identity,
+소유권, non-symlink 일반 파일·디렉터리, private mode, JSON/JSONL 형식과 page·line·record·전체 byte
+상한을 확인한다. 대상 settings가 있거나 profile 이름, 결정적 `legacy_*` session ID와 transcript가
+충돌하면 덮어쓰지 않고 건너뛴다. 안전한 설정 subset, opt-in HTTPS API-key profile, closed session과
+변환한 message/비실행 legacy event만 새 저장소에 기록한다. trust·approval·permission mode·자동 허용,
+hook과 MCP 실행 설정은 자동 이관하지 않고 source에는 쓰기·rename·chmod·삭제를 하지 않는다. 외부 API,
+실제 사용자 HOME, 이관 command와 앱 runtime, 검증 명령은 실행하지 않았다.

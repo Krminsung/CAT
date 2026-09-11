@@ -13,7 +13,7 @@ import { readJsonObject, writeJsonObjectAtomic } from "./json-file.js";
 
 const PROFILE_SCHEMA_VERSION = 1;
 const MAX_PROFILE_BYTES = 256 * 1024;
-const MAX_PROFILES = 64;
+export const MAX_STORED_PROFILES = 64;
 const PROFILE_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 
 export const PROVIDER_IDS = [
@@ -234,7 +234,7 @@ export class ProviderProfileStore {
     }
     const rawProfiles = object(document.profiles, "Provider profiles");
     const entries = Object.entries(rawProfiles);
-    if (entries.length > MAX_PROFILES) {
+    if (entries.length > MAX_STORED_PROFILES) {
       throw new ConfigurationError("Provider profile 수가 너무 많습니다.");
     }
     const profiles = new Map<string, ProviderProfile>();
@@ -288,7 +288,7 @@ export class ProviderProfileStore {
     });
     const current = await this.load();
     const profiles = new Map(current.profiles);
-    if (!profiles.has(normalized.name) && profiles.size >= MAX_PROFILES) {
+    if (!profiles.has(normalized.name) && profiles.size >= MAX_STORED_PROFILES) {
       throw new ConfigurationError("저장 가능한 provider profile 수를 초과했습니다.");
     }
     profiles.set(normalized.name, normalized);

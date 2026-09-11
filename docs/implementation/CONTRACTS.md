@@ -19,7 +19,7 @@
 | stdio MCP 2개 protocol | `src/mcp.ts` | `src/mcp/*` | P10/P13 | IMPLEMENTED |
 | public web 검색·fetch·evidence | `src/tools.ts`, `src/agent.ts` | `src/web/*` | P11 | IMPLEMENTED |
 | background tasks·worktree·SSH/clipboard | `src/tasks.ts`, `src/worktree.ts`, `src/clipboard.ts`, `src/ssh-clipboard.ts` | `src/process/*`, `src/git/*`, `src/clipboard/*` | P12 | IMPLEMENTED |
-| 기존 데이터의 명시적 비파괴 이관 | `src/sessions.ts`, `src/auth.ts` | `src/storage/legacy.ts`, `src/cli/legacy.ts` | P13 | IN_PROGRESS |
+| 기존 데이터의 명시적 비파괴 이관 | `src/sessions.ts`, `src/auth.ts` | `src/storage/legacy.ts`, `src/app/legacy-import.ts`, `src/cli/legacy.ts` | P13 | IMPLEMENTED |
 | npm 없는 사용자 영역 설치본 | `scripts/*`, `smilecode` | `scripts/*`, `bin/cat` | P14 | PLANNED |
 
 ## P13.1 최종 기능 매트릭스
@@ -76,8 +76,8 @@ management, agent 진입점을 분리한다.
 `--append-system-prompt`, `--no-session-persistence`, `--verbose`, `--no-color`,
 `--trust-workspace`, `-w/--worktree`, `--version`, positional prompt.
 
-현재 관리 진입점은 `auth`, `mcp`, `worktree`, `ssh`이며 P13.2에서 명시적 legacy import 진입점을
-추가한다. `src/app/application.ts`가 각 controller 또는 agent lifecycle로 실제 dispatch한다.
+관리 진입점은 `auth`, `mcp`, `worktree`, `ssh`, `migrate`다. `src/app/application.ts`가 각 controller,
+legacy import service 또는 agent lifecycle로 실제 dispatch한다.
 
 ### hook event 8개
 
@@ -93,6 +93,32 @@ session/prompt/compaction/end는 `src/app/application.ts`, tool 전후는 `HookT
 `createMcpProtocolAdapter`가 legacy initialize/initialized 흐름과 modern request metadata 흐름을
 각각 `LegacyMcpProtocolAdapter`, `ModernMcpProtocolAdapter`로 분기한다. config, CLI, 관리 도구도
 같은 상수를 사용한다.
+
+## P13.2 legacy import 계약
+
+`cat-tui migrate [--source DIRECTORY] [--include-credentials]`만 이관을 시작한다. 기본 source는
+`~/.smileserv`이며 source와 `CAT_HOME`이 같거나 서로 포함하면 중단한다. source 디렉터리 identity,
+현재 사용자 소유권·private mode, 파일·디렉터리의 non-symlink/일반 형식, credential·session 자료의
+private mode와 읽는 동안 identity·크기 변경을 확인한다. 원본 경로에는 write, rename, chmod, unlink를
+수행하지 않는다.
+
+- 사용자 설정은 대상 `~/.cat/settings.json`이 없을 때만 새로 쓴다. model, budget, context,
+  verbose, 도구 선택, 문서 크기·fallback과 더 제한적인 `deniedTools→disallowedTools`만 변환한다.
+  `permissionMode`, `allowedTools`, 기존 승인, hooks, MCP 실행 설정과 알 수 없는 key는 자동 이관하지
+  않는다.
+- `providers.json`과 `credentials.json`의 내용은 `--include-credentials`가 있을 때만 읽는다. 모든
+  profile·API key·HTTPS endpoint·protocol·크기를 먼저 검증하고, 대상과 같은 profile 이름은 덮어쓰지
+  않고 건너뛴다. 새 credential 저장 뒤 profile 저장이 실패하면 그 호출에서 만든 credential만
+  정리한다. 외부 API 확인 요청은 하지 않는다.
+- 세션 index는 page/record/전체 byte 상한 안에서 두 legacy field 표기를 읽고 최신 record를 선택한다.
+  target ID는 source identity와 원본 ID의 hash로 만든 `legacy_*` ID라 기존 ID를 덮어쓰지 않으며,
+  target index나 transcript 경로가 이미 있으면 건너뛴다. 가져온 session은 closed 상태로 기록한다.
+- 실제 model history에 전달됐던 user/assistant transcript만 새 message schema로 변환한다. 숨김·미전달
+  record와 도구 사용 중간 assistant 응답을 포함한 나머지는 실행되지 않는 `legacy_record` agent event로
+  보존한다. line·session·전체 byte/record 상한과 secret redaction을 적용하며 손상·초과 record는 원본을
+  유지한 채 집계해 알린다.
+- `trusted-workspaces.json`, project approval과 자동 허용 상태는 읽어 새 trust/approval로 만들지 않는다.
+  실행 결과는 이 두 항목이 이관되지 않았고 원본이 변경되지 않았음을 명시한다.
 
 ## 검증 한계
 
