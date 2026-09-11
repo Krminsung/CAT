@@ -265,7 +265,10 @@ deadline만 사용하도록 고쳤다. session별 active·unconfirmed 개요와 
 manager 소유 task cleanup을 이어가고 미확정 상태를 성공으로 숨기지 않는다. 실제 task, shell, 앱과
 검증 명령은 실행하지 않았다. P12.4는 `51fa1be5a66b51c31498415e07caab0aff6c9223`에서 완료했다.
 전체 정적 검토에서는 직접 셸 local context의 known-secret 재제거, 세션 전환 중 owned task 잔존 차단,
-재진입 shutdown의 동일 cleanup 결과 공유를 보완하고 있다. SSH는 사용자가 `-T`, background,
+재진입 shutdown의 동일 cleanup 결과 공유를 보완했다. SSH는 사용자가 `-T`, background,
 multiplex/control 또는 stdio forwarding 옵션으로 bridge의 소유 PTY·종료 계약을 무력화하지 못하도록
-관리 option을 고정하고 충돌 인자를 거부한다. 실제 process, Git worktree, SSH/PTY, clipboard, 앱과
-검증 명령은 실행하지 않았다.
+관리 option을 고정하고 충돌 인자를 거부한다. 이 보완은
+`1355e2063241a2454e7b51504a2db37b8bfa9060`에서 확정했고, `origin/main`이 P12 base와 같으며 base가
+현재 HEAD의 조상임을 확인했다. diff 형식 검사는 깨끗하다. 실제 process, Git worktree, SSH/PTY,
+clipboard와 앱은 실행하지 않았다. P12의 유일한 `npm run check`는 1/1로 예약했지만 아직 실행하지
+않았다.
