@@ -337,3 +337,11 @@ P14는 이 merge commit을 기준으로 시작했다. P14.1에서는 기본 PATH
 Node로 동일한 `dist/cli/main.js`를 실행하도록 구성한다. Node.js 공식 배포 자료에서 2026-09-11 현재
 LTS인 v24.21.0과 Linux x64/arm64 `tar.xz`의 SHA-256을 확인해 고정 manifest에 기록했다. 시스템
 `cat`, 앱, Node bundle과 검증 명령은 실행하지 않았다.
+P14.1은 `955d21f406d34eeebcd03b81416f4e8c389f684f`에서 완료했다. P14.2에서는 기존 `dist/`,
+고정 package/lockfile, wrapper, runtime manifest와 배포 문서만 임시 application stage로 복사한다.
+production dependency는 `npm ci --ignore-scripts --omit=dev --no-audit --no-fund` 한 번으로만 준비하며
+root lockfile의 전후 hash가 다르면 게시하지 않는다. 고정 Node archive 두 개는 HTTPS 공식 URL에서
+내려받아 manifest SHA-256과 길이를 확인한다. architecture별 deterministic payload와 self-extracting
+installer 및 checksum을 모두 임시 경로에 만든 뒤 기존 `artifacts/`가 없을 때만 디렉터리 단위로
+게시하도록 구성하고 있다. packager 안에는 build/typecheck/test/app 실행이 없으며 아직 packager,
+의존성 staging, 다운로드, tar, 앱과 검증 명령을 실행하지 않았다.
