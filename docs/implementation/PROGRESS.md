@@ -15,7 +15,7 @@ P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 �
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
-| P11 public web | BLOCKED_VERIFY | FAIL (1/1) | NOT_PUBLISHED |
+| P11 public web | VERIFYING | 1차 FAIL, 2차 NOT_RUN (2/2 예약) | NOT_PUBLISHED |
 | P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
@@ -231,5 +231,7 @@ SHA와 같다. 외부 URL, 앱·도구 runtime은 실행하지 않았다. 사용
 명시적으로 승인해 예약 commit `62705bd401fe209ae48343c535ee01a0dd9a2ab2`에서 실행한 검사는
 `src/app/application.ts:1824`의 capability 허용 타입에 `web`이 없는 TS2322와
 `src/web/evidence.ts:78`의 message narrowing 관련 TS2339·TS7006을 보고하고 종료 코드 2로
-실패했다. 추가 검사, source 수정, push, PR과 merge는 진행하지 않았으며 오류 수정과 P11 추가
-검증에는 사용자의 명시적 승인이 필요하다.
+실패했다. 추가 검사, source 수정, push, PR과 merge는 진행하지 않았다. 이후 사용자가 P11 오류
+수정과 `npm run check` 추가 1회를 명시적으로 승인해, 보고된 capability와 message narrowing 진단만
+`ebc48788ee8bd5672b7367bc36ef480a57d27671`에서 수정했다. 첫 실패 기록을 보존한 채 두 번째이자
+마지막 승인 검사를 2/2로 예약했다.

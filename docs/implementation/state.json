@@ -4,16 +4,16 @@
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P11",
   "currentStep": "P11.VERIFY",
-  "status": "BLOCKED_VERIFY",
+  "status": "VERIFYING",
   "baseMainSha": "5af2be849c07b8a2752772ce73c090c662a9e008",
-  "lastCommitSha": "62705bd401fe209ae48343c535ee01a0dd9a2ab2",
+  "lastCommitSha": "ebc48788ee8bd5672b7367bc36ef480a57d27671",
   "verification": {
-    "attemptsUsed": 1,
-    "maximumAttempts": 1,
+    "attemptsUsed": 2,
+    "maximumAttempts": 2,
     "command": "npm run check",
-    "targetCommitSha": "62705bd401fe209ae48343c535ee01a0dd9a2ab2",
-    "result": "FAIL",
-    "exitCode": 2
+    "targetCommitSha": null,
+    "result": "NOT_RUN",
+    "exitCode": null
   },
   "publication": {
     "branch": "cat/p11-web",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Wait for explicit approval to fix P11 and run one additional npm run check",
-  "blocker": "The only reserved P11 check found one capability-list diagnostic and two web evidence message diagnostics"
+  "nextAction": "Run the explicitly approved additional npm run check exactly once",
+  "blocker": null
 }
