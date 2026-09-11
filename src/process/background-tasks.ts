@@ -618,7 +618,7 @@ export class BackgroundTaskManager {
       throw new ConfigurationError(`background 출력 max_bytes는 1–${MAX_READ_BYTES} 사이의 정수여야 합니다.`);
     }
     const task = this.#find(sessionId, taskId);
-    let output = Buffer.alloc(0);
+    let output: Buffer = Buffer.alloc(0);
     let readError: string | undefined;
     try {
       output = this.#readTail(task, maximumBytes);
