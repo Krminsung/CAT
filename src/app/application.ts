@@ -2048,7 +2048,7 @@ class AgentApplicationRuntime {
   }
 
   #createCommands(): SlashCommandRegistry<AgentApplicationRuntime> {
-    const commands = new SlashCommandRegistry({
+    const commands = new SlashCommandRegistry<AgentApplicationRuntime>({
       capabilities: IMPLEMENTED_CAPABILITIES,
       handlers: {
         help: async (invocation, runtime) => await runtime.#commandHelp(invocation),
