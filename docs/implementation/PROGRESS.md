@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 이 커밋에서
+P12 기준 main은 `05a02e75e795e8079b318b2168fc372c50025c7b`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -15,8 +15,8 @@ P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 �
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
-| P11 public web | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
+| P12 tasks·worktree·clipboard | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 
@@ -237,3 +237,46 @@ SHA와 같다. 외부 URL, 앱·도구 runtime은 실행하지 않았다. 사용
 마지막 승인 검사를 `4ff679eab63a88805392e62d5cb51d1230cab295`에서 실행했고 종료 코드 0으로
 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 외부 검색·URL, 앱·TUI와 web
 도구 runtime은 실행하지 않았다.
+P11은 검토 head `638fcfee9379ca4a5008829351e7449ba53ee034`를 PR #11에서 merge commit
+`05a02e75e795e8079b318b2168fc372c50025c7b`로 병합했다. merge의 두 부모와 head/merge의
+동일 tree, phase head 조상 관계, `origin/main` 포함을 확인했으며 병합 뒤 검사는 반복하지 않았다.
+P12는 이 merge commit을 기준으로 시작했다. P12.1에서는 foreground timeout과 분리된 background
+deadline, 중앙 승인과 workspace identity 재검사, session별 ID 소유권, 8MiB disk-backed 원형 tail,
+작업 수·수명·복원 scan 상한과 TERM→KILL 종료 경계를 구현하고 있다. 종료를 확인하지 못한 persisted
+task는 재개 시 `stale`로 보존하되 PID를 추측하거나 signal하지 않으며, 현재 manager가 만든 child만
+session/app cleanup 대상으로 삼는다. list/output/stop 도구도 같은 session과 승인된 task identity에
+묶었다. P12.1은 `b7d78eb02eec6f77509c68127fd35d2c638729b7`에서 완료했다. P12.2에서는
+Git common directory의 canonical path·device·inode로 분리된 보호 registry에 cat이 직접 생성한
+worktree만 기록하고 있다. 생성은 registry 예약 뒤 path·branch·filesystem identity를 확인하며,
+제거는 현재 cwd, identity 불확실·변경, locked·bare·prunable 및 tracked·untracked·ignored 변경을
+거부하고 force·prune·branch 삭제를 제공하지 않는다. CLI add/list/remove와 `-w`, `/worktree`를
+연결하고 새 cwd의 trust 범위를 다시 해석한다. 실제 셸·task, Git worktree, 앱과 검증 명령은 실행하지
+않았다. P12.2는 `e72579c98e997127a6565ea57b86c2c088c9a193`에서 완료했다. P12.3에서는
+명시적 `/raw copy`에서만 로컬 clipboard 뒤 host 생성 OSC52를 사용하고 tmux/screen wrapping을
+지원한다. 로컬 TTY에서 사용자가 직접 시작하는 `cat-tui ssh`는 OpenSSH option을 shell 없는 argv로
+전달하고, stdout/stderr의 OSC·DCS류 문자열을 bounded parser로 제거한 뒤 제한된 OSC52 write만
+처리한다. clipboard read는 응답하지 않으며 canonical base64·UTF-8·크기·횟수·queue deadline과
+owned process group 종료 상한을 적용한다. 실제 SSH/PTTY, clipboard와 앱은 실행하지 않았다.
+P12.3은 `d6c9e36cfa740891c51adf361b1371376308b71f`에서 완료했다. P12.4에서는 `/tasks` 목록·출력·중지를
+중앙 task 도구와 permission 경계로 연결하고 `! command &`가 foreground timeout 대신 background
+deadline만 사용하도록 고쳤다. session별 active·unconfirmed 개요와 bounded 변경 listener로 header와
+`/status`를 갱신하며 non-terminal task는 제한된 compaction continuity에만 남긴다. 목록 command와
+오류, 상세 output은 별도 표시 상한을 사용한다. 종료 중 다른 service나 session 기록이 실패해도 현재
+manager 소유 task cleanup을 이어가고 미확정 상태를 성공으로 숨기지 않는다. 실제 task, shell, 앱과
+검증 명령은 실행하지 않았다. P12.4는 `51fa1be5a66b51c31498415e07caab0aff6c9223`에서 완료했다.
+전체 정적 검토에서는 직접 셸 local context의 known-secret 재제거, 세션 전환 중 owned task 잔존 차단,
+재진입 shutdown의 동일 cleanup 결과 공유를 보완했다. SSH는 사용자가 `-T`, background,
+multiplex/control 또는 stdio forwarding 옵션으로 bridge의 소유 PTY·종료 계약을 무력화하지 못하도록
+관리 option을 고정하고 충돌 인자를 거부한다. 이 보완은
+`1355e2063241a2454e7b51504a2db37b8bfa9060`에서 확정했고, `origin/main`이 P12 base와 같으며 base가
+현재 HEAD의 조상임을 확인했다. diff 형식 검사는 깨끗하다. 실제 process, Git worktree, SSH/PTY,
+clipboard와 앱은 실행하지 않았다. 사용자가 승인한 P12의 유일한 `npm run check`를 예약 commit
+`e261ebd19f200f3628d7c14e576513dd317b99f3`에서 120초 제한으로 실행했고 약 1.65초 뒤 종료 코드 2로
+실패했다. `src/process/background-tasks.ts:624`에서 output tail의 `Buffer<ArrayBufferLike>`를
+`Buffer<ArrayBuffer>`에 대입할 수 없다는 TS2322 진단 1건이 발생했다. 추가 검사, source 수정, push,
+PR과 merge는 진행하지 않았다. 이후 사용자가 P12 오류 수정과 `npm run check` 추가 1회를 명시적으로
+승인해, 지역 output 변수가 tail reader의 일반 Node Buffer 반환 타입을 수용하도록 1줄을
+`d20dd49285e99e7006085a4a3d1b514f8f12ac7e`에서 수정했다. 첫 실패 기록을 보존한 채 두 번째이자
+마지막 승인 검사를 예약 commit `4468b45a4313d790895923864936d3b5a210785f`에서 실행했고 약 1.65초 뒤
+종료 코드 0으로 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 process, Git
+worktree, SSH, clipboard와 앱 runtime은 실행하지 않았다.

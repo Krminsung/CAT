@@ -35,7 +35,7 @@ function normalizedPolicyPaths(paths: readonly string[] | undefined, label: stri
 }
 
 function mentionsCredentialPath(views: readonly string[], protectedPaths: readonly string[]): boolean {
-  const generic = /(?:^|[\/\s;|&(<>=])(?:~|\$(?:home|\{home\}))?\/?\.(?:cat|smileserv)\/(?:credentials?|profiles?|secrets?|sessions?|trusted-workspaces|project-approvals)(?:\.json|\/|(?=$|[\s;|&)>]))/u;
+  const generic = /(?:^|[\/\s;|&(<>=])(?:~|\$(?:home|\{home\}))?\/?\.(?:cat|smileserv)\/(?:credentials?|profiles?|secrets?|sessions?|tasks?|worktrees?|trusted-workspaces|project-approvals)(?:\.json|\/|(?=$|[\s;|&)>]))/u;
   return views.some((view) =>
     generic.test(view.replaceAll("\\", "/")) ||
     protectedPaths.some((path) => view.replaceAll("\\", "/").includes(path))

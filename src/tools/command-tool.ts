@@ -5,6 +5,10 @@ import type { ToolExecutionContext, ToolExecutionResult } from "../core/index.js
 import { ConfigurationError, PermissionDeniedError } from "../core/errors.js";
 import { captureChildProcess } from "../process/child-process.js";
 import {
+  BackgroundTaskManager,
+  type BackgroundTaskIdentity,
+} from "../process/background-tasks.js";
+import {
   assertShellCommandAllowed,
   validateShellCommand,
 } from "../security/command-policy.js";
@@ -19,9 +23,17 @@ import { ToolRegistry } from "./runtime.js";
 const MAX_COMMAND_CODE_POINTS = 32_000;
 const MAX_COMMAND_OUTPUT_BYTES = 1_000_000;
 const COMMAND_TOOL_OUTPUT_BYTES = 1024 * 1024;
+const TASK_TOOL_OUTPUT_BYTES = 256 * 1024;
+const DEFAULT_BACKGROUND_DEADLINE_SECONDS = 3_600;
+const MAX_BACKGROUND_DEADLINE_SECONDS = 86_400;
+const DEFAULT_TASK_READ_BYTES = 60_000;
+const MAX_TASK_READ_BYTES = 96 * 1024;
+const MAX_TASK_LIST_COMMAND_BYTES = 1_024;
+const MAX_TASK_LIST_ERROR_BYTES = 512;
 
-export interface ForegroundCommandToolOptions {
+export interface CommandToolOptions {
   paths: StoragePaths;
+  tasks: BackgroundTaskManager;
   userHome?: string;
 }
 
@@ -30,6 +42,18 @@ interface WorkspaceIdentity {
   device: number;
   inode: number;
 }
+
+type InspectedCommand =
+  | {
+      readonly command: string;
+      readonly background: false;
+      readonly timeoutSeconds: number;
+    }
+  | {
+      readonly command: string;
+      readonly background: true;
+      readonly deadlineSeconds: number;
+    };
 
 function objectSchema(properties: JsonObject, required: readonly string[]): JsonObject {
   return {
@@ -72,6 +96,32 @@ async function assertWorkspaceUnchanged(
 
 function cleanCapturedText(value: string): string {
   return value.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/gu, "�");
+}
+
+function taskListText(value: string, maximumBytes: number, omitted: string): string {
+  return Buffer.byteLength(value, "utf8") <= maximumBytes ? value : omitted;
+}
+
+function taskListSnapshot(task: JsonObject): JsonObject {
+  const command = task.command;
+  const outputError = task.output_error;
+  const commandPreview = typeof command === "string"
+    ? taskListText(command, MAX_TASK_LIST_COMMAND_BYTES, "[긴 command 생략]")
+    : undefined;
+  const errorPreview = typeof outputError === "string"
+    ? taskListText(outputError, MAX_TASK_LIST_ERROR_BYTES, "[긴 오류 상세 생략]")
+    : undefined;
+  return {
+    ...task,
+    ...(commandPreview === undefined ? {} : { command: commandPreview }),
+    ...(errorPreview === undefined ? {} : { output_error: errorPreview }),
+    ...(commandPreview !== undefined && commandPreview !== command
+      ? { command_truncated: true }
+      : {}),
+    ...(errorPreview !== undefined && errorPreview !== outputError
+      ? { output_error_truncated: true }
+      : {}),
+  };
 }
 
 function commandDetails(
@@ -158,9 +208,33 @@ function containsBackgroundOperator(command: string): boolean {
   return false;
 }
 
-export async function registerForegroundCommandTool(
+function commandApprovalTarget(
+  inspected: InspectedCommand,
+  workspace: string,
+): JsonObject {
+  return {
+    command: inspected.command,
+    cwd: workspace,
+    background: inspected.background,
+    ...(inspected.background
+      ? { deadline_seconds: inspected.deadlineSeconds }
+      : { timeout_seconds: inspected.timeoutSeconds }),
+  };
+}
+
+function taskApprovalTarget(identity: BackgroundTaskIdentity, workspace: string): JsonObject {
+  return {
+    task_id: identity.taskId,
+    session_id: identity.sessionId,
+    started_at: identity.startedAt,
+    command_digest: identity.commandDigest,
+    cwd: workspace,
+  };
+}
+
+export async function registerCommandTools(
   registry: ToolRegistry,
-  options: ForegroundCommandToolOptions,
+  options: CommandToolOptions,
 ): Promise<void> {
   const workspace = await captureWorkspaceIdentity(options.paths.workspace);
   const policyOptions = {
@@ -171,12 +245,38 @@ export async function registerForegroundCommandTool(
   const inspect = async (
     input: JsonObject,
     context: ToolExecutionContext,
-  ): Promise<{ command: string; timeoutSeconds: number }> => {
+  ): Promise<InspectedCommand> => {
     const command = validateShellCommand(stringArgument(input, "command"));
-    if (input.background !== false || containsBackgroundOperator(command)) {
+    if (containsBackgroundOperator(command)) {
       throw new ConfigurationError(
-        "background 명령은 P12 작업 관리자 연결 전까지 지원하지 않습니다.",
+        "명령 문자열 내부의 background 연산자는 관리 process 소유권을 벗어날 수 있어 지원하지 않습니다. background field를 사용하세요.",
       );
+    }
+    const background = input.background;
+    if (typeof background !== "boolean") {
+      throw new ConfigurationError("background는 boolean이어야 합니다.");
+    }
+    if (background) {
+      if (input.timeout_seconds !== undefined) {
+        throw new ConfigurationError("timeout_seconds는 background=false일 때만 사용할 수 있습니다.");
+      }
+      const candidate = input.deadline_seconds ?? DEFAULT_BACKGROUND_DEADLINE_SECONDS;
+      if (
+        typeof candidate !== "number" ||
+        !Number.isSafeInteger(candidate) ||
+        candidate < 1 ||
+        candidate > MAX_BACKGROUND_DEADLINE_SECONDS
+      ) {
+        throw new ConfigurationError(
+          `deadline_seconds는 1–${MAX_BACKGROUND_DEADLINE_SECONDS} 사이의 정수여야 합니다.`,
+        );
+      }
+      assertShellCommandAllowed(command, policyOptions);
+      await assertWorkspaceUnchanged(workspace, context);
+      return { command, background: true, deadlineSeconds: candidate };
+    }
+    if (input.deadline_seconds !== undefined) {
+      throw new ConfigurationError("deadline_seconds는 background=true일 때만 사용할 수 있습니다.");
     }
     const timeoutSeconds = input.timeout_seconds;
     if (
@@ -185,17 +285,19 @@ export async function registerForegroundCommandTool(
       timeoutSeconds < 1 ||
       timeoutSeconds > 300
     ) {
-      throw new ConfigurationError("timeout_seconds는 1–300 사이의 정수여야 합니다.");
+      throw new ConfigurationError(
+        "background=false일 때 timeout_seconds는 1–300 사이의 정수여야 합니다.",
+      );
     }
     assertShellCommandAllowed(command, policyOptions);
     await assertWorkspaceUnchanged(workspace, context);
-    return { command, timeoutSeconds };
+    return { command, background: false, timeoutSeconds };
   };
 
   registry.register({
     definition: {
       name: "run_command",
-      description: "Run /bin/sh in the registered workspace with bounded foreground output; background execution is unavailable until P12.",
+      description: "Run /bin/sh in the registered workspace. Foreground execution has a 1 MB capture and timeout; background=true creates a session-owned task with an 8 MiB tail and a separate deadline.",
       inputSchema: objectSchema(
         {
           command: {
@@ -206,22 +308,28 @@ export async function registerForegroundCommandTool(
           },
           timeout_seconds: {
             type: "integer",
-            description: "Foreground timeout in seconds",
+            description: "Foreground timeout in seconds; required only when background=false",
             minimum: 1,
             maximum: 300,
           },
           background: {
             type: "boolean",
-            description: "Must be false until the managed task service is added in P12",
+            description: "Start a managed session-owned background task",
+          },
+          deadline_seconds: {
+            type: "integer",
+            description: "Background lifetime deadline; optional only when background=true (default 3600)",
+            minimum: 1,
+            maximum: MAX_BACKGROUND_DEADLINE_SECONDS,
           },
         },
-        ["command", "timeout_seconds", "background"],
+        ["command", "background"],
       ),
       category: "shell",
       permission: { kind: "command" },
       outputLimitBytes: COMMAND_TOOL_OUTPUT_BYTES,
       handler: async (input, context) => {
-        let inspected: { command: string; timeoutSeconds: number };
+        let inspected: InspectedCommand;
         try {
           inspected = await inspect(input, context);
         } catch (error) {
@@ -246,6 +354,33 @@ export async function registerForegroundCommandTool(
             error instanceof Error ? error.message : "최소 child environment를 구성하지 못했습니다.",
             "not_started",
           );
+        }
+        if (inspected.background) {
+          try {
+            const task = options.tasks.start({
+              sessionId: context.sessionId,
+              command: inspected.command,
+              environment,
+              deadlineSeconds: inspected.deadlineSeconds,
+            });
+            return {
+              status: "success",
+              output: {
+                content: {
+                  background: true,
+                  cwd: workspace.path,
+                  ...task,
+                },
+                truncated: false,
+              },
+            };
+          } catch (error) {
+            return commandFailure(
+              "background_task_start_failed",
+              error instanceof Error ? error.message : "background task를 시작하지 못했습니다.",
+              "unknown",
+            );
+          }
         }
         const completed = await captureChildProcess(
           "/bin/sh",
@@ -326,28 +461,194 @@ export async function registerForegroundCommandTool(
     preflight: async (input, context): Promise<ToolPreflightResult> => {
       const inspected = await inspect(input, context);
       return {
-        summary: `명령 실행\ncwd: ${workspace.path}\ntimeout: ${inspected.timeoutSeconds}초\ncommand: ${inspected.command}`,
+        summary: inspected.background
+          ? `background 명령 시작\ncwd: ${workspace.path}\ndeadline: ${inspected.deadlineSeconds}초\ncommand: ${inspected.command}`
+          : `foreground 명령 실행\ncwd: ${workspace.path}\ntimeout: ${inspected.timeoutSeconds}초\ncommand: ${inspected.command}`,
         approvalScope: {
           kind: "command",
-          target: {
-            command: inspected.command,
-            cwd: workspace.path,
-            timeout_seconds: inspected.timeoutSeconds,
-            background: false,
-          },
+          target: commandApprovalTarget(inspected, workspace.path),
         },
       };
     },
     revalidate: async (input, context, preflight) => {
       const inspected = await inspect(input, context);
-      const currentTarget: JsonObject = {
-        command: inspected.command,
-        cwd: workspace.path,
-        timeout_seconds: inspected.timeoutSeconds,
-        background: false,
-      };
+      const currentTarget = commandApprovalTarget(inspected, workspace.path);
       if (JSON.stringify(currentTarget) !== JSON.stringify(preflight.approvalScope.target)) {
         throw new Error("승인 뒤 명령 또는 실행 대상이 변경되었습니다.");
+      }
+    },
+  });
+
+  registry.register({
+    definition: {
+      name: "list_tasks",
+      description: "List bounded background task snapshots owned by the current session only.",
+      inputSchema: objectSchema({}, []),
+      category: "read",
+      permission: { kind: "workspace", access: "read" },
+      outputLimitBytes: TASK_TOOL_OUTPUT_BYTES,
+      handler: async (_input, context) => {
+        await assertWorkspaceUnchanged(workspace, context);
+        const tasks = options.tasks.list(context.sessionId).map(taskListSnapshot);
+        return {
+          status: "success",
+          output: {
+            content: {
+              tasks: [...tasks],
+              count: tasks.length,
+              stale_scan_truncated: options.tasks.scanTruncated,
+            },
+            truncated: false,
+          },
+        };
+      },
+    },
+    preflight: async (_input, context) => {
+      await assertWorkspaceUnchanged(workspace, context);
+      return {
+        summary: "현재 세션이 소유한 background task 목록 조회",
+        approvalScope: {
+          kind: "workspace",
+          target: { cwd: workspace.path, session_id: context.sessionId },
+        },
+      };
+    },
+    revalidate: async (_input, context, preflight) => {
+      await assertWorkspaceUnchanged(workspace, context);
+      const target: JsonObject = { cwd: workspace.path, session_id: context.sessionId };
+      if (JSON.stringify(target) !== JSON.stringify(preflight.approvalScope.target)) {
+        throw new Error("조회 전에 background task session 또는 workspace가 변경되었습니다.");
+      }
+    },
+  });
+
+  registry.register({
+    definition: {
+      name: "get_task_output",
+      description: "Read a bounded output tail and status for one background task owned by the current session.",
+      inputSchema: objectSchema(
+        {
+          task_id: {
+            type: "string",
+            description: "Exact task ID or an unambiguous prefix",
+            pattern: "^[a-f0-9]{1,16}$",
+            minLength: 1,
+            maxLength: 16,
+          },
+          max_bytes: {
+            type: "integer",
+            description: "Maximum output tail bytes",
+            minimum: 1,
+            maximum: MAX_TASK_READ_BYTES,
+          },
+        },
+        ["task_id"],
+      ),
+      category: "read",
+      permission: { kind: "workspace", access: "read" },
+      outputLimitBytes: TASK_TOOL_OUTPUT_BYTES,
+      handler: async (input, context) => {
+        await assertWorkspaceUnchanged(workspace, context);
+        const maximumBytes = typeof input.max_bytes === "number"
+          ? input.max_bytes
+          : DEFAULT_TASK_READ_BYTES;
+        const task = options.tasks.read(
+          context.sessionId,
+          stringArgument(input, "task_id"),
+          maximumBytes,
+        );
+        return {
+          status: "success",
+          output: { content: task, truncated: false },
+        };
+      },
+    },
+    preflight: async (input, context) => {
+      await assertWorkspaceUnchanged(workspace, context);
+      const identity = options.tasks.identity(context.sessionId, stringArgument(input, "task_id"));
+      return {
+        summary: `현재 세션 background task 출력 조회: ${identity.taskId}`,
+        approvalScope: {
+          kind: "workspace",
+          target: taskApprovalTarget(identity, workspace.path),
+        },
+      };
+    },
+    revalidate: async (input, context, preflight) => {
+      await assertWorkspaceUnchanged(workspace, context);
+      const identity = options.tasks.identity(context.sessionId, stringArgument(input, "task_id"));
+      const target = taskApprovalTarget(identity, workspace.path);
+      if (JSON.stringify(target) !== JSON.stringify(preflight.approvalScope.target)) {
+        throw new Error("조회 전에 background task identity가 변경되었습니다.");
+      }
+    },
+  });
+
+  registry.register({
+    definition: {
+      name: "stop_task",
+      description: "Stop one live background child owned by the current session; stale process IDs are never signalled.",
+      inputSchema: objectSchema(
+        {
+          task_id: {
+            type: "string",
+            description: "Exact task ID or an unambiguous prefix",
+            pattern: "^[a-f0-9]{1,16}$",
+            minLength: 1,
+            maxLength: 16,
+          },
+        },
+        ["task_id"],
+      ),
+      category: "shell",
+      permission: { kind: "command" },
+      outputLimitBytes: TASK_TOOL_OUTPUT_BYTES,
+      handler: async (input, context) => {
+        await assertWorkspaceUnchanged(workspace, context);
+        const result = await options.tasks.stop(
+          context.sessionId,
+          stringArgument(input, "task_id"),
+        );
+        const details: JsonObject = {
+          ...result.task,
+          stop_signal_sent: result.signalSent,
+          termination_confirmed: result.terminationConfirmed,
+          already_terminal: result.alreadyTerminal,
+        };
+        if (!result.terminationConfirmed && !result.alreadyTerminal) {
+          return commandFailure(
+            "background_task_stop_unconfirmed",
+            "현재 process가 소유한 background child의 종료를 확인하지 못했습니다. stale PID에는 signal을 보내지 않았습니다.",
+            "unknown",
+            details,
+          );
+        }
+        return {
+          status: "success",
+          output: { content: details, truncated: false },
+        };
+      },
+    },
+    preflight: async (input, context) => {
+      await assertWorkspaceUnchanged(workspace, context);
+      const identity = options.tasks.identity(context.sessionId, stringArgument(input, "task_id"));
+      return {
+        summary: `현재 세션 background task 중지: ${identity.taskId}`,
+        approvalScope: {
+          kind: "command",
+          target: taskApprovalTarget(identity, workspace.path),
+        },
+      };
+    },
+    revalidate: async (input, context, preflight) => {
+      await assertWorkspaceUnchanged(workspace, context);
+      const identity = options.tasks.identity(context.sessionId, stringArgument(input, "task_id"));
+      const target = taskApprovalTarget(identity, workspace.path);
+      if (
+        !options.tasks.identityMatches(identity) ||
+        JSON.stringify(target) !== JSON.stringify(preflight.approvalScope.target)
+      ) {
+        throw new Error("승인 뒤 background task identity가 변경되었습니다.");
       }
     },
   });

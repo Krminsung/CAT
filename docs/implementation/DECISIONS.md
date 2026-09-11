@@ -364,3 +364,59 @@
   않고 host 문구로 교체한다. 거부·취소된 웹 권한은 같은 run의 다른 웹 경로로 우회하지 않는다.
   거부된 초안은 화면과 message transcript에 남기지 않으며, 위치 없는 날씨 요청은 host 정보를
   추론하거나 외부로 보내지 않고 지역을 요청한다.
+
+## D035 — session 소유 background process와 stale 복구
+
+- 상태: 승인됨
+- 결정: background 명령은 foreground timeout과 분리된 deadline, 중앙 command 승인과 고정 workspace
+  identity를 사용한다. manager가 생성해 메모리에 보유한 child/process group만 TERM 뒤 KILL하며 임의
+  PID를 입력받거나 재시작 뒤 PID를 추측하지 않는다. 출력은 workspace별 보호 저장소의 8MiB 원형 log와
+  bounded reader로 관리하고 task 수·복원 scan·수명을 함께 제한한다.
+- 결과: list/read/stop은 현재 session의 ID 범위에서만 동작하고 승인 뒤에는 시작 시각과 command digest까지
+  다시 확인한다. 종료 확인 전 process가 끊긴 manifest는 재개 시 `stale`로 보존하되 신호를 보내지 않으며,
+  session 격리와 앱 종료는 현재 manager가 만든 task만 정리한다. terminal control, 저장 실패와 종료 확인
+  실패는 성공으로 숨기지 않고 실제 task runtime은 개발 단계에서 실행하지 않는다.
+
+## D036 — repository identity에 묶인 managed worktree registry
+
+- 상태: 승인됨
+- 결정: 제품 worktree는 Git common directory의 canonical path·device·inode로 분리한 보호 저장소와
+  registry에서만 관리한다. create는 이름·고정 branch·경로를 먼저 예약한 뒤 Git porcelain과 directory
+  identity를 확인하며, remove는 동일 registry·repository·경로·생성 identity와 clean 상태가 모두
+  다시 확인된 항목에만 force 없는 Git remove를 허용한다. lock과 작업 결과가 불확실하면 자동 복구나
+  PID 기반 stale lock 삭제 대신 명시적인 `unknown` 상태와 수동 확인을 선택한다.
+- 결과: 등록되지 않은 worktree, 바뀐 directory, 현재 process 또는 선택 cwd를 포함한 worktree,
+  locked·bare·prunable 및 tracked·untracked·ignored 변경은 자동 제거하지 않는다. branch 삭제·prune
+  경로도 제공하지 않는다. 생성 후 이동한 cwd는 기존 workspace 승인 범위를 상속하지 않고 project
+  customization과 filesystem identity 기반 trust를 다시 확인하며 실제 Git worktree 동작은 개발
+  단계에서 실행하지 않는다.
+
+## D037 — 사용자 origin OSC52와 쓰기 전용 SSH bridge
+
+- 상태: 승인됨
+- 결정: OSC52는 model·tool·server 문자열을 일반 화면에 쓰는 과정에서 실행하지 않고 `/raw copy` 등
+  명시적 사용자 clipboard action을 받은 host writer만 생성한다. desktop writer 실패 시 payload
+  상한을 지킨 OSC52로 fallback하고 tmux/screen wrapping도 이 생성 경로에만 둔다. SSH bridge는
+  사용자가 로컬 TTY에서 전용 CLI를 직접 시작한 동안에만 제한된 원격 OSC52 write를 해석하며 read
+  query에는 응답하지 않는다.
+- 결과: SSH 양쪽 output stream의 OSC와 DCS/SOS/PM/APC 문자열은 bounded parser가 제거하므로 nested
+  passthrough로 clipboard 권한을 우회할 수 없다. 허용 selection, canonical base64, UTF-8, 크기·횟수와
+  queue deadline을 통과한 write만 로컬/host OSC writer로 전달된다. OpenSSH 옵션은 shell 문자열이 아닌
+  argv로 전달하고 최소 environment 및 검증된 agent socket만 사용한다. PTY·stdin·session과 control
+  master 설정은 bridge가 고정하며 이를 무력화하는 background/multiplex/stdio 옵션은 거부한다.
+  credential·key path는 기록하지 않고 실제 terminal, SSH, clipboard 동작은 개발 단계에서 실행하지
+  않는다.
+
+## D038 — 중앙 task UI와 실패 독립 종료 정리
+
+- 상태: 승인됨
+- 결정: `/tasks`와 사용자 직접 background shell도 별도 manager 우회 경로를 만들지 않고 등록된
+  task 도구와 중앙 permission·workspace identity를 통과한다. UI는 manager의 session별 bounded
+  overview와 상태 변경 알림만 구독하고 command·output은 제한된 도구 결과에서 표시한다. foreground
+  timeout과 background deadline은 입력 객체에서도 동시에 존재하지 않게 한다.
+- 결과: active·unconfirmed 작업 수는 header와 상태 overlay에 갱신되고, 긴 목록과 출력은 화면·도구
+  상한 안에 머문다. compaction에는 제한된 non-terminal snapshot만 비신뢰 continuity로 보존한다.
+  session 기록이나 다른 service 종료 실패는 background manager close를 건너뛰게 하지 않으며, 같은
+  process가 소유하지 않은 stale PID에는 신호를 보내지 않는다. 직접 셸 local context는 알려진 secret을
+  제거한 뒤 model 입력에 합치고, 세션 전환 뒤 이전 owned child를 숨기지 않으며, 중복 shutdown 호출은
+  같은 cleanup 결과를 기다린다. 실제 task와 앱은 개발 단계에서 실행하지 않는다.

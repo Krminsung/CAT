@@ -9,6 +9,10 @@ export type { PermissionMode } from "../security/permissions.js";
 
 export const SETTINGS_SCHEMA_VERSION = 1;
 
+export interface WorktreeSettings {
+  baseRef?: string;
+}
+
 export interface SettingsValues {
   permissionMode: PermissionMode;
   maxTurns: number;
@@ -22,6 +26,7 @@ export interface SettingsValues {
   projectDocFallbackFilenames: string[];
   hooks?: JsonObject;
   mcpServers?: JsonObject;
+  worktree?: WorktreeSettings;
   provider?: string;
   profile?: string;
   model?: string;
@@ -66,6 +71,7 @@ const SETTING_KEYS = new Set([
   "projectDocFallbackFilenames",
   "hooks",
   "mcpServers",
+  "worktree",
   "provider",
   "profile",
   "model",
@@ -122,6 +128,34 @@ function stringList(raw: JsonObject, key: string, source: string): string[] | un
     );
   }
   return value.map((item) => String(item).trim());
+}
+
+function worktreeSettings(raw: JsonObject, source: string): WorktreeSettings | undefined {
+  const value = raw.worktree;
+  if (value === undefined) return undefined;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return fail(source, "worktree", "객체여야 합니다");
+  }
+  const keys = Object.keys(value);
+  if (keys.some((key) => key !== "baseRef")) {
+    return fail(source, "worktree", "baseRef만 포함할 수 있습니다");
+  }
+  const baseRef = value.baseRef;
+  if (baseRef === undefined) return {};
+  if (
+    typeof baseRef !== "string" ||
+    !baseRef.trim() ||
+    baseRef.trim().startsWith("-") ||
+    /[\p{Cc}\p{Cf}]/u.test(baseRef) ||
+    Buffer.byteLength(baseRef.trim(), "utf8") > 1_024
+  ) {
+    return fail(
+      source,
+      "worktree.baseRef",
+      "-로 시작하지 않는 제어 문자 없는 1–1024 bytes Git ref여야 합니다",
+    );
+  }
+  return { baseRef: baseRef.trim() };
 }
 
 function integer(
@@ -237,6 +271,8 @@ export function parseSettingsValues(
     }
     result.mcpServers = structuredClone(raw.mcpServers) as JsonObject;
   }
+  const worktree = worktreeSettings(raw, source);
+  if (worktree !== undefined) result.worktree = worktree;
   const provider = optionalString(raw, "provider", source, 64);
   if (provider !== undefined) {
     if (!IDENTIFIER_PATTERN.test(provider)) fail(source, "provider", "안전한 식별자여야 합니다");
@@ -292,6 +328,11 @@ function mergeSettings(base: SettingsValues, overlay: SettingsOverrides): Settin
       ? [...overlay.projectDocFallbackFilenames]
       : [...base.projectDocFallbackFilenames],
     ...(mergedMcpServers === undefined ? {} : { mcpServers: mergedMcpServers }),
+    ...(overlay.worktree === undefined
+      ? base.worktree === undefined
+        ? {}
+        : { worktree: { ...base.worktree } }
+      : { worktree: { ...overlay.worktree } }),
   };
 }
 
@@ -353,6 +394,7 @@ function overridesToJson(overrides: SettingsOverrides): JsonObject {
   assign("projectDocFallbackFilenames", overrides.projectDocFallbackFilenames);
   assign("hooks", overrides.hooks);
   assign("mcpServers", overrides.mcpServers);
+  assign("worktree", overrides.worktree === undefined ? undefined : { ...overrides.worktree });
   assign("provider", overrides.provider);
   assign("profile", overrides.profile);
   assign("model", overrides.model);

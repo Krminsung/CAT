@@ -76,15 +76,15 @@ const RAW_DEFINITIONS: readonly SlashCommandDefinition[] = [
   { name: "models", description: "현재 provider의 model 목록에서 선택", usage: "/models", capability: "model", unavailableReason: "model 목록 선택 경로가 연결되지 않았습니다." },
   { name: "provider", description: "저장된 provider profile 선택", usage: "/provider [profile]", capability: "authentication", unavailableReason: "provider profile 선택 경로가 연결되지 않았습니다." },
   { name: "permissions", description: "권한 모드 확인 또는 변경", usage: "/permissions [ask|auto-edit|full-auto|plan]", capability: "permission", unavailableReason: "권한 선택 경로가 연결되지 않았습니다." },
-  { name: "raw", description: "alternate screen 밖의 제한된 복사 보기", usage: "/raw", capability: "terminal", unavailableReason: "raw transcript 화면이 연결되지 않았습니다." },
+  { name: "raw", description: "제한된 복사 보기 또는 명시적 clipboard 복사", usage: "/raw [copy]", capability: "terminal", unavailableReason: "raw transcript 화면이 연결되지 않았습니다." },
   { name: "rename", description: "현재 세션 표시 이름 변경", usage: "/rename <name>", capability: "session", unavailableReason: "세션 이름 변경 경로가 연결되지 않았습니다." },
   { name: "reload", description: "신뢰한 지침·명령·skill·hook 다시 로드", usage: "/reload", capability: "extensions", unavailableReason: "확장 재로딩은 P09에서 활성화됩니다." },
   { name: "resume", description: "저장된 현재 workspace 세션 재개", usage: "/resume [session-id]", capability: "session", unavailableReason: "세션 재개 선택 경로가 연결되지 않았습니다." },
   { name: "sessions", description: "저장된 현재 workspace 세션 목록 표시", usage: "/sessions", capability: "session", unavailableReason: "세션 선택 경로가 연결되지 않았습니다." },
   { name: "rewind", description: "현재 세션의 마지막 관리 파일 변경 복원", usage: "/rewind", capability: "session", unavailableReason: "checkpoint rewind 경로가 연결되지 않았습니다." },
   { name: "status", description: "세션·provider·model·workspace 상태 표시", usage: "/status", capability: "configuration", unavailableReason: "상태 표시 경로가 연결되지 않았습니다." },
-  { name: "tasks", description: "현재 세션 소유 background 작업 관리", usage: "/tasks [task-id|stop task-id]", capability: "tasks", unavailableReason: "background 작업은 P12에서 활성화됩니다." },
-  { name: "worktree", description: "관리되는 격리 worktree 정보 표시", usage: "/worktree", capability: "worktree", unavailableReason: "worktree 기능은 P12에서 활성화됩니다." },
+  { name: "tasks", description: "현재 세션 소유 background 작업 관리", usage: "/tasks [task-id|stop task-id]", capability: "tasks", unavailableReason: "background task manager가 연결되지 않았습니다." },
+  { name: "worktree", description: "관리되는 격리 worktree 정보 표시", usage: "/worktree", capability: "worktree", unavailableReason: "managed worktree 정보가 연결되지 않았습니다." },
 ];
 
 function stableDefinitions(): readonly SlashCommandDefinition[] {
