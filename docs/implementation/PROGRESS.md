@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 이 커밋에서
+P14 기준 main은 `7d1cc7809871bb09bf704daab71a73299233f7c3`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -17,8 +17,8 @@ P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 �
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
 | P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
-| P13 통합·이관·문서 | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P13 통합·이관·문서 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #13 / MERGED `7d1cc78` |
+| P14 배포·설치본 | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
 `cfed67a6e8cf5e3de36983773a51414a4ca209d8`, P01.3은
@@ -329,3 +329,11 @@ PR과 merge는 진행하지 않았다. 이후 사용자가 P13 오류 수정과 
 마지막 승인 검사를 예약 commit `b64c284288f47b4e4483492a80bf6caf3e8aee05`에서 실행했고 약
 1.59초 뒤 종료 코드 0으로 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 앱,
 이관 command, provider, MCP, hook, 도구와 사용자 자료 runtime은 실행하지 않았다.
+P13은 검토 head `471c5d3b597a5f89a3fccf1303c6f47e86b0b6c4`를 PR #13에서 merge commit
+`7d1cc7809871bb09bf704daab71a73299233f7c3`으로 병합했다. merge의 두 부모, phase head와 merge의
+동일 tree, phase head 조상 관계와 `origin/main` 포함을 확인했으며 병합 뒤 검사는 반복하지 않았다.
+P14는 이 merge commit을 기준으로 시작했다. P14.1에서는 기본 PATH 명령을 `cat-tui`로 유지하면서
+설치 디렉터리 안의 `bin/cat` wrapper가 내장 Node를 우선하고, 소스 checkout에서는 호환되는 host
+Node로 동일한 `dist/cli/main.js`를 실행하도록 구성한다. Node.js 공식 배포 자료에서 2026-09-11 현재
+LTS인 v24.21.0과 Linux x64/arm64 `tar.xz`의 SHA-256을 확인해 고정 manifest에 기록했다. 시스템
+`cat`, 앱, Node bundle과 검증 명령은 실행하지 않았다.

@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "cat-tui": "dist/cli/main.js"
+    "cat-tui": "bin/cat"
   },
   "files": [
     "dist",

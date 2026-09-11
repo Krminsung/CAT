@@ -1,0 +1,78 @@
+#!/bin/sh
+set -eu
+
+launcher_path=$0
+link_hops=0
+
+while [ -L "$launcher_path" ]; do
+    link_hops=$((link_hops + 1))
+    if [ "$link_hops" -gt 40 ]; then
+        printf '%s\n' 'cat: 실행 파일 심볼릭 링크가 너무 깊습니다.' >&2
+        exit 1
+    fi
+
+    link_target=$(readlink -- "$launcher_path") || {
+        printf 'cat: 실행 파일 링크를 읽을 수 없습니다: %s\n' "$launcher_path" >&2
+        exit 1
+    }
+    case "$link_target" in
+        /*) launcher_path=$link_target ;;
+        *) launcher_path=$(dirname -- "$launcher_path")/$link_target ;;
+    esac
+done
+
+launcher_dir=$(CDPATH= cd -P -- "$(dirname -- "$launcher_path")" && pwd) || {
+    printf '%s\n' 'cat: 설치 경로를 확인할 수 없습니다.' >&2
+    exit 1
+}
+install_root=$(CDPATH= cd -P -- "$launcher_dir/.." && pwd) || {
+    printf '%s\n' 'cat: 설치 루트를 확인할 수 없습니다.' >&2
+    exit 1
+}
+entrypoint=$install_root/dist/cli/main.js
+
+if [ ! -f "$entrypoint" ]; then
+    printf 'cat: 컴파일된 진입점이 없습니다: %s\n' "$entrypoint" >&2
+    printf '%s\n' '소스 checkout이라면 npm run build를 먼저 실행하세요.' >&2
+    exit 1
+fi
+
+node_is_compatible() {
+    candidate=$1
+    [ -x "$candidate" ] || return 1
+    version=$("$candidate" --version 2>/dev/null) || return 1
+    case "$version" in
+        v[0-9]*.[0-9]*.[0-9]*) ;;
+        *) return 1 ;;
+    esac
+
+    version=${version#v}
+    major=${version%%.*}
+    remainder=${version#*.}
+    minor=${remainder%%.*}
+    case "$major$minor" in
+        *[!0-9]*) return 1 ;;
+    esac
+    [ "$major" -gt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -ge 19 ]; }
+}
+
+bundled_node=$install_root/.runtime/node/bin/node
+if [ -x "$bundled_node" ]; then
+    node_bin=$bundled_node
+elif command -v node >/dev/null 2>&1; then
+    node_bin=$(command -v node)
+    if ! node_is_compatible "$node_bin"; then
+        printf '%s\n' 'cat: Node.js 22.19.0 이상이 필요합니다.' >&2
+        exit 1
+    fi
+else
+    printf '%s\n' 'cat: Node.js 22.19.0 이상을 찾지 못했습니다.' >&2
+    printf '%s\n' '공식 설치본에는 고정된 Node.js 런타임이 포함됩니다.' >&2
+    exit 1
+fi
+
+runtime_bin=$(dirname -- "$node_bin")
+PATH=$runtime_bin:${PATH:-}
+export PATH
+
+exec "$node_bin" --enable-source-maps "$entrypoint" "$@"
