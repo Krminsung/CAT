@@ -277,4 +277,6 @@ clipboard와 앱은 실행하지 않았다. 사용자가 승인한 P12의 유일
 PR과 merge는 진행하지 않았다. 이후 사용자가 P12 오류 수정과 `npm run check` 추가 1회를 명시적으로
 승인해, 지역 output 변수가 tail reader의 일반 Node Buffer 반환 타입을 수용하도록 1줄을
 `d20dd49285e99e7006085a4a3d1b514f8f12ac7e`에서 수정했다. 첫 실패 기록을 보존한 채 두 번째이자
-마지막 승인 검사를 예약했으며 아직 실행하지 않았다.
+마지막 승인 검사를 예약 commit `4468b45a4313d790895923864936d3b5a210785f`에서 실행했고 약 1.65초 뒤
+종료 코드 0으로 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 process, Git
+worktree, SSH, clipboard와 앱 runtime은 실행하지 않았다.

@@ -4,16 +4,16 @@
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P12",
   "currentStep": "P12.VERIFY",
-  "status": "VERIFYING",
+  "status": "VERIFIED",
   "baseMainSha": "05a02e75e795e8079b318b2168fc372c50025c7b",
-  "lastCommitSha": "d20dd49285e99e7006085a4a3d1b514f8f12ac7e",
+  "lastCommitSha": "4468b45a4313d790895923864936d3b5a210785f",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
     "command": "npm run check",
-    "targetCommitSha": null,
-    "result": "NOT_RUN",
-    "exitCode": null
+    "targetCommitSha": "4468b45a4313d790895923864936d3b5a210785f",
+    "result": "PASS",
+    "exitCode": 0
   },
   "publication": {
     "branch": "cat/p12-worktree-tasks",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Run the explicitly approved additional npm run check exactly once",
+  "nextAction": "Record the successful additional check, verify docs-only drift, then create the P12 branch",
   "blocker": null
 }
