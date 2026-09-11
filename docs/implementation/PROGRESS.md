@@ -18,7 +18,7 @@ P14 기준 main은 `7d1cc7809871bb09bf704daab71a73299233f7c3`이다. 구현은 �
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
 | P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
 | P13 통합·이관·문서 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #13 / MERGED `7d1cc78` |
-| P14 배포·설치본 | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
+| P14 배포·설치본 | BLOCKED_VERIFY | BUILD PASS (1/1), PACKAGE FAIL (1회) | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
 `cfed67a6e8cf5e3de36983773a51414a4ca209d8`, P01.3은
@@ -371,5 +371,14 @@ incoming package를 확인하고, 설치·명령·기존/staged 디렉터리 ide
 형식은 깨끗하다. build, dependency staging, download, tar, packager, installer와 앱은 실행하지 않았다.
 정적 검토 보완은 `b7f18d8b7abc8f36c3550ba80be148de692b2ab8`에서 확정했다. `origin/main`이
 P14 base와 동일하고 `artifacts/`와 `dist/`는 없으며 고정 lockfile의 `node_modules`는 준비된 상태다.
-P14의 유일한 `npm run build`를 명령 실행 전에 `1 / 1`로 예약하고 이 예약 commit 자체를 검사 대상으로
-삼는다. 사용자 승인 전에는 build, packager와 installer를 실행하지 않는다.
+P14의 유일한 `npm run build`를 명령 실행 전에 `1 / 1`로 예약하고 예약 commit
+`ffbccf8f0414ea89c09726d419a3818a8e00232e`에서 120초 제한으로 실행했다. `tsc -p tsconfig.json`은
+약 1.84초 뒤 종료 코드 0으로 통과했고 `dist/`를 생성했다. 추가 compiler나 앱 runtime은 실행하지
+않았다. 이어 기존 `dist/`만 소비하는 `npm run package:installer`를 한 번 실행해 production dependency
+9개를 고정 lockfile에서 준비했으나, 첫 Linux x64 공식 Node runtime 다운로드에서 약 0.85초 뒤 종료
+코드 1로 실패했다. 이 환경은 proxy 경유 공식 URL에는 HTTP 200으로 접근하지만 직접 HTTPS 연결은
+timeout되며, packager가 환경 proxy 사용을 활성화하지 않은 것이 원인이다. 빈 `AggregateError.message`로
+상세 진단도 출력되지 않았다. 임시 stage는 정리됐고 `artifacts/`는 게시되지 않았으며 tracked source와
+root lockfile은 바뀌지 않았다. proxy-aware 다운로드와 중첩 오류 출력을 수정하고 추가 build 1회 및
+packaging 재시도 1회를 수행하려면 P14 전용 사용자 승인이 필요하다. 승인 전에는 수정, 재실행, push,
+PR과 merge를 진행하지 않는다.

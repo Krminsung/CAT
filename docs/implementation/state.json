@@ -3,17 +3,17 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.VERIFY",
-  "status": "VERIFYING",
+  "currentStep": "P14.PACKAGE",
+  "status": "BLOCKED_VERIFY",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "b7f18d8b7abc8f36c3550ba80be148de692b2ab8",
+  "lastCommitSha": "ffbccf8f0414ea89c09726d419a3818a8e00232e",
   "verification": {
     "attemptsUsed": 1,
     "maximumAttempts": 1,
     "command": "npm run build",
-    "targetCommitSha": null,
-    "result": "NOT_RUN",
-    "exitCode": null
+    "targetCommitSha": "ffbccf8f0414ea89c09726d419a3818a8e00232e",
+    "result": "PASS",
+    "exitCode": 0
   },
   "publication": {
     "branch": "cat/p14-packaging",
@@ -22,6 +22,6 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Await explicit P14 approval, then run npm run build exactly once against this reservation commit",
-  "blocker": null
+  "nextAction": "Wait for explicit approval to fix P14 proxy-aware runtime download and diagnostics, run one additional npm run build, then retry packaging once",
+  "blocker": "The single P14 build passed, but packaging could not download the first fixed Node runtime because direct HTTPS is blocked and the packager did not enable the configured environment proxy"
 }
