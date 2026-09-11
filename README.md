@@ -10,8 +10,8 @@
 ## 현재 배포 상태
 
 현재 저장소는 소스 구현 단계다. Node.js와 npm으로 의존성을 설치하고 TypeScript를 컴파일해야 하며,
-npm 없이 설치하는 사용자 영역 배포본과 `cat` launcher는 P14에서 추가한다. 지금 package의 실행 이름은
-`cat-tui`이고 npm registry나 GitHub Release에 공개 배포됐다고 가정하면 안 된다.
+npm 없이 설치하는 사용자 영역 배포본과 `cat` launcher는 아직 포함하지 않는다. 지금 package의 실행
+이름은 `cat-tui`이고 npm registry나 GitHub Release에 공개 배포됐다고 가정하면 안 된다.
 
 필요 조건은 Node.js `22.19.0` 이상과 npm이다. 소스 checkout에서는 다음 순서로 준비한다.
 
@@ -284,8 +284,8 @@ project approval, hook과 MCP 실행 설정은 자동 이관하지 않는다. so
   종료로 표시하지 않으므로 사용자가 OS 상태를 점검해야 할 수 있다.
 - local clipboard backend나 OSC52 지원 여부는 OS·terminal·SSH 환경에 따라 다르며 실제 환경에서
   검증하지 않았다. clipboard 읽기는 지원하지 않는다.
-- 현재 npm 없는 설치본, checksum, 사용자 launcher와 배포 artifact는 아직 없다. P14 완료 전에는 source
-  checkout 밖의 설치 절차를 보장하지 않는다.
+- 현재 npm 없는 설치본, checksum, 사용자 launcher와 배포 artifact는 아직 없다. 별도 배포본이 마련되기
+  전에는 source checkout 밖의 설치 절차를 보장하지 않는다.
 - package는 `UNLICENSED`이며 공개 사용·재배포 조건이 부여됐다고 해석하면 안 된다.
 
 ## 자주 만나는 오류

@@ -28,6 +28,23 @@ cat 소스는 기능 계약을 토대로 새 디렉터리 경계와 새 코드�
 license metadata만으로 모든 참조 자료의 권리가 확인됐다고 주장하지 않는다. 공개
 배포 전 권리 확인은 별도이며, P14 완료도 공개 배포 승인을 의미하지 않는다.
 
+## P13 legacy 호환 표식
+
+legacy import의 입력 형식은 제공 archive의 `src/auth.ts`, `src/sessions.ts`, `src/settings.ts`를 읽어
+재구현했다. 새 저장 형식이나 실행 코드를 원본에서 복사하지 않고 bounded reader와 새 credential,
+profile, session schema 사이의 명시적 변환으로 분리했다.
+
+새 제품 화면 이름과 network `User-Agent`는 `cat`이다. 제품 source에 남은 `Smile Code`, `smilecode`,
+`.smileserv`, `SMILECODE_*`, `SMILESERV_*`, `SMILESERV.md`, `CAGENT.md`는 다음 legacy 호환 경계에서만
+사용한다.
+
+- 사용자가 실행하는 기존 데이터 이관의 source label과 보존 provenance field
+- 기존 API key 환경변수와 provider alias
+- 기존 지침 파일 탐색과 민감 경로 차단
+
+이 문자열들은 새 제품명이나 새 기본 데이터 경로로 노출하기 위한 것이 아니며, 범위 정리에서 임의로
+삭제하지 않는다. 실제 legacy 자료는 저장소에 추가하거나 개발 중 읽지 않았다.
+
 ## P10 schema validator 의존성
 
 - package: `ajv@8.20.0` (MIT)

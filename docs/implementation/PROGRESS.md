@@ -305,3 +305,12 @@ P13.2는 `e75d6f04f2d4939f20f4816c7c67a36dfa1c9c4e`에서 완료했다. P13.3에
 자료, 명시적 legacy 이관, 자주 만나는 오류를 설명한다. npm 없는 설치본은 P14 전에는 없다고 구분하고,
 “정적 검사만 수행했고 런타임은 미검증”이라는 제한과 provider/MCP/web/rewind/process/clipboard의
 미검증 범위를 명시했다. 문서 작성 중 앱, 외부 서비스, 사용자 자료와 검증 명령은 실행하지 않았다.
+P13.3은 `56a55f57fd220e79b8e30433c75139764a1dff75`에서 완료했다. P13.4에서는 제품 source의
+제품명·단계 문자열, secret 형태 fixture, stub, 기준 registry와 P13 cleanup을 한 차례 검색하고 있다.
+과거 P09가 아직 활성화 전이라고 표시하던 slash fallback과 tool/budget 주석을 현재 의미로 바꾸고,
+관리 명령 union·Set의 중복 이름은 `CLI_MANAGEMENT_COMMANDS` 단일 tuple에서 파생하도록 정리했다.
+secret fixture와 새 제품을 Smile Code로 표시하는 경로는 발견되지 않았고, legacy import·민감 경로·환경
+호환에 필요한 `.smileserv`, 기존 이름·환경변수·fallback 파일명은 출처 표식으로 보존한다. P13 writer
+release, profile 실패 credential 정리와 source read-only 경로에서 새 cleanup 누락이나 빈 성공 handler는
+발견되지 않았다. 보안 우선 이관 결정을 `DECISIONS.md`, 호환 문자열 범위를 `PROVENANCE.md`에 기록했으며
+앱, 외부 서비스, 실제 사용자 자료와 검증 명령은 실행하지 않았다.

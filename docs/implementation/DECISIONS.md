@@ -420,3 +420,17 @@
   process가 소유하지 않은 stale PID에는 신호를 보내지 않는다. 직접 셸 local context는 알려진 secret을
   제거한 뒤 model 입력에 합치고, 세션 전환 뒤 이전 owned child를 숨기지 않으며, 중복 shutdown 호출은
   같은 cleanup 결과를 기다린다. 실제 task와 앱은 개발 단계에서 실행하지 않는다.
+
+## D039 — 명시적이고 비파괴적인 legacy import
+
+- 상태: 승인됨
+- 결정: legacy `.smileserv`는 사용자가 `cat-tui migrate`를 직접 실행할 때만 읽고, plaintext API key가
+  있는 `providers.json`과 `credentials.json` 내용은 `--include-credentials`를 별도로 지정한 경우에만
+  읽는다. source와 `CAT_HOME`은 같거나 중첩될 수 없고 source에는 write, rename, chmod, unlink를 하지
+  않는다. 기존 HTTP profile, trust, approval, 자동 허용·hook·MCP 실행 설정은 호환성보다 새 보안 경계를
+  우선해 자동 이관하지 않는다.
+- 결과: 안전한 설정 subset과 검증한 HTTPS API-key profile만 기존 target과 이름이 충돌하지 않을 때
+  저장한다. 세션은 source identity와 원본 ID에서 만든 `legacy_*` ID로 닫힌 상태에 가져오며, 실제 model
+  history message만 새 schema로 바꾸고 나머지 record는 실행되지 않는 legacy event로 보존한다. target
+  index나 transcript가 이미 있으면 덮어쓰지 않으며 실제 사용자 HOME과 이관 runtime은 개발 중 실행하지
+  않는다.

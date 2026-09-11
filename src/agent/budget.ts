@@ -107,7 +107,7 @@ export interface RunBudgetControllerOptions {
   readonly now?: () => number;
 }
 
-/** P06/P09/P11의 compaction, Stop hook과 web 복구가 공유해야 하는 run 소유 예산 port다. */
+/** Compaction, Stop hook과 web 복구가 공유하는 run 소유 예산 port다. */
 export interface AgentExtensionBudgetPort extends RetryBudgetPort {
   readonly signal: AbortSignal;
   readonly deadlineAt: number;

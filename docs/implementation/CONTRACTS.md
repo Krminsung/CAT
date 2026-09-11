@@ -76,7 +76,8 @@ management, agent 진입점을 분리한다.
 `--append-system-prompt`, `--no-session-persistence`, `--verbose`, `--no-color`,
 `--trust-workspace`, `-w/--worktree`, `--version`, positional prompt.
 
-관리 진입점은 `auth`, `mcp`, `worktree`, `ssh`, `migrate`다. `src/app/application.ts`가 각 controller,
+`CLI_MANAGEMENT_COMMANDS`가 관리 진입점 `auth`, `mcp`, `worktree`, `ssh`, `migrate`의 단일 기준이며
+parser type과 dispatch 입력이 이 tuple에서 파생된다. `src/app/application.ts`가 각 controller,
 legacy import service 또는 agent lifecycle로 실제 dispatch한다.
 
 ### hook event 8개
@@ -119,6 +120,18 @@ private mode와 읽는 동안 identity·크기 변경을 확인한다. 원본 �
   유지한 채 집계해 알린다.
 - `trusted-workspaces.json`, project approval과 자동 허용 상태는 읽어 새 trust/approval로 만들지 않는다.
   실행 결과는 이 두 항목이 이관되지 않았고 원본이 변경되지 않았음을 명시한다.
+
+## P13.4 통합 범위 정리
+
+제품 source의 제품명·단계 문구, secret 형태 fixture, stub·registry·cleanup을 기능 계약과 P13 diff
+중심으로 한 차례 검색했다. 관리 명령 이름은 `CLI_MANAGEMENT_COMMANDS`로 단일화했고, built-in/slash,
+provider, hook, MCP protocol은 기존 기준 상수와 조립 시 exact 대조를 유지한다. 모든 slash handler가
+연결된 현재 제품에서 fallback 문구가 과거 P09를 안내하지 않도록 capability 미연결 문구로 바꿨다.
+
+새 제품을 Smile Code로 표시하는 경로와 secret fixture는 발견되지 않았다. 남아 있는 Smile Code 이름,
+`.smileserv`, 기존 환경변수·provider alias·지침 파일명은 P13.2 이관, 민감 경로 차단과 출처 보존에
+필요한 legacy 호환 표식이라 삭제하지 않았다. P13 변경의 writer와 credential 실패 정리 경로를 다시
+확인했으며 실행되지 않는 성공 handler나 새 누락 cleanup은 발견되지 않았다.
 
 ## 검증 한계
 
