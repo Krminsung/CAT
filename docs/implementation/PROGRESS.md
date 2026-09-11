@@ -17,7 +17,7 @@ P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 �
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
 | P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
-| P13 통합·이관·문서 | VERIFYING | NOT_RUN (1/1 예약) | NOT_PUBLISHED |
+| P13 통합·이관·문서 | BLOCKED_VERIFY | FAIL (1/1) | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
@@ -319,5 +319,8 @@ release, profile 실패 credential 정리와 source read-only 경로에서 새 c
 넣을 때의 깊이·node 여유, writer lock 획득 뒤 충돌 재확인, 특수 JSON field 복사와 `CAT_HOME` 제어
 문자·크기 제한도 함께 정리해 `72bcd74bee47c9d4a4a9472ad179ae46eaa5b4f4`에서 확정했다.
 `origin/main`은 P13 base와 같고 diff 형식은 깨끗하다. 앱, 외부 서비스와 실제 사용자 자료는 실행하거나
-읽지 않았다. P13의 유일한 `npm run check`는 다음 예약 commit을 대상으로 1회 예약했으며 아직 실행하지
-않았다.
+읽지 않았다. P13의 유일한 `npm run check`를 예약 commit
+`1decd9645f3e67e019b0a955b5a920ba0d0a75bd`에서 120초 제한으로 실행했고 약 1.55초 뒤 종료 코드
+2로 실패했다. `src/app/application.ts:2054–2081`의 slash handler 28곳에서 지역 registry의 generic
+문맥이 없어 `runtime`이 `unknown`으로 추론된 TS18046 진단이 발생했다. 추가 검사, source 수정, push,
+PR과 merge는 진행하지 않았다.
