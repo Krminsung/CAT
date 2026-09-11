@@ -2,26 +2,26 @@
   "schemaVersion": 1,
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
-  "currentPhase": "P13",
-  "currentStep": "P13.VERIFY",
+  "currentPhase": "P14",
+  "currentStep": "P14.PUBLISH",
   "status": "VERIFIED",
-  "baseMainSha": "c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859",
-  "lastCommitSha": "b64c284288f47b4e4483492a80bf6caf3e8aee05",
+  "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
+  "lastCommitSha": "437710e0fcc55e625acb8e7d53266e61e646c77a",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
-    "command": "npm run check",
-    "targetCommitSha": "b64c284288f47b4e4483492a80bf6caf3e8aee05",
+    "command": "npm run build",
+    "targetCommitSha": "437710e0fcc55e625acb8e7d53266e61e646c77a",
     "result": "PASS",
     "exitCode": 0
   },
   "publication": {
-    "branch": "cat/p13-integration",
+    "branch": "cat/p14-packaging",
     "pullRequestNumber": null,
     "reviewedHeadSha": null,
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Record the successful additional check, verify docs-only drift, then create the P13 branch",
+  "nextAction": "Create cat/p14-packaging, push it, open the P14 pull request, review metadata and diff, then merge",
   "blocker": null
 }

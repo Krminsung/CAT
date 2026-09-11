@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 이 커밋에서
+P14 기준 main은 `7d1cc7809871bb09bf704daab71a73299233f7c3`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -17,8 +17,8 @@ P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 �
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
 | P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
-| P13 통합·이관·문서 | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P13 통합·이관·문서 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #13 / MERGED `7d1cc78` |
+| P14 배포·설치본 | VERIFIED | BUILD 1차 PASS, 2차 PASS (2/2); PACKAGE 1차 FAIL, 2차 PASS | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
 `cfed67a6e8cf5e3de36983773a51414a4ca209d8`, P01.3은
@@ -329,3 +329,68 @@ PR과 merge는 진행하지 않았다. 이후 사용자가 P13 오류 수정과 
 마지막 승인 검사를 예약 commit `b64c284288f47b4e4483492a80bf6caf3e8aee05`에서 실행했고 약
 1.59초 뒤 종료 코드 0으로 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 앱,
 이관 command, provider, MCP, hook, 도구와 사용자 자료 runtime은 실행하지 않았다.
+P13은 검토 head `471c5d3b597a5f89a3fccf1303c6f47e86b0b6c4`를 PR #13에서 merge commit
+`7d1cc7809871bb09bf704daab71a73299233f7c3`으로 병합했다. merge의 두 부모, phase head와 merge의
+동일 tree, phase head 조상 관계와 `origin/main` 포함을 확인했으며 병합 뒤 검사는 반복하지 않았다.
+P14는 이 merge commit을 기준으로 시작했다. P14.1에서는 기본 PATH 명령을 `cat-tui`로 유지하면서
+설치 디렉터리 안의 `bin/cat` wrapper가 내장 Node를 우선하고, 소스 checkout에서는 호환되는 host
+Node로 동일한 `dist/cli/main.js`를 실행하도록 구성한다. Node.js 공식 배포 자료에서 2026-09-11 현재
+LTS인 v24.21.0과 Linux x64/arm64 `tar.xz`의 SHA-256을 확인해 고정 manifest에 기록했다. 시스템
+`cat`, 앱, Node bundle과 검증 명령은 실행하지 않았다.
+P14.1은 `955d21f406d34eeebcd03b81416f4e8c389f684f`에서 완료했다. P14.2에서는 기존 `dist/`,
+고정 package/lockfile, wrapper, runtime manifest와 배포 문서만 임시 application stage로 복사한다.
+production dependency는 `npm ci --ignore-scripts --omit=dev --no-audit --no-fund` 한 번으로만 준비하며
+root lockfile의 전후 hash가 다르면 게시하지 않는다. 고정 Node archive 두 개는 HTTPS 공식 URL에서
+내려받아 manifest SHA-256과 길이를 확인한다. architecture별 deterministic payload와 self-extracting
+installer 및 checksum을 모두 임시 경로에 만든 뒤 기존 `artifacts/`가 없을 때만 디렉터리 단위로
+게시하도록 구성하고 있다. packager 안에는 build/typecheck/test/app 실행이 없으며 아직 packager,
+의존성 staging, 다운로드, tar, 앱과 검증 명령을 실행하지 않았다.
+P14.2는 `5fa11970dd9f2ede7a799e626000f148a629886c`에서 완료했다. P14.3에서는 installer가
+root/sudo 실행을 거부하고 `CAT_INSTALL_DIR`과 `CAT_BIN_DIR`을 현재 사용자가 소유한 HOME 아래의
+비중첩 canonical 경로로 제한한다. installer architecture, 내장 payload, 공식 Node archive를 commit
+전에 확인하며 Node와 앱은 실행하지 않는다. 기존 경로는 관리 표식·package 이름·launcher가 모두
+맞거나 빈 디렉터리일 때만 backup으로 이동하고 staging rename 뒤 오류가 나면 이전 설치와 새로 만든
+링크를 복구한다. `cat-tui`는 기본 user-bin link이고 `cat`은 `CAT_INSTALL_CAT_COMMAND=1`인 경우에만
+시도하며 기존 파일·다른 link는 덮어쓰지 않고 안내하도록 구성하고 있다. profile, sudo, OS package
+manager, 시스템 `cat`, installer, 앱과 검증 명령은 실행하지 않았다.
+P14.3은 `8cc52845d1c59038789cb8c7c0ad0b91a0522bba`에서 완료했다. P14.4에서는 README와
+`docs/release/`에 source/standalone 설치, Linux x64/arm64, 기본 `cat-tui`와 선택적 `cat`, 충돌·update·
+rollback 정책을 정리한다. production dependency closure와 Node archive license를
+`THIRD_PARTY_NOTICES.md`에 기록하고 프로젝트 자체는 원본의 license metadata를 승계하지 않는
+`UNLICENSED` 상태임을 `LICENSE`와 provenance에 명시한다. 고정 source/build/package 입력과 비재귀
+생성 순서, host tool에 따른 bit-for-bit 재현 한계, checksum이 배포자 신원을 증명하지 않는 경계도
+문서화하고 있다. 설치본, app/runtime, compiler, packager와 검증 명령은 실행하지 않았다.
+P14.4는 `233112132c5d8389eb197454c20328238709746d`에서 완료했다. P14 전체 정적 검토에서는
+wrapper가 host와 embedded Node의 정확한 numeric semver를 확인하도록 하고, packager가 현재 TS source의
+`.js`/`.js.map`/`.d.ts` 집합과 symlink 없는 `dist/`를 요구하도록 보완했다. package engine/bin/lifecycle,
+manifest 역할을 대조하고 production stage에서 script metadata를 제거하며 npm symlink를 상대 형태로
+보존한다. runtime 다운로드에는 5분 전체 제한을 추가했다. installer는 필수 `chmod`와 direct dependency,
+incoming package를 확인하고, 설치·명령·기존/staged 디렉터리 identity를 commit 직전에 다시 대조한다.
+`mv -T`와 선예약된 transaction 상태로 signal 사이에도 다른 경로를 중첩 이동하거나 이전 설치를 잃지
+않도록 rollback을 보완했다. `origin/main`은 P14 base와 같고 base가 현재 detached 작업의 조상이며 diff
+형식은 깨끗하다. build, dependency staging, download, tar, packager, installer와 앱은 실행하지 않았다.
+정적 검토 보완은 `b7f18d8b7abc8f36c3550ba80be148de692b2ab8`에서 확정했다. `origin/main`이
+P14 base와 동일하고 `artifacts/`와 `dist/`는 없으며 고정 lockfile의 `node_modules`는 준비된 상태다.
+P14의 유일한 `npm run build`를 명령 실행 전에 `1 / 1`로 예약하고 예약 commit
+`ffbccf8f0414ea89c09726d419a3818a8e00232e`에서 120초 제한으로 실행했다. `tsc -p tsconfig.json`은
+약 1.84초 뒤 종료 코드 0으로 통과했고 `dist/`를 생성했다. 추가 compiler나 앱 runtime은 실행하지
+않았다. 이어 기존 `dist/`만 소비하는 `npm run package:installer`를 한 번 실행해 production dependency
+9개를 고정 lockfile에서 준비했으나, 첫 Linux x64 공식 Node runtime 다운로드에서 약 0.85초 뒤 종료
+코드 1로 실패했다. 이 환경은 proxy 경유 공식 URL에는 HTTP 200으로 접근하지만 직접 HTTPS 연결은
+timeout되며, packager가 환경 proxy 사용을 활성화하지 않은 것이 원인이다. 빈 `AggregateError.message`로
+상세 진단도 출력되지 않았다. 임시 stage는 정리됐고 `artifacts/`는 게시되지 않았으며 tracked source와
+root lockfile은 바뀌지 않았다. proxy-aware 다운로드와 중첩 오류 출력을 수정하고 추가 build 1회 및
+packaging 재시도 1회를 수행하려면 P14 전용 사용자 승인이 필요하다. 승인 전에는 수정, 재실행, push,
+PR과 merge를 진행하지 않는다. 사용자가 P14 오류 수정과 `npm run build` 및
+`npm run package:installer` 추가 1회씩을 명시적으로 승인했다. 고정 direct dependency
+`undici@7.29.1`의 `EnvHttpProxyAgent`를 요청별로 사용해 환경 proxy/NO_PROXY를 존중하고, 공식 URL·
+길이·SHA-256과 download 제한은 유지하도록 `288a99c98866321c5f6668594059cfb9bb0d4121`에서
+수정했다. 중첩 network cause/errors는 제한된 길이로 출력하되 URL credential을 가린다. 추가 build
+예약 commit `437710e0fcc55e625acb8e7d53266e61e646c77a`에서 약 2.04초 뒤 종료 코드 0으로 통과했다.
+이 checkout의 `dist/`를 사용한 승인된 packaging 재시도도 약 5.13초 뒤 종료 코드 0으로 통과했다.
+Linux arm64 installer는 44,350,829 bytes / SHA-256
+`471902e07c0951474882751e5dd7e1fa21d5e25ff07341468736d4aa5e280b25`, x64 installer는
+45,767,649 bytes / SHA-256 `fa6817a8ded3006a50ef418f3c835d27ed8dc43ffdd193e72478549301eb94e1`이다.
+통합 `SHA256SUMS`로 두 파일을 다시 확인해 모두 일치했다. 임시 stage가 남지 않았고 tracked source와
+root lockfile은 바뀌지 않았다. 설치본, bundled Node와 앱 runtime은 실행하지 않았으며 artifact는
+Git에 추가하지 않는다.

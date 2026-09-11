@@ -6,7 +6,7 @@
 
 | 계약 | 원본 근거 | cat 구현 경계 | 단계 | 상태 |
 |---|---|---|---|---|
-| 제품명·`cat-tui` 실행 정책 | `package.json`, `src/version.ts` | `package.json`, `src/core/version.ts`, `bin/cat` | P01/P14 | IN_PROGRESS |
+| 제품명·`cat-tui` 실행 정책 | `package.json`, `src/version.ts` | `package.json`, `src/core/version.ts`, `bin/cat` | P01/P14 | IMPLEMENTED |
 | provider 중립 JSON/message/tool/event | `src/types.ts` | `src/core/*` | P01 | IMPLEMENTED |
 | 설정·API key·profile·trust | `src/settings.ts`, `src/auth.ts`, `src/trust.ts` | `src/storage/*`, `src/security/*` | P02 | IMPLEMENTED |
 | 13개 provider와 SSE transport | `src/providers.ts`, `src/api.ts`, `src/http.ts` | `src/providers/*`, `src/transport/*` | P03 | IMPLEMENTED |
@@ -20,7 +20,7 @@
 | public web 검색·fetch·evidence | `src/tools.ts`, `src/agent.ts` | `src/web/*` | P11 | IMPLEMENTED |
 | background tasks·worktree·SSH/clipboard | `src/tasks.ts`, `src/worktree.ts`, `src/clipboard.ts`, `src/ssh-clipboard.ts` | `src/process/*`, `src/git/*`, `src/clipboard/*` | P12 | IMPLEMENTED |
 | 기존 데이터의 명시적 비파괴 이관 | `src/sessions.ts`, `src/auth.ts` | `src/storage/legacy.ts`, `src/app/legacy-import.ts`, `src/cli/legacy.ts` | P13 | IMPLEMENTED |
-| npm 없는 사용자 영역 설치본 | `scripts/*`, `smilecode` | `scripts/*`, `bin/cat` | P14 | PLANNED |
+| npm 없는 사용자 영역 설치본 | `scripts/*`, `smilecode` | `scripts/*`, `bin/cat` | P14 | IMPLEMENTED |
 
 ## P13.1 최종 기능 매트릭스
 

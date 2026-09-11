@@ -7,23 +7,34 @@
 > 검증 상태: 현재 구현은 단계별 TypeScript 정적 검사만 수행했고 런타임은 미검증이다. 실제 TUI,
 > provider API, 웹, MCP server, shell, SSH/clipboard와 설치본을 실행해 확인하지 않았다.
 
-## 현재 배포 상태
+## 설치와 현재 배포 상태
 
-현재 저장소는 소스 구현 단계다. Node.js와 npm으로 의존성을 설치하고 TypeScript를 컴파일해야 하며,
-npm 없이 설치하는 사용자 영역 배포본과 `cat` launcher는 아직 포함하지 않는다. 지금 package의 실행
-이름은 `cat-tui`이고 npm registry나 GitHub Release에 공개 배포됐다고 가정하면 안 된다.
-
-필요 조건은 Node.js `22.19.0` 이상과 npm이다. 소스 checkout에서는 다음 순서로 준비한다.
+소스 checkout의 필요 조건은 Node.js `22.19.0` 이상과 npm이다. 다음 순서로 고정 dependency를 설치하고
+TypeScript를 컴파일한 뒤 내부 launcher를 사용할 수 있다.
 
 ```bash
 npm ci
 npm run build
-node dist/cli/main.js --help
+./bin/cat --help
 ```
 
-이 문서의 나머지 예시는 설치 후 명령 이름인 `cat-tui`를 사용한다. 현재 checkout에서는 각
-`cat-tui`를 `node dist/cli/main.js`로 바꿔 실행할 수 있다. 위 설치·실행 절차 자체도 아직 실제
-런타임으로 검증하지 않았다.
+standalone installer source도 포함하지만 생성 결과인 `artifacts/`는 Git에 넣지 않으며 npm registry나
+GitHub Release에 자동 공개하지 않는다. 최종 source를 한 번 컴파일한 뒤 별도 packaging 명령은 기존
+`dist/`만 소비해 Linux x64/arm64 설치본과 SHA-256을 만든다.
+
+```bash
+npm run package:installer
+```
+
+설치본은 공식 Node.js v24.21.0, production dependency, `bin/cat`과 license 자료를 포함한다. artifact
+검증·설치, 기본 사용자 경로, update/rollback과 `cat` 충돌 정책은
+[`docs/release/INSTALL.md`](docs/release/INSTALL.md)를 따른다. 입력과 재현 범위는
+[`docs/release/REPRODUCIBILITY.md`](docs/release/REPRODUCIBILITY.md)에 기록했다. 이 절차와 생성된
+installer는 아직 runtime으로 실행 검증하지 않았다.
+
+이 문서의 나머지 예시는 설치 후 기본 PATH 이름인 `cat-tui`를 사용한다. source checkout에서는 이를
+`./bin/cat`으로 바꿔 실행한다. Unix 기본 명령과 충돌하는 `cat` PATH link는 설치 시
+`CAT_INSTALL_CAT_COMMAND=1`을 명시했을 때 user-bin 안에서만 시도한다.
 
 ## 빠른 시작
 
@@ -289,8 +300,9 @@ key 후보를 오류 출력 redaction에 먼저 등록하고, 새 provider catal
   종료로 표시하지 않으므로 사용자가 OS 상태를 점검해야 할 수 있다.
 - local clipboard backend나 OSC52 지원 여부는 OS·terminal·SSH 환경에 따라 다르며 실제 환경에서
   검증하지 않았다. clipboard 읽기는 지원하지 않는다.
-- 현재 npm 없는 설치본, checksum, 사용자 launcher와 배포 artifact는 아직 없다. 별도 배포본이 마련되기
-  전에는 source checkout 밖의 설치 절차를 보장하지 않는다.
+- standalone installer 구성과 checksum 생성 경로는 포함하지만 installer, bundled Node와 설치·rollback은
+  실행 검증하지 않았다. 로컬 artifact가 만들어져도 npm/GitHub에 공개됐거나 운영 호환성이 확인됐다는
+  뜻이 아니다.
 - package는 `UNLICENSED`이며 공개 사용·재배포 조건이 부여됐다고 해석하면 안 된다.
 
 ## 자주 만나는 오류
