@@ -152,7 +152,6 @@ const IMPLEMENTED_CAPABILITIES = Object.freeze([
   "git",
   "extensions",
   "mcp",
-  "web",
 ] as const);
 const PERMISSION_ORDER: readonly PermissionMode[] = Object.freeze([
   "ask",

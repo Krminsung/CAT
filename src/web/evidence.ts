@@ -1,4 +1,4 @@
-import type { ConversationMessage } from "../core/messages.js";
+import type { ConversationMessage, UserMessage } from "../core/messages.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
 import type { ToolExecutionResult } from "../core/tools.js";
 import { ToolInputValidationError } from "../tools/schema.js";
@@ -74,7 +74,7 @@ function record(value: JsonValue | undefined): JsonObject | undefined {
     : undefined;
 }
 
-function messageText(message: ConversationMessage): string {
+function messageText(message: UserMessage): string {
   return message.content.flatMap((part) => part.type === "text" ? [part.text] : []).join("\n");
 }
 
