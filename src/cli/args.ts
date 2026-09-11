@@ -132,7 +132,7 @@ export function cliHelp(): string {
     "  cat-tui auth <setup|status|use|remove> ...\n" +
     "  cat-tui mcp <list|get|add|remove> ...\n" +
     "  cat-tui worktree <add|list|remove> ...\n" +
-    "  cat-tui ssh ...       (P12에서 활성화)\n";
+    "  cat-tui ssh [OpenSSH options] user@host [remote command]\n";
 }
 
 function byteLength(value: string): number {

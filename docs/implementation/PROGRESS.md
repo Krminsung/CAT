@@ -251,4 +251,9 @@ worktree만 기록하고 있다. 생성은 registry 예약 뒤 path·branch·fil
 제거는 현재 cwd, identity 불확실·변경, locked·bare·prunable 및 tracked·untracked·ignored 변경을
 거부하고 force·prune·branch 삭제를 제공하지 않는다. CLI add/list/remove와 `-w`, `/worktree`를
 연결하고 새 cwd의 trust 범위를 다시 해석한다. 실제 셸·task, Git worktree, 앱과 검증 명령은 실행하지
-않았다.
+않았다. P12.2는 `e72579c98e997127a6565ea57b86c2c088c9a193`에서 완료했다. P12.3에서는
+명시적 `/raw copy`에서만 로컬 clipboard 뒤 host 생성 OSC52를 사용하고 tmux/screen wrapping을
+지원한다. 로컬 TTY에서 사용자가 직접 시작하는 `cat-tui ssh`는 OpenSSH option을 shell 없는 argv로
+전달하고, stdout/stderr의 OSC·DCS류 문자열을 bounded parser로 제거한 뒤 제한된 OSC52 write만
+처리한다. clipboard read는 응답하지 않으며 canonical base64·UTF-8·크기·횟수·queue deadline과
+owned process group 종료 상한을 적용한다. 실제 SSH/PTTY, clipboard와 앱은 실행하지 않았다.

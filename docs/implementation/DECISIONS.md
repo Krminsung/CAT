@@ -390,3 +390,17 @@
   경로도 제공하지 않는다. 생성 후 이동한 cwd는 기존 workspace 승인 범위를 상속하지 않고 project
   customization과 filesystem identity 기반 trust를 다시 확인하며 실제 Git worktree 동작은 개발
   단계에서 실행하지 않는다.
+
+## D037 — 사용자 origin OSC52와 쓰기 전용 SSH bridge
+
+- 상태: 승인됨
+- 결정: OSC52는 model·tool·server 문자열을 일반 화면에 쓰는 과정에서 실행하지 않고 `/raw copy` 등
+  명시적 사용자 clipboard action을 받은 host writer만 생성한다. desktop writer 실패 시 payload
+  상한을 지킨 OSC52로 fallback하고 tmux/screen wrapping도 이 생성 경로에만 둔다. SSH bridge는
+  사용자가 로컬 TTY에서 전용 CLI를 직접 시작한 동안에만 제한된 원격 OSC52 write를 해석하며 read
+  query에는 응답하지 않는다.
+- 결과: SSH 양쪽 output stream의 OSC와 DCS/SOS/PM/APC 문자열은 bounded parser가 제거하므로 nested
+  passthrough로 clipboard 권한을 우회할 수 없다. 허용 selection, canonical base64, UTF-8, 크기·횟수와
+  queue deadline을 통과한 write만 로컬/host OSC writer로 전달된다. OpenSSH 옵션은 shell 문자열이 아닌
+  argv로 전달하고 최소 environment 및 검증된 agent socket만 사용하며 credential·key path는 기록하지
+  않는다. 실제 terminal, SSH, clipboard 동작은 개발 단계에서 실행하지 않는다.

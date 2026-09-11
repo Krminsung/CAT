@@ -19,7 +19,7 @@ import {
   type TuiStopOptions,
 } from "@earendil-works/pi-tui";
 
-import { LocalClipboardWriter } from "../clipboard/local.js";
+import { UserRequestedClipboardWriter } from "../clipboard/terminal.js";
 import {
   MAX_CLIPBOARD_TEXT_BYTES,
   type ClipboardWriteOrigin,
@@ -135,6 +135,7 @@ export interface CatTerminalScreenOptions {
   readonly redactor?: TerminalTextRedactor;
   readonly secrets?: readonly string[];
   readonly clipboard?: ClipboardWriter;
+  readonly environment?: NodeJS.ProcessEnv;
 }
 
 interface ActiveModal {
@@ -616,7 +617,11 @@ export class CatTerminalScreen {
     this.#terminal = options.terminal ?? new ProcessTerminal();
     this.#tty = { ...(options.tty ?? detectTerminalTtyState()) };
     this.#diagnostics = options.diagnostics ?? process.stderr;
-    this.#clipboard = options.clipboard ?? new LocalClipboardWriter();
+    this.#clipboard = options.clipboard ?? new UserRequestedClipboardWriter({
+      output: { write: (data) => this.#terminal.write(data) },
+      enabled: this.#tty.stdout,
+      ...(options.environment === undefined ? {} : { environment: options.environment }),
+    });
     this.#redactor = new ScreenRedactor(configuredScreenRedactor(options));
     this.#transcript = new Container();
     this.#transcriptModel = new TerminalTranscript(this.#transcript, {
@@ -1257,12 +1262,14 @@ export class CatTerminalScreen {
       }
     }
     const message: Readonly<Record<ClipboardWriteResult["status"], string>> = {
-      written: "대화 내용을 로컬 clipboard에 복사했습니다.",
+      written: result.status === "written" && result.adapter.includes("osc52")
+        ? "터미널에 OSC52 clipboard 복사 요청을 보냈습니다."
+        : "대화 내용을 로컬 clipboard에 복사했습니다.",
       empty: "복사할 대화 내용이 없습니다.",
       too_large: "대화 내용이 clipboard 복사 크기 제한을 초과했습니다. /raw를 사용하세요.",
-      unavailable: "사용할 수 있는 로컬 clipboard 도구가 없습니다.",
+      unavailable: "사용할 수 있는 로컬 또는 OSC52 clipboard 경로가 없습니다.",
       cancelled: "clipboard 복사를 취소했습니다.",
-      failed: "로컬 clipboard에 복사하지 못했습니다.",
+      failed: "clipboard에 복사하지 못했습니다.",
     };
     this.setStatus(message[result.status]);
     return result;

@@ -18,7 +18,8 @@ export type ClipboardWriteResult =
 
 /**
  * Clipboard writes are only reached from an explicit user action. This boundary
- * intentionally has no clipboard-read operation and no terminal OSC support.
+ * intentionally has no clipboard-read operation. Terminal OSC writers are
+ * separate adapters that can only receive the same explicit user origin.
  */
 export interface ClipboardWriter {
   writeText(request: ClipboardWriteRequest): Promise<ClipboardWriteResult>;
