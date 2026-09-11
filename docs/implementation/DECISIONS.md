@@ -364,3 +364,15 @@
   않고 host 문구로 교체한다. 거부·취소된 웹 권한은 같은 run의 다른 웹 경로로 우회하지 않는다.
   거부된 초안은 화면과 message transcript에 남기지 않으며, 위치 없는 날씨 요청은 host 정보를
   추론하거나 외부로 보내지 않고 지역을 요청한다.
+
+## D035 — session 소유 background process와 stale 복구
+
+- 상태: 승인됨
+- 결정: background 명령은 foreground timeout과 분리된 deadline, 중앙 command 승인과 고정 workspace
+  identity를 사용한다. manager가 생성해 메모리에 보유한 child/process group만 TERM 뒤 KILL하며 임의
+  PID를 입력받거나 재시작 뒤 PID를 추측하지 않는다. 출력은 workspace별 보호 저장소의 8MiB 원형 log와
+  bounded reader로 관리하고 task 수·복원 scan·수명을 함께 제한한다.
+- 결과: list/read/stop은 현재 session의 ID 범위에서만 동작하고 승인 뒤에는 시작 시각과 command digest까지
+  다시 확인한다. 종료 확인 전 process가 끊긴 manifest는 재개 시 `stale`로 보존하되 신호를 보내지 않으며,
+  session 격리와 앱 종료는 현재 manager가 만든 task만 정리한다. terminal control, 저장 실패와 종료 확인
+  실패는 성공으로 숨기지 않고 실제 task runtime은 개발 단계에서 실행하지 않는다.

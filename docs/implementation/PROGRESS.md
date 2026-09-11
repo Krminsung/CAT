@@ -1,6 +1,6 @@
 # cat 구현 진행 상태
 
-P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 이 커밋에서
+P12 기준 main은 `05a02e75e795e8079b318b2168fc372c50025c7b`이다. 구현은 이 커밋에서
 분리된 detached HEAD에서 진행하며 단계 검증이 끝난 뒤에만 정식 브랜치를 만든다.
 
 | 단계 | 상태 | 검증 | 게시 |
@@ -15,8 +15,8 @@ P11 기준 main은 `5af2be849c07b8a2752772ce73c090c662a9e008`이다. 구현은 �
 | P08 CLI·명령 | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #8 / MERGED `7d86fdd` |
 | P09 확장·hooks | DONE | PASS (1/1) | PR #9 / MERGED `e38ef6f` |
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
-| P11 public web | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
-| P12 tasks·worktree·clipboard | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
+| P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
+| P12 tasks·worktree·clipboard | IMPLEMENTING | NOT_RUN (0/1) | NOT_PUBLISHED |
 | P13 통합·이관·문서 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 
@@ -237,3 +237,12 @@ SHA와 같다. 외부 URL, 앱·도구 runtime은 실행하지 않았다. 사용
 마지막 승인 검사를 `4ff679eab63a88805392e62d5cb51d1230cab295`에서 실행했고 종료 코드 0으로
 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 외부 검색·URL, 앱·TUI와 web
 도구 runtime은 실행하지 않았다.
+P11은 검토 head `638fcfee9379ca4a5008829351e7449ba53ee034`를 PR #11에서 merge commit
+`05a02e75e795e8079b318b2168fc372c50025c7b`로 병합했다. merge의 두 부모와 head/merge의
+동일 tree, phase head 조상 관계, `origin/main` 포함을 확인했으며 병합 뒤 검사는 반복하지 않았다.
+P12는 이 merge commit을 기준으로 시작했다. P12.1에서는 foreground timeout과 분리된 background
+deadline, 중앙 승인과 workspace identity 재검사, session별 ID 소유권, 8MiB disk-backed 원형 tail,
+작업 수·수명·복원 scan 상한과 TERM→KILL 종료 경계를 구현하고 있다. 종료를 확인하지 못한 persisted
+task는 재개 시 `stale`로 보존하되 PID를 추측하거나 signal하지 않으며, 현재 manager가 만든 child만
+session/app cleanup 대상으로 삼는다. list/output/stop 도구도 같은 session과 승인된 task identity에
+묶었다. 실제 셸·task와 검증 명령은 실행하지 않았다.

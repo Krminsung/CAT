@@ -16,8 +16,8 @@
 | CLI와 28개 slash 명령 | `src/cli.ts` | `src/cli/*`, `src/tui/commands/*` | P08 | PLANNED |
 | AGENTS·skills·markdown commands·8 hooks | `src/context.ts`, `src/extensions.ts`, `src/hooks.ts` | `src/context/*`, `src/extensions/*` | P09 | PLANNED |
 | stdio MCP 2개 protocol | `src/mcp.ts` | `src/mcp/*` | P10 | IMPLEMENTED |
-| public web 검색·fetch·evidence | `src/tools.ts`, `src/agent.ts` | `src/web/*` | P11 | IN_PROGRESS |
-| background tasks·worktree·SSH/clipboard | `src/tasks.ts`, `src/worktree.ts`, `src/clipboard.ts`, `src/ssh-clipboard.ts` | `src/process/*`, `src/git/*`, `src/clipboard/*` | P12 | PLANNED |
+| public web 검색·fetch·evidence | `src/tools.ts`, `src/agent.ts` | `src/web/*` | P11 | IMPLEMENTED |
+| background tasks·worktree·SSH/clipboard | `src/tasks.ts`, `src/worktree.ts`, `src/clipboard.ts`, `src/ssh-clipboard.ts` | `src/process/*`, `src/git/*`, `src/clipboard/*` | P12 | IN_PROGRESS |
 | 기존 데이터의 명시적 비파괴 이관 | `src/sessions.ts`, `src/auth.ts` | `src/storage/legacy/*` | P13 | PLANNED |
 | npm 없는 사용자 영역 설치본 | `scripts/*`, `smilecode` | `scripts/*`, `bin/cat` | P14 | PLANNED |
 

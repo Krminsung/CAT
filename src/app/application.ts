@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import type { AgentEvent } from "../core/events.js";
 import {
   CancelledError,
@@ -76,10 +77,11 @@ import {
   digestBytes,
   type FileObservationStore,
   ToolRegistry,
-  registerForegroundCommandTool,
+  registerCommandTools,
   registerWorkspaceMutationTools,
   registerWorkspaceReadTools,
 } from "../tools/index.js";
+import { BackgroundTaskManager } from "../process/index.js";
 import {
   HookEngine,
   HookStopPort,
@@ -213,6 +215,7 @@ interface RuntimeOptions {
   readonly guard: WorkspacePathGuard;
   readonly observations: FileObservationStore;
   readonly checkpoints: CheckpointManager;
+  readonly backgroundTasks: BackgroundTaskManager;
   readonly screen?: CatTerminalScreen;
   readonly overlays?: TerminalOverlayController;
   readonly interactions: AgentInteractionHub;
@@ -736,6 +739,7 @@ class AgentApplicationRuntime {
   readonly guard: WorkspacePathGuard;
   readonly observations: FileObservationStore;
   readonly checkpoints: CheckpointManager;
+  readonly backgroundTasks: BackgroundTaskManager;
   readonly screen: CatTerminalScreen | undefined;
   readonly overlays: TerminalOverlayController | undefined;
   readonly interactions: AgentInteractionHub;
@@ -783,6 +787,7 @@ class AgentApplicationRuntime {
     this.guard = options.guard;
     this.observations = options.observations;
     this.checkpoints = options.checkpoints;
+    this.backgroundTasks = options.backgroundTasks;
     this.screen = options.screen;
     this.overlays = options.overlays;
     this.interactions = options.interactions;
@@ -841,13 +846,18 @@ class AgentApplicationRuntime {
       this.output.diagnostic(`cat: SessionEnd hook 실패: ${errorMessage(error)}`);
     }
     const result = await this.lifecycle.close(this.#handle, reason);
+    const taskClose = await this.backgroundTasks.close();
+    if (!taskClose.complete) {
+      this.output.diagnostic(`cat: background task 종료 일부 실패: ${taskClose.failures.join("; ")}`);
+    }
     this.policy.resetSession(result.sessionId);
     if (!result.complete) {
       this.output.diagnostic(
         `cat: 세션 ${result.sessionId} 종료를 완전히 기록하지 못했습니다: ${result.failures.join("; ")}`,
       );
     }
-    return result.complete && hookComplete && mcpClose.complete && publicWebComplete;
+    return result.complete && hookComplete && mcpClose.complete && publicWebComplete &&
+      taskClose.complete;
   }
 
   #newRunner(): AgentRunner {
@@ -2491,6 +2501,10 @@ async function composeRuntime(
     secrets: knownSecrets,
   });
   const catalog = new SessionCatalog(sessionStore);
+  const backgroundTasks = new BackgroundTaskManager({
+    workspace: paths.workspace,
+    storageRoot: join(paths.catHome, "tasks"),
+  });
   const guard = await WorkspacePathGuard.create(
     paths.workspace,
     createSensitivePathPolicy(paths),
@@ -2511,7 +2525,7 @@ async function composeRuntime(
   const observations = registerWorkspaceReadTools(registry, { guard });
   const checkpoints = new CheckpointManager(guard);
   registerWorkspaceMutationTools(registry, { guard, observations, checkpoints });
-  await registerForegroundCommandTool(registry, { paths });
+  await registerCommandTools(registry, { paths, tasks: backgroundTasks });
   registerPublicWebTools(registry, {
     transport: publicWebTransport,
     inputGuard: publicWebInputGuard,
@@ -2542,6 +2556,7 @@ async function composeRuntime(
     activeRuns: sharedSessionRunCoordinator,
     stateCleaners: [
       { name: "file_observations", clearSession: (sessionId) => observations.clearSession(sessionId) },
+      { name: "background_tasks", clearSession: async (sessionId) => await backgroundTasks.clearSession(sessionId) },
     ],
   });
   let handle: SessionHandle | undefined;
@@ -2681,6 +2696,7 @@ async function composeRuntime(
       guard,
       observations,
       checkpoints,
+      backgroundTasks,
       ...(screen === undefined ? {} : { screen, overlays: new TerminalOverlayController(screen) }),
       interactions,
       policy,
@@ -2718,6 +2734,10 @@ async function composeRuntime(
       if (close && !close.complete) {
         output.diagnostic(`cat: 앱 조립 실패 뒤 세션 정리도 일부 실패했습니다: ${close.failures.join("; ")}`);
       }
+    }
+    const taskClose = await backgroundTasks.close().catch(() => undefined);
+    if (taskClose && !taskClose.complete) {
+      output.diagnostic(`cat: 앱 조립 실패 뒤 background task 종료도 일부 실패했습니다: ${taskClose.failures.join("; ")}`);
     }
     throw error;
   }
