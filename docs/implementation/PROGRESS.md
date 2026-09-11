@@ -17,7 +17,7 @@ P13 기준 main은 `c3481e50dc0b5a8b9862d3a185cf7dd8d4f33859`이다. 구현은 �
 | P10 stdio MCP | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #10 / MERGED `5af2be8` |
 | P11 public web | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #11 / MERGED `05a02e7` |
 | P12 tasks·worktree·clipboard | DONE | 1차 FAIL, 2차 PASS (2/2) | PR #12 / MERGED `c3481e5` |
-| P13 통합·이관·문서 | VERIFYING | 1차 FAIL, 2차 NOT_RUN (2/2 예약) | NOT_PUBLISHED |
+| P13 통합·이관·문서 | VERIFIED | 1차 FAIL, 2차 PASS (2/2) | NOT_PUBLISHED |
 | P14 배포·설치본 | NOT_STARTED | NOT_RUN | NOT_PUBLISHED |
 
 P01.1은 `50d716d891791fd08e37053bc6032341b575ba84`, P01.2는
@@ -326,4 +326,6 @@ release, profile 실패 credential 정리와 source read-only 경로에서 새 c
 PR과 merge는 진행하지 않았다. 이후 사용자가 P13 오류 수정과 `npm run check` 추가 1회를 명시적으로
 승인해 `SlashCommandRegistry<AgentApplicationRuntime>` context generic을
 `91288df89c51d109faa412d6c7c0d33f22340386`에서 명시했다. 첫 실패 기록을 보존한 채 두 번째이자
-마지막 승인 검사를 예약했으며 아직 실행하지 않았다.
+마지막 승인 검사를 예약 commit `b64c284288f47b4e4483492a80bf6caf3e8aee05`에서 실행했고 약
+1.59초 뒤 종료 코드 0으로 통과했다. 검사는 `tsc -p tsconfig.json --noEmit`만 수행했으며 실제 앱,
+이관 command, provider, MCP, hook, 도구와 사용자 자료 runtime은 실행하지 않았다.
