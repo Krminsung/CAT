@@ -83,7 +83,7 @@ const FLAG_OPTIONS = new Set<string>([
 const SAFE_IDENTIFIER = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const SESSION_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
 const TOOL_IDENTIFIER = /^[a-z][a-z0-9_]{0,127}$/u;
-const WORKTREE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const WORKTREE_IDENTIFIER = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 
 export function cliUsage(): string {
   return "usage: cat-tui [-h] [-p] [-C CWD] [--model MODEL] " +
@@ -126,12 +126,12 @@ export function cliHelp(): string {
     "  --verbose                      상세 상태 표시\n" +
     "  --no-color                     색상·장식 최소화\n" +
     "  --trust-workspace              현재 workspace trust를 명시적으로 저장\n" +
-    "  -w, --worktree [NAME]          P12 worktree 기능 예약 옵션\n" +
+    "  -w, --worktree [NAME]          새 managed Git worktree에서 실행\n" +
     "  --version                      버전 표시\n\n" +
     "management commands:\n" +
     "  cat-tui auth <setup|status|use|remove> ...\n" +
     "  cat-tui mcp <list|get|add|remove> ...\n" +
-    "  cat-tui worktree ...  (P12에서 활성화)\n" +
+    "  cat-tui worktree <add|list|remove> ...\n" +
     "  cat-tui ssh ...       (P12에서 활성화)\n";
 }
 
@@ -327,8 +327,15 @@ export function parseCliInvocation(argv: readonly string[]): CliInvocation {
           worktree = "";
         }
       }
-      if (worktree && !WORKTREE_IDENTIFIER.test(worktree)) {
-        throw new CliUsageError("--worktree 이름 형식이 올바르지 않습니다.");
+      if (
+        worktree && (
+          !WORKTREE_IDENTIFIER.test(worktree) ||
+          worktree.endsWith(".") ||
+          worktree.endsWith(".lock") ||
+          worktree.includes("..")
+        )
+      ) {
+        throw new CliUsageError("--worktree 이름은 소문자·숫자로 시작하고 . _ - 만 포함해야 합니다.");
       }
       continue;
     }

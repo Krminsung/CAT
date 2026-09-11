@@ -376,3 +376,17 @@
   다시 확인한다. 종료 확인 전 process가 끊긴 manifest는 재개 시 `stale`로 보존하되 신호를 보내지 않으며,
   session 격리와 앱 종료는 현재 manager가 만든 task만 정리한다. terminal control, 저장 실패와 종료 확인
   실패는 성공으로 숨기지 않고 실제 task runtime은 개발 단계에서 실행하지 않는다.
+
+## D036 — repository identity에 묶인 managed worktree registry
+
+- 상태: 승인됨
+- 결정: 제품 worktree는 Git common directory의 canonical path·device·inode로 분리한 보호 저장소와
+  registry에서만 관리한다. create는 이름·고정 branch·경로를 먼저 예약한 뒤 Git porcelain과 directory
+  identity를 확인하며, remove는 동일 registry·repository·경로·생성 identity와 clean 상태가 모두
+  다시 확인된 항목에만 force 없는 Git remove를 허용한다. lock과 작업 결과가 불확실하면 자동 복구나
+  PID 기반 stale lock 삭제 대신 명시적인 `unknown` 상태와 수동 확인을 선택한다.
+- 결과: 등록되지 않은 worktree, 바뀐 directory, 현재 process 또는 선택 cwd를 포함한 worktree,
+  locked·bare·prunable 및 tracked·untracked·ignored 변경은 자동 제거하지 않는다. branch 삭제·prune
+  경로도 제공하지 않는다. 생성 후 이동한 cwd는 기존 workspace 승인 범위를 상속하지 않고 project
+  customization과 filesystem identity 기반 trust를 다시 확인하며 실제 Git worktree 동작은 개발
+  단계에서 실행하지 않는다.

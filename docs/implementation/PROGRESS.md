@@ -245,4 +245,10 @@ deadline, 중앙 승인과 workspace identity 재검사, session별 ID 소유권
 작업 수·수명·복원 scan 상한과 TERM→KILL 종료 경계를 구현하고 있다. 종료를 확인하지 못한 persisted
 task는 재개 시 `stale`로 보존하되 PID를 추측하거나 signal하지 않으며, 현재 manager가 만든 child만
 session/app cleanup 대상으로 삼는다. list/output/stop 도구도 같은 session과 승인된 task identity에
-묶었다. 실제 셸·task와 검증 명령은 실행하지 않았다.
+묶었다. P12.1은 `b7d78eb02eec6f77509c68127fd35d2c638729b7`에서 완료했다. P12.2에서는
+Git common directory의 canonical path·device·inode로 분리된 보호 registry에 cat이 직접 생성한
+worktree만 기록하고 있다. 생성은 registry 예약 뒤 path·branch·filesystem identity를 확인하며,
+제거는 현재 cwd, identity 불확실·변경, locked·bare·prunable 및 tracked·untracked·ignored 변경을
+거부하고 force·prune·branch 삭제를 제공하지 않는다. CLI add/list/remove와 `-w`, `/worktree`를
+연결하고 새 cwd의 trust 범위를 다시 해석한다. 실제 셸·task, Git worktree, 앱과 검증 명령은 실행하지
+않았다.

@@ -3,3 +3,4 @@ export * from "./auth.js";
 export * from "./mcp.js";
 export * from "./output.js";
 export * from "./run.js";
+export * from "./worktree.js";
