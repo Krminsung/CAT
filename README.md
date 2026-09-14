@@ -258,7 +258,10 @@ workspace trust가 필요하다. 대화형 실행은 관련 파일 목록과 신
 설정을 덮어쓸 수 있다.
 
 세션은 append-only JSONL metadata와 transcript로 저장한다. `--no-session-persistence`는 현재 실행의
-새 세션 기록을 만들지 않는다. transcript 출력과 저장은 알려진 secret과 민감 field를 가리지만,
+새 세션 기록을 만들지 않는다. 실행 중에는 도구 시작 전과 결과 수신 후에 메시지·이벤트를 순차 저장한다.
+저장 실패 시 추가 실행을 차단하며, 재개할 때 결과가 누락된 호출은 성공이나 미실행으로 추측하지 않고
+`unknown`으로 표시한다. 이미 발생한 셸·MCP 부작용은 실제 상태를 확인하기 전 자동 재실행하지 않는다.
+transcript 출력과 저장은 알려진 secret과 민감 field를 가리지만,
 임의의 비밀 문자열을 모두 탐지한다고 보장하지 않으므로 prompt와 tool 출력에 secret을 넣지 않는 것이
 안전하다.
 

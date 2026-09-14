@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { ConfigurationError } from "../core/errors.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
 import type {
@@ -529,6 +530,7 @@ function compactionBoundary(record: StoredTranscriptRecord): CompactionBoundary 
 }
 
 export class ModelContextProjector {
+  readonly #unresolvedExecutions = new Map<string, { toolName: string; callId: string; createdAt: number }>();
   readonly #context: ModelContextInfo;
   readonly #limits: ResolvedLimits;
   readonly #redactor: Redactor;
@@ -578,6 +580,23 @@ export class ModelContextProjector {
     if (this.#sourceRecords > this.#limits.maxSourceRecords) {
       throw new ConfigurationError("Projection source transcript record 상한을 초과했습니다.");
     }
+    if (record.kind === "agent_event") {
+      const event = record.data.event;
+      if (!event || typeof event !== "object" || Array.isArray(event)) return;
+      const { runId, callId, toolName } = event;
+      if (typeof runId !== "string" || typeof callId !== "string" || typeof toolName !== "string" ||
+        runId.length > 256 || callId.length > 256 || toolName.length > 256) return;
+      const key = JSON.stringify([runId, callId]);
+      if (event.type === "tool_start") {
+        if (this.#unresolvedExecutions.size >= 256 && !this.#unresolvedExecutions.has(key)) {
+          throw new ConfigurationError("실행 결과가 없는 기록이 너무 많습니다. 세션 상태를 직접 확인하세요.");
+        }
+        this.#unresolvedExecutions.set(key, { toolName, callId, createdAt: Date.parse(record.createdAt) });
+      } else if (event.type === "tool_result" && this.#unresolvedExecutions.get(key)?.toolName === toolName) {
+        this.#unresolvedExecutions.delete(key);
+      }
+      return;
+    }
     if (record.kind === "compaction") {
       try {
         const boundary = compactionBoundary(record);
@@ -611,6 +630,20 @@ export class ModelContextProjector {
     this.#assertMutable();
     this.#finished = true;
     this.#discardPending("Transcript 끝에 완료되지 않은 tool call/result가 있습니다.");
+    if (this.#unresolvedExecutions.size > 0) {
+      const unresolved = [...this.#unresolvedExecutions.values()];
+      const names = unresolved.slice(0, MAX_INCOMPLETE_TOOL_REFERENCES)
+        .map((item) => `${item.toolName} (${item.callId})`).join(", ");
+      const notice = `이전 실행 ${unresolved.length}건의 결과 기록이 없습니다: ${names}. ` +
+        "실행 여부 불명이며 부작용이 발생했을 수 있습니다. 자동으로 재실행하지 말고 실제 상태와 사용자 의도를 확인하세요.";
+      this.#warn("incomplete_tool_exchange", notice);
+      this.#addUnit([{
+        role: "user",
+        id: `recovery:${createHash("sha256").update(notice).digest("hex")}`,
+        createdAt: unresolved[0]?.createdAt ?? 0,
+        content: [{ type: "text", text: notice }],
+      }], 0);
+    }
 
     let observationRemaining = this.#limits.maxObservationBytes;
     let observationBytes = 0;
@@ -948,6 +981,25 @@ export class ModelContextProjector {
           omitted > 0 ? ` 외 ${omitted}개` : ""
         }.`;
     this.#warn("incomplete_tool_exchange", `${message}${detail}`);
+    const unknownResults: ToolMessage[] = unresolved.map(([callId, toolName]) => ({
+      role: "tool",
+      id: `recovered:${createHash("sha256").update(`${pending.assistant.id}:${callId}`).digest("hex")}`,
+      createdAt: pending.assistant.createdAt,
+      callId,
+      toolName,
+      result: {
+        status: "failure",
+        execution: "unknown",
+        error: {
+          code: "interrupted_tool_result_unknown",
+          message: "이전 실행의 결과가 저장되지 않았습니다. 부작용이 이미 발생했을 수 있습니다. 자동 재실행하지 말고 실제 상태와 사용자 의도를 확인하세요.",
+          retryable: false,
+        },
+      },
+    }));
+    // Keep completed siblings as well as explicit unknown results. Do not
+    // silently erase the whole batch, and never manufacture a success.
+    this.#addUnit([pending.assistant, ...pending.results, ...unknownResults], pending.expected.size);
   }
 
   #warn(code: ContextProjectionWarning["code"], message: string): void {

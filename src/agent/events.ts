@@ -82,6 +82,10 @@ export class AgentEventJournal implements AgentEventWriter {
     return Object.freeze([...this.#events]);
   }
 
+  eventsAfter(sequence: number): readonly AgentEvent[] {
+    return this.#events.slice(sequence);
+  }
+
   #append(payload: AgentEventPayload): AgentEvent {
     const occurredAt = this.#now();
     if (!Number.isSafeInteger(occurredAt) || occurredAt < 0) {
