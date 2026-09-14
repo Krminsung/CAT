@@ -1730,6 +1730,7 @@ class AgentApplicationRuntime {
 
   async #persistEvents(events: readonly AgentEvent[]): Promise<void> {
     for (const event of events) {
+      if (event.type === "text_delta") continue;
       await this.#handle.appendTranscript({
         kind: "agent_event",
         runId: event.runId,

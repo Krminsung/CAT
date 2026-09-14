@@ -659,6 +659,7 @@ export class TerminalTranscript {
         break;
       }
       case "approval_required":
+      case "text_complete":
       case "user_input_required":
       case "user_input_result":
       case "usage":

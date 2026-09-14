@@ -444,6 +444,7 @@ class TextDeltaGate {
     if (!this.#released && visibleText) {
       this.#journal.emit({ type: "text_delta", text: visibleText });
     }
+    if (visibleText) this.#journal.emit({ type: "text_complete", text: visibleText });
     this.#heldParts.length = 0;
     this.#released = true;
   }

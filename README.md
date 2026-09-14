@@ -121,7 +121,11 @@ HTTP endpoint는 내부 개발 환경에서 `--allow-insecure-http`까지 명시
 | 출력 조정 | `--verbose`, `--no-color` |
 
 `--resume`과 `--continue`, 그리고 이 둘과 `--worktree`는 함께 사용할 수 없다. `json`과
-`stream-json` 출력은 `--print`에서만 사용할 수 있다. `--base-url`은 선택한 저장 profile의 endpoint와
+`stream-json` 출력은 `--print`에서만 사용할 수 있다. 비밀값이 여러 토큰에 나뉘어 노출되는 것을 막기 위해
+텍스트는 완성된 `text_complete` 이벤트에서 전체 redaction 후 전달한다. 원시 `text_delta`는 TUI의
+일시적인 표시에만 사용하며 JSON stdout과 세션 이벤트 기록에는 남기지 않는다. 이벤트 sequence에는
+생략된 delta로 인한 간격이 있을 수 있다. 중단된 미완성 응답은 JSON 텍스트 이벤트로 내보내지 않는다.
+`--base-url`은 선택한 저장 profile의 endpoint와
 일치하는지 확인하는 옵션이지, 임시 credential을 만드는 옵션이 아니다.
 
 관리 명령은 agent 대화와 별도 진입점이다.
