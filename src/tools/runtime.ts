@@ -15,6 +15,7 @@ import type {
 import { PermissionPolicy } from "../security/permissions.js";
 import {
   assertSupportedToolSchema,
+  isStrictProviderSchema,
   ToolInputValidationError,
   validateToolInput,
 } from "./schema.js";
@@ -310,7 +311,7 @@ export class ToolRegistry {
       preflight: registration.preflight ?? (async (input) => defaultPreflight(storedDefinition, input)),
       revalidate: registration.revalidate ?? (async () => undefined),
       validateInput: (input) => validateToolInput(input, storedDefinition.inputSchema, storedDefinition.name),
-      strictProviderSchema: true,
+      strictProviderSchema: isStrictProviderSchema(storedDefinition.inputSchema),
       source: Object.freeze({ kind: "builtin" }),
     });
   }
