@@ -23,5 +23,17 @@
     "result": "NOT_PUBLISHED"
   },
   "nextAction": "Create cat/p14-packaging, push it, open the P14 pull request, review metadata and diff, then merge",
-  "blocker": null
+  "blocker": null,
+  "reviewFollowUp": {
+    "scope": ["R01", "R02", "R03", "R04"],
+    "baseMainSha": "4abb0ea84c7f5306706e521cefc1729688c70b59",
+    "codeHeadSha": "563e8ae",
+    "progressRef": "refs/cat-progress/P14-review-fixes",
+    "status": "AWAITING_VERIFICATION_APPROVAL",
+    "verificationRuns": 0,
+    "verificationAuthorized": false,
+    "publication": "LOCAL_ONLY",
+    "artifactsContainReviewFixes": false,
+    "nextAction": "Request explicit approval for one npm run check of the review fixes; do not reuse the previous P14 build result."
+  }
 }

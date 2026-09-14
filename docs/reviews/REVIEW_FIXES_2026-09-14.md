@@ -17,4 +17,8 @@
 
 ## 검증과 배포
 
-소스 읽기와 diff 검토만 수행한다. 추가 typecheck/build/test/앱 실행/패키징은 미실행이다. 기존 `dist/`와 `artifacts/`는 이번 수정이 반영된 배포물이 아니다.
+소스 읽기와 diff 검토를 수행했다. 추가 typecheck/build/test/앱 실행/패키징은 미실행이다. 기존 `dist/`와 `artifacts/`는 이번 수정이 반영된 배포물이 아니다.
+
+수정 커밋: R01 `ac7cdf9`, R02 `1304ff6`, R03 `3b22d71`, R04 `563e8ae`. 별도 안전 ref에 로컬 보존했으며 main 변경·원격 push·PR·병합은 하지 않았다.
+
+현재 상태는 `AWAITING_VERIFICATION_APPROVAL`이다. 다음 최소 검증으로 수정본의 `npm run check` 1회 실행 승인을 요청한다. 기존 P14 빌드 통과를 새 코드의 검증 결과로 재사용하지 않는다. 타입 검사 승인만으로 build·installer 재포장·런타임 테스트도 승인된 것으로 간주하지 않는다.
