@@ -9,7 +9,9 @@
 
 - R01: 내장 도구 스키마의 보수적 strict 호환성 판정을 추가했다. 선택 인자나 호환성을 확정하지 않은 제약이 있으면 strict를 false로 전송한다. 호스트 검증과 기존 입력 형식은 유지했다.
 - R02: `text_complete` 이벤트를 추가하고 JSON stdout 및 이벤트 저장에서 원시 `text_delta`를 제외했다. 완성 텍스트 전체를 기존 redactor로 처리한다. 취소·오류 중 미완성 조각은 공개/저장 경로로 flush하지 않는다. TUI의 실시간 렌더링은 유지한다.
-- R03–R04: 수정 진행 중.
+- R03: foreground/background/MCP에 소유 그룹 정리 경계를 연결했다. 직접 자식 close 이후에도 TERM→KILL 정리를 기다리며, Linux에서는 관측한 PID·PGID·session·시작 시각을 다시 확인하고 신호를 보낸다. 종료 확인에 실패하면 성공 대신 unknown/오류를 반환하고 background 기록과 관측 PGID를 보존한다. MCP의 미확인 소유 process를 제거하거나 재시작하지 않는다.
+- R03 한계: 직접 자식이 관측되지 않은 후손을 남기고 먼저 종료했거나 `/proc` 관측이 제한되면 그룹 소유권을 추측해 강제 종료하지 않는다. 정리 불명으로 보고하고 수동 조치를 요구한다. 그룹을 벗어난 임의 daemon까지 격리하는 sandbox는 아니다. [Linux proc stat 규격](https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html)을 참고했다.
+- R04: 수정 진행 중.
 
 ## 검증과 배포
 

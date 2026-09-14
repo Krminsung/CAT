@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { ownedProcessGroup } from "../process/owned-group.js";
 import type { JsonObject, JsonValue } from "../core/json.js";
 import { ConfigurationError } from "../core/errors.js";
 import { Redactor } from "../security/redaction.js";
@@ -11,8 +12,6 @@ const MAX_PENDING_REQUESTS = 256;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const MAX_REQUEST_TIMEOUT_MS = 5 * 60_000;
 const STDIN_CLOSE_GRACE_MS = 250;
-const TERM_GRACE_MS = 1_500;
-const KILL_GRACE_MS = 1_000;
 const MAX_ARGUMENTS = 4_096;
 const MAX_ARGUMENT_BYTES = 1024 * 1024;
 const MAX_COMMAND_BYTES = 4_096;
@@ -138,23 +137,6 @@ function encodeFrame(message: JsonObject, label: string): Buffer {
   return frame;
 }
 
-function ownedSignal(child: ChildProcessWithoutNullStreams, signal: NodeJS.Signals): void {
-  if (!child.pid) return;
-  if (process.platform !== "win32") {
-    try {
-      process.kill(-child.pid, signal);
-      return;
-    } catch {
-      // 같은 호출에서 생성한 child만 직접 종료하는 fallback이다.
-    }
-  }
-  try {
-    child.kill(signal);
-  } catch {
-    // 이미 종료된 소유 child는 종료된 것으로 취급한다.
-  }
-}
-
 export class McpStdioTransport {
   readonly serverName: string;
   readonly #options: McpStdioTransportOptions;
@@ -225,6 +207,7 @@ export class McpStdioTransport {
       throw new McpError(`MCP 서버를 시작하지 못했습니다: ${this.serverName}`, { cause: error });
     }
     this.#process = child;
+    ownedProcessGroup(child);
     child.stdout.on("data", (value: Buffer | string) => {
       if (this.#process !== child) return;
       this.#consumeStdout(typeof value === "string" ? Buffer.from(value) : value);
@@ -288,13 +271,13 @@ export class McpStdioTransport {
       if (this.#process !== child) return;
       const detail = this.stderrTail().trim().slice(-2_000);
       const expected = this.#state === "closing" || this.#state === "closed";
-      this.#process = undefined;
-      this.#state = expected ? "closed" : "failed";
+      if (!expected) this.#state = "failed";
       this.#failAll(new McpError(
         `MCP 서버 연결이 종료되었습니다: ${this.serverName}` +
           ` (code=${String(code)}, signal=${String(exitSignal)})` +
           (detail ? ` · ${detail}` : ""),
       ));
+      if (!expected) void this.close("process exited").catch(() => undefined);
     });
 
     const startPromise = new Promise<void>((resolve, reject) => {
@@ -473,58 +456,31 @@ export class McpStdioTransport {
     const child = this.#process;
     this.#state = "closing";
     this.#failAll(new McpError(`MCP transport를 종료했습니다: ${this.serverName} · ${reason}`));
-    if (!child || child.exitCode !== null || child.signalCode !== null) {
+    if (!child) {
       this.#process = undefined;
       this.#state = "closed";
       return;
     }
-    const closing = new Promise<void>((resolve, reject) => {
-      let settled = false;
-      let termTimer: NodeJS.Timeout | undefined;
-      let killTimer: NodeJS.Timeout | undefined;
-      let forceTimer: NodeJS.Timeout | undefined;
-      const finish = (error?: Error): void => {
-        if (settled) return;
-        settled = true;
-        if (termTimer) clearTimeout(termTimer);
-        if (killTimer) clearTimeout(killTimer);
-        if (forceTimer) clearTimeout(forceTimer);
-        child.off("close", closed);
-        if (error) {
-          if (this.#process === child) this.#state = "failed";
-          reject(error);
-          return;
-        }
-        if (this.#process === child) this.#process = undefined;
-        this.#state = "closed";
-        resolve();
-      };
-      const closed = (): void => finish();
-      child.once("close", closed);
+    const closing = (async (): Promise<void> => {
+      const group = ownedProcessGroup(child);
+      group.observe();
       try {
         child.stdin.end();
       } catch {
         // 닫힌 stdin은 다음 TERM 단계로 이어간다.
       }
-      termTimer = setTimeout(() => {
-        ownedSignal(child, "SIGTERM");
-        killTimer = setTimeout(() => {
-          ownedSignal(child, "SIGKILL");
-          forceTimer = setTimeout(() => {
-            if (child.exitCode !== null || child.signalCode !== null) {
-              finish();
-              return;
-            }
-            finish(new McpError(
-              `MCP 소유 process 종료를 확인하지 못했습니다: ${this.serverName}`,
-            ));
-          }, KILL_GRACE_MS);
-          forceTimer.unref();
-        }, TERM_GRACE_MS);
-        killTimer.unref();
-      }, STDIN_CLOSE_GRACE_MS);
-      termTimer.unref();
-    });
+      await new Promise<void>((resolve) => setTimeout(resolve, STDIN_CLOSE_GRACE_MS));
+      const confirmed = await group.cleanup();
+      child.stdin.destroy();
+      child.stdout.destroy();
+      child.stderr.destroy();
+      if (!confirmed) {
+        this.#state = "failed";
+        throw new McpError(`MCP 소유 프로세스 그룹 종료 불명 (PGID=${child.pid ?? "unknown"}): ${this.serverName}`);
+      }
+      if (this.#process === child) this.#process = undefined;
+      this.#state = "closed";
+    })();
     this.#closePromise = closing;
     try {
       await closing;

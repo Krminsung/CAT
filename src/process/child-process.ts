@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
+import { ownedProcessGroup } from "./owned-group.js";
 
 const MAX_CAPTURE_TIMEOUT_MS = 300_000;
 const MAX_CAPTURE_OUTPUT_BYTES = 8 * 1024 * 1024;
@@ -24,6 +25,8 @@ export interface ChildCaptureResult {
   timedOut: boolean;
   cancelled: boolean;
   outputLimitReached: boolean;
+  terminationConfirmed?: boolean;
+  processGroupId?: number;
   spawnErrorCode?: string;
   spawnErrorMessage?: string;
 }
@@ -120,38 +123,12 @@ export async function captureChildProcess(
     let cancelled = false;
     let outputLimitReached = false;
     let spawnError: Error | undefined;
-    let killTimer: NodeJS.Timeout | undefined;
-    let forceCloseTimer: NodeJS.Timeout | undefined;
-
-    const sendSignal = (signal: NodeJS.Signals): void => {
-      if (!child.pid) return;
-      if (process.platform !== "win32") {
-        try {
-          process.kill(-child.pid, signal);
-          return;
-        } catch {
-          // 같은 호출에서 생성한 child만 fallback으로 종료한다.
-        }
-      }
-      try {
-        child.kill(signal);
-      } catch {
-        // 이미 끝난 owned child는 종료된 것으로 취급한다.
-      }
-    };
+    const group = ownedProcessGroup(child);
 
     const terminate = (): void => {
       if (terminating || settled) return;
       terminating = true;
-      sendSignal("SIGTERM");
-      killTimer = setTimeout(() => {
-        sendSignal("SIGKILL");
-        forceCloseTimer = setTimeout(() => {
-          child.stdout.destroy();
-          child.stderr.destroy();
-          finish(null, null);
-        }, 1_000);
-      }, 250);
+      void group.cleanup().then(() => finish(child.exitCode, child.signalCode));
     };
 
     const collect = (stream: Readable, destination: Buffer[]): void => {
@@ -179,20 +156,23 @@ export async function captureChildProcess(
       terminate();
     }, options.timeoutMs);
 
-    function finish(code: number | null, signal: NodeJS.Signals | null): void {
+    async function finish(code: number | null, signal: NodeJS.Signals | null): Promise<void> {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutTimer);
-      if (killTimer) clearTimeout(killTimer);
-      if (forceCloseTimer) clearTimeout(forceCloseTimer);
       options.signal.removeEventListener("abort", abort);
+      const terminationConfirmed = await group.cleanup();
+      child.stdout.destroy();
+      child.stderr.destroy();
       const codeValue = spawnError ? errorCode(spawnError) : undefined;
       resolve({
         started: child.pid !== undefined,
         stdout: decode(stdout),
         stderr: decode(stderr),
-        exitCode: code,
-        exitSignal: signal,
+        exitCode: terminationConfirmed ? code : null,
+        exitSignal: terminationConfirmed ? signal : null,
+        terminationConfirmed,
+        ...(child.pid === undefined ? {} : { processGroupId: child.pid }),
         timedOut,
         cancelled: cancelled || options.signal.aborted,
         outputLimitReached,
