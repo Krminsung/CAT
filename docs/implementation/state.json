@@ -29,7 +29,7 @@
     "baseMainSha": "4abb0ea84c7f5306706e521cefc1729688c70b59",
     "codeHeadSha": "563e8aefb7498b46cad003a83a695ff0ffef6201",
     "progressRef": "refs/cat-progress/P14-review-fixes",
-    "status": "VERIFYING",
+    "status": "VERIFIED",
     "verificationRuns": 1,
     "verificationAuthorized": true,
     "verificationAttempts": [
@@ -38,13 +38,15 @@
         "command": "npm run check",
         "authorization": "사용자가 수정본의 npm run check 1회 실행을 명시적으로 승인함",
         "reservedAt": "2026-09-14T01:24:44Z",
-        "targetCommitSha": null,
-        "result": "PENDING",
-        "exitCode": null
+        "targetCommitSha": "e42f37f2c52e3ab4e58b98dc610aa233fa928c38",
+        "startedAt": "2026-09-14T01:25:22Z",
+        "completionObservedAt": "2026-09-14T01:25:28Z",
+        "result": "PASS",
+        "exitCode": 0
       }
     ],
     "publication": "LOCAL_ONLY",
     "artifactsContainReviewFixes": false,
-    "nextAction": "Run the explicitly authorized npm run check once against the reservation commit, with a 120-second timeout. Record the result without rerunning."
+    "nextAction": "Report that the single authorized type check passed. Do not rerun checks or perform build, packaging, runtime execution, or remote publication under this check-only approval."
   }
 }
