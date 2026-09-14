@@ -22,3 +22,11 @@
 수정 커밋: R01 `ac7cdf9`, R02 `1304ff6`, R03 `3b22d71`, R04 `563e8ae`. 별도 안전 ref에 로컬 보존했으며 main 변경·원격 push·PR·병합은 하지 않았다.
 
 현재 상태는 `AWAITING_VERIFICATION_APPROVAL`이다. 다음 최소 검증으로 수정본의 `npm run check` 1회 실행 승인을 요청한다. 기존 P14 빌드 통과를 새 코드의 검증 결과로 재사용하지 않는다. 타입 검사 승인만으로 build·installer 재포장·런타임 테스트도 승인된 것으로 간주하지 않는다.
+
+## 추가 검사 1회 승인 및 예약
+
+- 사용자가 수정본의 `npm run check` 1회 실행을 명시적으로 승인했다.
+- 승인 예약: 2026-09-14 01:24:44 UTC. 상태를 `VERIFYING`으로 변경하고 실행 기회를 먼저 예약했다.
+- 코드 HEAD: `563e8aefb7498b46cad003a83a695ff0ffef6201`. 실제 검사 대상은 이 예약 문서 커밋의 HEAD로 확정한다.
+- 원격 main은 기준 `4abb0ea84c7f5306706e521cefc1729688c70b59`와 동일함을 읽기 전용 조회로 확인했다.
+- 명령은 `npm run check`이며 `tsc -p tsconfig.json --noEmit`만 수행한다. timeout 120초, 재실행 없음. build·패키징·앱·테스트 실행은 포함하지 않는다.
