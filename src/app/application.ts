@@ -899,6 +899,7 @@ class AgentApplicationRuntime {
   #contextTokens: number | undefined;
   #responseId: string | undefined;
   #pendingLocalContext = "";
+  #persistenceError: ConfigurationError | undefined;
   #knownSecrets: readonly string[];
   readonly #unsubscribeBackgroundTasks: () => void;
   #shutdownPromise: Promise<boolean> | undefined;
@@ -1285,7 +1286,13 @@ class AgentApplicationRuntime {
     });
     for (const notice of scan.notices) this.screen?.setStatus(notice.message);
     if (additional !== undefined) projector.pushMessage(additional);
-    return projector.finish();
+    const projection = projector.finish();
+    for (const warning of projection.warnings) {
+      if (warning.code !== "incomplete_tool_exchange") continue;
+      this.screen?.setStatus(warning.message);
+      this.output.diagnostic(warning.message);
+    }
+    return projection;
   }
 
   async #compactProjection(
@@ -1356,6 +1363,7 @@ class AgentApplicationRuntime {
   }
 
   async #executePrompt(rawPrompt: string, signal: AbortSignal): Promise<AgentRunResult> {
+    if (this.#persistenceError) throw this.#persistenceError;
     const prompt = safePrompt(rawPrompt);
     const promptHook = await this.#hooks.run(
       "UserPromptSubmit",
@@ -1471,7 +1479,6 @@ class AgentApplicationRuntime {
       await this.#handle.appendTranscript(transcriptMessageRequest(user));
       this.#pendingLocalContext = "";
     }
-    const initialMessages = projection.messages.length;
     let result: AgentRunResult;
     try {
       result = await this.#runner.run({
@@ -1480,6 +1487,10 @@ class AgentApplicationRuntime {
         messages: projection.messages,
         signal,
         onEvent: (event) => this.#eventSink(event),
+        persistence: {
+          appendMessage: async (message) => await this.#persistMessage(message, runId),
+          appendEvent: async (event) => await this.#persistEvents([event]),
+        },
         allowTools: true,
         webPrompt: prompt,
         ...(sharedBudget === undefined ? {} : { budget: sharedBudget }),
@@ -1491,10 +1502,8 @@ class AgentApplicationRuntime {
     }
     const runUsage = addUsage(compactionUsage, result.usage);
     this.#usage = addUsage(this.#usage, runUsage);
-    for (const message of result.messages.slice(initialMessages)) {
-      await this.#handle.appendTranscript(transcriptMessageRequest(message, runId));
-    }
-    await this.#persistEvents(result.events);
+    // Messages and non-delta events were already durably saved at run boundaries.
+    if (this.#persistenceError) return result;
     this.#responseId = result.responseId ?? this.#responseId;
     const updated = await this.lifecycle.update(this.#handle, {
       model: this.#model,
@@ -1654,6 +1663,7 @@ class AgentApplicationRuntime {
     input: JsonObject,
     signal: AbortSignal,
   ): Promise<ToolExecutionResult> {
+    if (this.#persistenceError) throw this.#persistenceError;
     const identity = {
       sessionId: this.sessionId,
       runId: `direct:${randomUUID()}`,
@@ -1669,6 +1679,12 @@ class AgentApplicationRuntime {
     const callId = `call:${randomUUID()}`;
     let interactionLease: ReturnType<AgentInteractionHub["attach"]> | undefined;
     let started = false;
+    let persistedSequence = 0;
+    const flushEvents = async (): Promise<void> => {
+      const events = journal.eventsAfter(persistedSequence);
+      await this.#persistEvents(events);
+      persistedSequence = events.at(-1)?.sequence ?? persistedSequence;
+    };
     let result: ToolExecutionResult = {
       status: "failure",
       error: {
@@ -1683,6 +1699,13 @@ class AgentApplicationRuntime {
       started = true;
       interactionLease = this.interactions.attach(identity.sessionId, identity.runId, journal);
       journal.emit({ type: "tool_start", callId, toolName, input });
+      await this.#persistMessage({
+        role: "assistant",
+        id: `message:${identity.runId}:direct`,
+        createdAt: Date.now(),
+        content: [{ type: "tool_call", callId, name: toolName, input }],
+      }, identity.runId);
+      await flushEvents();
       result = await this.interactions.withToolCall(identity.runId, callId, async () =>
         await this.#executor.execute(toolName, input, {
           ...identity,
@@ -1724,18 +1747,50 @@ class AgentApplicationRuntime {
       interactionLease?.release();
       ownership.lease.release();
     }
-    await this.#persistEvents(journal.events());
+    if (this.#persistenceError) throw this.#persistenceError;
+    await this.#persistMessage({
+      role: "tool",
+      id: `message:${identity.runId}:result`,
+      createdAt: Date.now(),
+      callId,
+      toolName,
+      result,
+    }, identity.runId);
+    await flushEvents();
     return result;
   }
 
+  #failPersistence(cause: unknown): never {
+    this.#persistenceError ??= new ConfigurationError(
+      "실행 기록 저장에 실패해 추가 실행을 차단했습니다. 저장소 상태와 미완료 작업을 확인한 뒤 세션을 다시 여세요.",
+      { cause },
+    );
+    throw this.#persistenceError;
+  }
+
+  async #persistMessage(message: ConversationMessage, runId: string): Promise<void> {
+    if (this.#persistenceError) throw this.#persistenceError;
+    try {
+      await this.#handle.appendTranscript(transcriptMessageRequest(message, runId));
+    } catch (error) {
+      this.#failPersistence(error);
+    }
+  }
+
   async #persistEvents(events: readonly AgentEvent[]): Promise<void> {
-    for (const event of events) {
-      await this.#handle.appendTranscript({
-        kind: "agent_event",
-        runId: event.runId,
-        createdAt: new Date(event.occurredAt).toISOString(),
-        data: { event: jsonObjectSnapshot(event, "Agent event") },
-      });
+    if (this.#persistenceError) throw this.#persistenceError;
+    try {
+      for (const event of events) {
+        if (event.type === "text_delta") continue;
+        await this.#handle.appendTranscript({
+          kind: "agent_event",
+          runId: event.runId,
+          createdAt: new Date(event.occurredAt).toISOString(),
+          data: { event: jsonObjectSnapshot(event, "Agent event") },
+        });
+      }
+    } catch (error) {
+      this.#failPersistence(error);
     }
   }
 

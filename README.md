@@ -121,7 +121,11 @@ HTTP endpoint는 내부 개발 환경에서 `--allow-insecure-http`까지 명시
 | 출력 조정 | `--verbose`, `--no-color` |
 
 `--resume`과 `--continue`, 그리고 이 둘과 `--worktree`는 함께 사용할 수 없다. `json`과
-`stream-json` 출력은 `--print`에서만 사용할 수 있다. `--base-url`은 선택한 저장 profile의 endpoint와
+`stream-json` 출력은 `--print`에서만 사용할 수 있다. 비밀값이 여러 토큰에 나뉘어 노출되는 것을 막기 위해
+텍스트는 완성된 `text_complete` 이벤트에서 전체 redaction 후 전달한다. 원시 `text_delta`는 TUI의
+일시적인 표시에만 사용하며 JSON stdout과 세션 이벤트 기록에는 남기지 않는다. 이벤트 sequence에는
+생략된 delta로 인한 간격이 있을 수 있다. 중단된 미완성 응답은 JSON 텍스트 이벤트로 내보내지 않는다.
+`--base-url`은 선택한 저장 profile의 endpoint와
 일치하는지 확인하는 옵션이지, 임시 credential을 만드는 옵션이 아니다.
 
 관리 명령은 agent 대화와 별도 진입점이다.
@@ -254,7 +258,10 @@ workspace trust가 필요하다. 대화형 실행은 관련 파일 목록과 신
 설정을 덮어쓸 수 있다.
 
 세션은 append-only JSONL metadata와 transcript로 저장한다. `--no-session-persistence`는 현재 실행의
-새 세션 기록을 만들지 않는다. transcript 출력과 저장은 알려진 secret과 민감 field를 가리지만,
+새 세션 기록을 만들지 않는다. 실행 중에는 도구 시작 전과 결과 수신 후에 메시지·이벤트를 순차 저장한다.
+저장 실패 시 추가 실행을 차단하며, 재개할 때 결과가 누락된 호출은 성공이나 미실행으로 추측하지 않고
+`unknown`으로 표시한다. 이미 발생한 셸·MCP 부작용은 실제 상태를 확인하기 전 자동 재실행하지 않는다.
+transcript 출력과 저장은 알려진 secret과 민감 field를 가리지만,
 임의의 비밀 문자열을 모두 탐지한다고 보장하지 않으므로 prompt와 tool 출력에 secret을 넣지 않는 것이
 안전하다.
 

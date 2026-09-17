@@ -6,6 +6,7 @@ import {
   PermissionDeniedError,
   ProtocolError,
   ProviderError,
+  StorageError,
 } from "../core/errors.js";
 import type { AgentEvent } from "../core/events.js";
 import type {
@@ -107,6 +108,12 @@ export interface AgentRunRequest extends RunIdentity {
   readonly webPrompt?: string;
   /** 사전 compaction이 소비한 동일 run 예산의 소유권을 runner에 넘긴다. */
   readonly budget?: RunBudgetController;
+  readonly persistence?: AgentRunPersistence;
+}
+
+export interface AgentRunPersistence {
+  appendMessage(message: ConversationMessage): Promise<void>;
+  appendEvent(event: AgentEvent): Promise<void>;
 }
 
 export interface AgentRunResult extends RunIdentity {
@@ -149,6 +156,10 @@ interface OwnedRunContext {
   readonly usage: ProviderUsage;
   readonly allowTools: boolean;
   readonly web: WebEvidenceRun | undefined;
+  readonly persistence: AgentRunPersistence | undefined;
+  persistedMessages: number;
+  persistedEvents: number;
+  persistenceFailure: StorageError | undefined;
 }
 
 function sameRunLimits(left: AgentRunLimits, right: AgentRunLimits): boolean {
@@ -374,6 +385,9 @@ function outcomeForError(
   if (error instanceof ProviderError) {
     return { termination: "provider_error", text, message: error.message };
   }
+  if (error instanceof StorageError) {
+    return { termination: "protocol_error", text, message: "실행 기록 저장에 실패해 후속 실행을 중단했습니다. 이미 실행한 도구를 자동으로 재시도하지 마세요." };
+  }
   if (error instanceof ProtocolError || error instanceof ConfigurationError) {
     return { termination: "protocol_error", text, message: error.message };
   }
@@ -444,6 +458,7 @@ class TextDeltaGate {
     if (!this.#released && visibleText) {
       this.#journal.emit({ type: "text_delta", text: visibleText });
     }
+    if (visibleText) this.#journal.emit({ type: "text_complete", text: visibleText });
     this.#heldParts.length = 0;
     this.#released = true;
   }
@@ -583,6 +598,10 @@ export class AgentRunner {
       usage: {},
       allowTools,
       web,
+      persistence: request.persistence,
+      persistedMessages: messages.length,
+      persistedEvents: 0,
+      persistenceFailure: undefined,
     };
     let latestText = "";
     let outcome: LoopOutcome | undefined;
@@ -636,6 +655,11 @@ export class AgentRunner {
       );
       state.finish(outcome.termination);
       journal.end(outcome.termination, outcome.message);
+      try {
+        await this.#persistBoundary(context);
+      } catch (error) {
+        outcome = outcomeForError(error, budget, latestText);
+      }
     }
 
     if (!outcome) throw new Error("agent loop 종료 결과가 유실되었습니다.");
@@ -662,6 +686,7 @@ export class AgentRunner {
     let responseId: string | undefined;
     context.state.transition("MODEL");
     while (context.state.state !== "FINISH") {
+      await this.#persistBoundary(context);
       context.budget.assertActive();
       context.budget.consumeTurn();
       context.budget.consumeModelRequest();
@@ -792,6 +817,7 @@ export class AgentRunner {
         normalized.calls,
         hostLimitedWebAnswer ? false : normalized.fallbackUsed,
       );
+      await this.#persistBoundary(context);
 
       const fatalIssue = normalized.issues.find((item) => !item.recoverable);
       if (fatalIssue) {
@@ -917,6 +943,9 @@ export class AgentRunner {
           toolName: call.name,
           input: call.input as JsonObject,
         });
+        // The write must complete before hooks, approval or a handler can
+        // produce side effects. Missing results remain unknown after a crash.
+        await this.#persistBoundary(context);
         const executionContext: ToolExecutionContext = {
           ...context.identity,
           workspace: this.#workspace,
@@ -946,8 +975,9 @@ export class AgentRunner {
           );
         }
         const record = context.ledger.finish(call.callId, result);
-        web?.observeTool(call.name, call.input, result);
         this.#emitAndAppendResult(context, record, allowance);
+        await this.#persistBoundary(context);
+        web?.observeTool(call.name, call.input, result);
         context.progress.observe(record);
 
         if (result.status === "denied") {
@@ -1011,6 +1041,27 @@ export class AgentRunner {
       context.state.transition("MODEL");
     }
     throw new ProtocolError("종료 상태 밖에서 agent loop가 끝났습니다.");
+  }
+
+  async #persistBoundary(context: OwnedRunContext): Promise<void> {
+    if (!context.persistence) return;
+    if (context.persistenceFailure) throw context.persistenceFailure;
+    try {
+      while (context.persistedMessages < context.messages.length) {
+        const message = context.messages[context.persistedMessages];
+        if (!message) throw new StorageError("저장할 실행 메시지가 없습니다.");
+        await context.persistence.appendMessage(message);
+        context.persistedMessages += 1;
+      }
+      for (const event of context.journal.eventsAfter(context.persistedEvents)) {
+        if (event.type !== "text_delta") await context.persistence.appendEvent(event);
+        context.persistedEvents = event.sequence;
+      }
+    } catch (error) {
+      // A failed append may have reached disk. Never retry it implicitly.
+      context.persistenceFailure = new StorageError("실행 기록 저장에 실패했습니다.", { cause: error });
+      throw context.persistenceFailure;
+    }
   }
 
   async #collectProviderTurn(

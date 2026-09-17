@@ -184,7 +184,9 @@ export class CliOutput {
   }
 
   agentEvent(event: AgentEvent): void {
-    if (this.#format !== "stream-json") return;
+    // A secret may span any number of deltas. Publish only the complete text
+    // boundary, on which jsonLine can redact the entire value before writing.
+    if (this.#format !== "stream-json" || event.type === "text_delta") return;
     this.#stdout.write(jsonLine({ schemaVersion: 1, type: "agent_event", event }, this.#redactor));
   }
 

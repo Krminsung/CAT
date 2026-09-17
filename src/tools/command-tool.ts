@@ -141,6 +141,8 @@ function commandDetails(
     timed_out: result.timedOut,
     cancelled: result.cancelled,
     output_limit_reached: result.outputLimitReached,
+    termination_confirmed: result.terminationConfirmed ?? !result.started,
+    process_group_id: result.processGroupId ?? null,
     stdout: cleanCapturedText(result.stdout),
     stderr: cleanCapturedText(result.stderr),
     output_truncated: result.outputLimitReached,
@@ -394,6 +396,14 @@ export async function registerCommandTools(
           },
         );
         const details = commandDetails(completed, workspace.path);
+        if (completed.terminationConfirmed === false) {
+          return commandFailure(
+            "command_cleanup_unknown",
+            "직접 자식은 종료됐을 수 있지만 소유 프로세스 그룹의 정리를 확인하지 못했습니다. 후손이 계속 실행 중일 수 있습니다.",
+            "unknown",
+            details,
+          );
+        }
         if (completed.spawnErrorMessage !== undefined) {
           return commandFailure(
             "command_spawn_failed",

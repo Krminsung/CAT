@@ -21,6 +21,7 @@ import {
 import { isAbsolute, join, resolve } from "node:path";
 import type { JsonObject } from "../core/json.js";
 import { ConfigurationError, StorageError } from "../core/errors.js";
+import { ownedProcessGroup } from "./owned-group.js";
 
 const TASK_ID = /^[a-f0-9]{16}$/u;
 const TASK_ID_PREFIX = /^[a-f0-9]{1,16}$/u;
@@ -124,6 +125,7 @@ interface PersistedTaskManifest {
   readonly stopRequested: boolean;
   readonly terminationConfirmed: boolean;
   readonly outputError: string | null;
+  readonly processGroupId?: number | null;
 }
 
 interface LogState {
@@ -147,6 +149,7 @@ interface BackgroundTaskRecord {
   readonly ownedHere: boolean;
   child: ChildProcess | undefined;
   pid: number | undefined;
+  reportedProcessGroup?: number | null;
   outputDescriptor: number | undefined;
   outputBytesSeen: number;
   outputBytesStored: number;
@@ -394,6 +397,8 @@ function parseManifest(
     stopRequested: value.stopRequested,
     terminationConfirmed: value.terminationConfirmed,
     outputError: outputError as string | null,
+    processGroupId: typeof value.processGroupId === "number" && Number.isSafeInteger(value.processGroupId) && value.processGroupId > 0
+      ? value.processGroupId : null,
   };
 }
 
@@ -413,6 +418,7 @@ function taskManifest(task: BackgroundTaskRecord, workspace: string): PersistedT
     stopRequested: task.stopRequested,
     terminationConfirmed: task.terminationConfirmed,
     outputError: task.outputError ?? null,
+    processGroupId: task.pid ?? task.reportedProcessGroup ?? null,
   };
 }
 
@@ -577,6 +583,7 @@ export class BackgroundTaskManager {
       });
       task.child = child;
       task.pid = child.pid;
+      ownedProcessGroup(child);
       this.#attach(task, child);
       const remaining = Math.max(1, deadlineMs - this.#now());
       task.deadlineTimer = setTimeout(() => this.#deadline(task), remaining);
@@ -796,6 +803,7 @@ export class BackgroundTaskManager {
           outputPath,
           manifestPath,
           ownedHere: false,
+          reportedProcessGroup: manifest.processGroupId ?? null,
           child: undefined,
           pid: undefined,
           outputDescriptor: undefined,
@@ -897,30 +905,38 @@ export class BackgroundTaskManager {
       task.exitCode = code;
       task.exitSignal = signal;
       if (!task.timedOut && !task.stopRequested) {
-        task.status = code === 0 && signal === null ? "completed" : "failed";
+        task.status = "unknown";
       }
       this.#tryPersist(task);
       this.#notify(task.sessionId);
     });
     child.once("close", (code, signal) => {
-      if (task.child !== child || task.closed) return;
-      task.exitCode = code;
-      task.exitSignal = signal;
-      if (task.timedOut) task.status = "timed_out";
-      else if (task.stopRequested) task.status = "stopped";
-      else task.status = code === 0 && signal === null ? "completed" : "failed";
-      task.outputPending = false;
-      task.terminationConfirmed = true;
-      task.closed = true;
+      void this.#finishGroup(task, child, code, signal);
+    });
+  }
+
+  async #finishGroup(task: BackgroundTaskRecord, child: ChildProcess, code: number | null, signal: NodeJS.Signals | null): Promise<void> {
+    if (task.child !== child || task.closed) return;
+    task.exitCode = code;
+    task.exitSignal = signal;
+    task.status = "unknown";
+    task.outputPending = false;
+    this.#clearTimers(task);
+    this.#closeOutput(task);
+    task.terminationConfirmed = await ownedProcessGroup(child).cleanup();
+    task.closed = true;
+    if (task.terminationConfirmed) {
+      task.status = task.timedOut ? "timed_out" : task.stopRequested ? "stopped"
+        : code === 0 && signal === null ? "completed" : "failed";
       task.child = undefined;
       task.pid = undefined;
-      this.#clearTimers(task);
-      this.#closeOutput(task);
-      this.#tryPersist(task);
-      for (const waiter of task.closeWaiters) waiter();
-      task.closeWaiters.clear();
-      this.#notify(task.sessionId);
-    });
+    } else {
+      task.outputError = "소유 프로세스 그룹의 종료를 확인하지 못했습니다. 후손이 남아 있을 수 있어 작업 기록을 보존합니다.";
+    }
+    this.#tryPersist(task);
+    for (const waiter of task.closeWaiters) waiter();
+    task.closeWaiters.clear();
+    this.#notify(task.sessionId);
   }
 
   #storeOutput(task: BackgroundTaskRecord, chunk: Buffer): void {
@@ -1062,19 +1078,7 @@ export class BackgroundTaskManager {
   #sendSignal(task: BackgroundTaskRecord, signal: NodeJS.Signals): boolean {
     const child = task.child;
     if (!child || !child.pid || child.pid !== task.pid || task.closed) return false;
-    if (process.platform !== "win32") {
-      try {
-        process.kill(-child.pid, signal);
-        return true;
-      } catch {
-        // 같은 manager가 만든 child 자체에만 fallback signal을 보낸다.
-      }
-    }
-    try {
-      return child.kill(signal);
-    } catch {
-      return false;
-    }
+    return ownedProcessGroup(child).signal(signal);
   }
 
   async #waitForClose(task: BackgroundTaskRecord, timeoutMs: number): Promise<void> {
@@ -1138,6 +1142,7 @@ export class BackgroundTaskManager {
       timed_out: task.timedOut,
       stop_requested: task.stopRequested,
       termination_confirmed: task.terminationConfirmed,
+      process_group_id: task.pid ?? task.reportedProcessGroup ?? null,
       execution_state: task.status === "stale" || task.status === "unknown"
         ? "unknown"
         : statusIsActive(task)
@@ -1209,7 +1214,7 @@ export class BackgroundTaskManager {
     const sessionTasks = [...this.#tasks.values()].filter((task) => task.sessionId === sessionId);
     const prune = (): boolean => {
       const candidate = [...this.#tasks.values()]
-        .filter((task) => task.sessionId === sessionId && !statusIsActive(task))
+        .filter((task) => task.sessionId === sessionId && !statusIsActive(task) && task.terminationConfirmed)
         .sort((left, right) => left.startedMs - right.startedMs || left.id.localeCompare(right.id))[0];
       if (!candidate) return false;
       this.#discard(candidate);
@@ -1231,8 +1236,8 @@ export class BackgroundTaskManager {
   }
 
   #discard(task: BackgroundTaskRecord): void {
-    if (statusIsActive(task)) {
-      throw new StorageError("실행 중인 background task 기록은 삭제할 수 없습니다.");
+    if (statusIsActive(task) || !task.terminationConfirmed) {
+      throw new StorageError("실행 중이거나 종료가 확인되지 않은 background task 기록은 삭제할 수 없습니다.");
     }
     this.#clearTimers(task);
     this.#closeOutput(task);

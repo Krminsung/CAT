@@ -36,6 +36,11 @@ export type AgentEvent =
       text: string;
     })
   | (AgentEventBase & {
+      /** Public/persistent text boundary; raw deltas are transient UI only. */
+      type: "text_complete";
+      text: string;
+    })
+  | (AgentEventBase & {
       type: "tool_start";
       callId: string;
       toolName: string;

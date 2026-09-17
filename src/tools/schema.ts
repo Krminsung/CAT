@@ -25,6 +25,35 @@ const SUPPORTED_KEYWORDS = new Set([
   "maxItems",
 ]);
 
+/** Only claim provider strictness for the conservative, fully-required subset.
+ * Host validation remains mandatory, including when this returns false. */
+export function isStrictProviderSchema(schema: JsonObject): boolean {
+  const permitted = new Set([
+    "type", "description", "enum", "properties", "required", "additionalProperties", "items",
+  ]);
+  const visit = (node: JsonValue, depth: number): boolean => {
+    if (depth > MAX_SCHEMA_DEPTH || node === null || typeof node !== "object" || Array.isArray(node)) {
+      return false;
+    }
+    if (Object.keys(node).some((key) => !permitted.has(key))) return false;
+    if (node.type === "object") {
+      const properties = node.properties;
+      const required = node.required;
+      if (
+        node.additionalProperties !== false || !properties ||
+        typeof properties !== "object" || Array.isArray(properties) ||
+        !Array.isArray(required)
+      ) return false;
+      const names = Object.keys(properties);
+      return names.length === required.length && names.every((name) => required.includes(name)) &&
+        Object.values(properties).every((child) => visit(child, depth + 1));
+    }
+    if (node.type === "array") return node.items !== undefined && visit(node.items, depth + 1);
+    return typeof node.type === "string" && SUPPORTED_TYPES.has(node.type);
+  };
+  return schema.type === "object" && visit(schema, 0);
+}
+
 export class ToolInputValidationError extends Error {
   override name = "ToolInputValidationError";
 }

@@ -659,6 +659,7 @@ export class TerminalTranscript {
         break;
       }
       case "approval_required":
+      case "text_complete":
       case "user_input_required":
       case "user_input_result":
       case "usage":
@@ -683,6 +684,19 @@ export class TerminalTranscript {
     }
     if (invalidRecords > 0) {
       this.addNotice("warning", "resume_invalid", `${invalidRecords}개 transcript record를 화면에 복원하지 못했습니다.`);
+    }
+    for (const entry of [...this.#tools.values()]) {
+      if (!(entry.component instanceof ToolTranscriptEntry) || !entry.component.active) continue;
+      entry.component.finish({
+        status: "failure",
+        execution: "unknown",
+        error: {
+          code: "interrupted_tool_result_unknown",
+          message: "이전 실행 결과가 기록되지 않았습니다. 실제 상태를 확인하기 전에는 재실행하지 마세요.",
+          retryable: false,
+        },
+      });
+      this.#touch(entry);
     }
     this.addResume({
       ...display,
