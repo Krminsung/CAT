@@ -27,6 +27,7 @@ export class TextInputPanel implements Component, Focusable {
   constructor(readonly options: TextInputPanelOptions) {
     this.#input = new Input({ prompt: `${options.label}: ` });
     this.#input.setValue((options.initialValue ?? "").slice(0, MAX_INPUT_BYTES));
+    this.#input.handleInput("\u0005"); // Place the cursor after the initial value (Ctrl+E).
     this.#message = new Text(options.message ?? "", 0, 0);
     this.#input.onSubmit = (value) => {
       try {
