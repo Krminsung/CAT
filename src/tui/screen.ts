@@ -43,6 +43,7 @@ import {
   type RawTranscriptExitReason,
 } from "./raw-view.js";
 import { SecretInputPanel } from "./secret-input.js";
+import { TextInputPanel } from "./text-input.js";
 import {
   safeTerminalLine,
   sanitizeTerminalText,
@@ -146,6 +147,11 @@ export interface SecretPromptOptions {
   readonly label: string;
   readonly message?: string;
   readonly signal?: AbortSignal;
+}
+
+export interface TextPromptOptions extends SecretPromptOptions {
+  readonly initialValue?: string;
+  readonly validate?: (value: string) => string;
 }
 
 export interface TerminalSelectionOption {
@@ -861,6 +867,14 @@ export class CatTerminalScreen {
   }
 
   requestSecret(options: SecretPromptOptions): Promise<string> {
+    return this.#requestInput(options);
+  }
+
+  requestText(options: TextPromptOptions): Promise<string> {
+    return this.#requestInput(options, options);
+  }
+
+  #requestInput(options: SecretPromptOptions, textOptions?: TextPromptOptions): Promise<string> {
     if (this.#state !== "running") {
       return Promise.reject(new TerminalScreenError(
         "screen_application_failed",
@@ -884,7 +898,10 @@ export class CatTerminalScreen {
     }
 
     return new Promise<string>((resolve, reject) => {
-      const panel = new SecretInputPanel({
+      const panel = textOptions ? new TextInputPanel({
+        ...textOptions,
+        redactor: this.#redactor,
+      }) : new SecretInputPanel({
         label: options.label,
         ...(options.message === undefined ? {} : { message: options.message }),
         redactor: this.#redactor,
@@ -929,7 +946,7 @@ export class CatTerminalScreen {
       panel.onCancel = () => active.cancel(new CancelledError("비밀 입력을 취소했습니다."));
       panel.onSubmit = (secret) => {
         if (settled) return;
-        if (!this.#redactor.addSecret(secret)) {
+        if (!textOptions && !this.#redactor.addSecret(secret)) {
           const error = new Error("비밀값을 안전한 화면 redaction 목록에 등록하지 못했습니다.");
           active.cancel(error);
           this.reportApplicationFailure(error);

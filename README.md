@@ -97,6 +97,10 @@ cat-tui auth remove PROFILE
 
 `custom` provider에는 HTTPS base URL과 protocol을 함께 지정한다.
 
+초기 provider 선택 화면과 `/connect custom [profile]`에서도 서버 주소, 통신 방식과 API key를
+순서대로 입력할 수 있다. 잘못된 주소는 같은 화면에서 수정하고 Esc로 provider 선택에 돌아간다.
+모델 목록을 지원하지 않거나 조회가 실패하면 모델 ID를 직접 입력할 수 있다.
+
 ```bash
 cat-tui auth setup \
   --provider custom \

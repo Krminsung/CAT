@@ -1,4 +1,12 @@
-# cat-agent-cli 0.1.2 배포 기록
+# cat-agent-cli 0.1.3 배포 기록
+
+## 초기 설정 보완
+
+- custom 선택 시 종료되던 문제를 수정하고 서버 주소·통신 방식·API 경로·API key 입력을 연결했다.
+- 모델 목록 조회 실패나 빈 목록에서도 모델 ID를 직접 지정할 수 있다.
+- 초기 설정과 `/connect`, `/models`, `/provider`가 같은 설정·모델 선택 흐름을 사용한다.
+- 실제 PTY와 로컬 모의 API로 초기 설정부터 첫 대화까지 확인한다. 상세 결과와 한계는
+  `docs/implementation/phases/P14-R08.md`에 기록한다. 실제 외부 provider 전체의 호환성 확인은 아니다.
 
 ## 포함 범위
 

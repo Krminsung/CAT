@@ -11,7 +11,7 @@ import type {
   ProviderModel,
 } from "../providers/catalog.js";
 import type { BackgroundTaskOverview } from "../process/index.js";
-import { PROVIDER_CATALOG } from "../providers/catalog.js";
+import { PROVIDER_CATALOG, validateManualModelId } from "../providers/catalog.js";
 import type {
   ApprovalPromptPort,
   ApprovalRequest,
@@ -245,8 +245,8 @@ export class TerminalOverlayController {
     models: readonly ProviderModel[],
     current?: string,
     signal?: AbortSignal,
+    message?: string,
   ): Promise<string | undefined> {
-    if (models.length === 0) return undefined;
     const currentModel = current === undefined
       ? undefined
       : models.find((model) => model.id === current);
@@ -254,21 +254,35 @@ export class TerminalOverlayController {
       currentModel === undefined
         ? models
         : [currentModel, ...models.filter((model) => model.id !== currentModel.id)]
-    ).slice(0, 128);
+    ).slice(0, 127);
     const omitted = models.length > visible.length
       ? ` · ${models.length}개 중 ${visible.length}개 표시`
       : "";
-    return await this.#chooseOptional(
+    const selected = visible.length === 0 ? "manual" : await this.#chooseOptional(
       "Model 선택",
-      visible.map((model) => ({
-        value: model.id,
+      [...visible.map((model, index) => ({
+        value: `model:${index}`,
         label: `${model.id === current ? "● " : ""}${model.id}`,
         description: model.contextWindow === undefined
           ? `context window 알 수 없음${omitted}`
           : `context ${model.contextWindow.toLocaleString("ko-KR")} tokens${omitted}`,
-      })),
+      })), { value: "manual", label: "모델 ID 직접 입력", description: "목록에 없는 모델도 지정할 수 있습니다." }],
       signal,
     );
+    if (selected === undefined) return undefined;
+    if (selected !== "manual") return visible[Number(selected.slice(6))]?.id;
+    try {
+      return await this.screen.requestText({
+        label: "모델 ID",
+        message: boundedUtf8(message ?? "사용할 모델 ID를 입력하세요. 서버의 모델 목록이 없어도 직접 지정할 수 있습니다."),
+        ...(current === undefined ? {} : { initialValue: current }),
+        validate: validateManualModelId,
+        ...(signal === undefined ? {} : { signal }),
+      });
+    } catch (error) {
+      if (error instanceof CancelledError && !signal?.aborted) return undefined;
+      throw error;
+    }
   }
 
   async chooseSession(
