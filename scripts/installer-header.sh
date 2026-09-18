@@ -30,7 +30,9 @@ for required_tool in base64 chmod dirname find grep id ln mkdir mktemp mv readli
 done
 
 installer_uid=$(id -u)
-[ "$installer_uid" -ne 0 ] || fail "root 또는 sudo 실행을 지원하지 않습니다. 일반 사용자로 실행하세요."
+if [ "$installer_uid" -eq 0 ]; then
+    warn "root 권한으로 설치합니다. 설치된 cat과 cat이 시작하는 명령도 root 권한으로 실행됩니다."
+fi
 [ -n "${HOME:-}" ] || fail "HOME 환경변수가 필요합니다."
 case "$HOME" in
     /*) ;;
@@ -40,7 +42,13 @@ esac
 cat_home_real=$(realpath -e -- "$HOME") || fail "HOME의 실제 경로를 확인할 수 없습니다."
 [ -d "$cat_home_real" ] || fail "HOME이 디렉터리가 아닙니다: $cat_home_real"
 [ "$cat_home_real" != "/" ] || fail "HOME이 루트 디렉터리일 수 없습니다."
-[ "$(stat -c '%u' -- "$cat_home_real")" = "$installer_uid" ] || fail "현재 사용자가 HOME을 소유하지 않습니다."
+cat_home_owner=$(stat -c '%u' -- "$cat_home_real")
+if [ "$cat_home_owner" != "$installer_uid" ]; then
+    if [ "$installer_uid" -eq 0 ]; then
+        fail "root 설치의 HOME은 root 소유 경로여야 합니다. sudo에서는 -H를 사용하세요: $cat_home_real"
+    fi
+    fail "현재 사용자가 HOME을 소유하지 않습니다."
+fi
 
 normalize_user_path() {
     path_candidate=$1
