@@ -296,7 +296,7 @@ function addNotice(
 
 function includeTarget(line: string): string | undefined {
   const match = line.match(/^\s*@([^\s]+)\s*(?:\r\n|\r|\n)?$/u);
-  const value = match?.[1]?.replace(/[.,:;!?)\]}\"]+$/u, "");
+  const value = match?.[1]?.replace(/[.,:;!?)\]}"]+$/u, "");
   return value || undefined;
 }
 

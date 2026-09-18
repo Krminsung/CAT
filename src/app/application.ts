@@ -1523,7 +1523,7 @@ class AgentApplicationRuntime {
   async #expandFileMentions(prompt: string, signal: AbortSignal): Promise<string> {
     const paths: string[] = [];
     for (const match of prompt.matchAll(/(?<![\p{L}\p{N}_@])@([\p{L}\p{N}_./-]+)/gu)) {
-      const path = match[1]?.replace(/[.,:;!?)\]}\"]+$/u, "");
+      const path = match[1]?.replace(/[.,:;!?)\]}"]+$/u, "");
       if (!path || paths.includes(path)) continue;
       if (paths.length >= MAX_ATTACHMENTS) {
         throw new ConfigurationError(`파일 첨부는 한 요청에 최대 ${MAX_ATTACHMENTS}개까지 가능합니다.`);

@@ -4,8 +4,9 @@
 
 standalone 설치본은 Linux x64(`x86_64`)와 arm64(`aarch64`)를 대상으로 한다. 각 설치본에는 공식
 Node.js v24.21.0 runtime, 컴파일된 JavaScript, 고정 production dependency, `bin/cat`, 사용 문서와
-license 자료가 포함된다. glibc·terminal·배포판별 실제 호환성, 앱 실행과 설치/rollback 흐름은 아직
-runtime으로 검증하지 않았다.
+license 자료가 포함된다. 생성된 JavaScript의 Node.js 22/24 구문 검사와 source checkout의
+`./bin/cat --help` 시작 경로 확인 외에 glibc·terminal·배포판별 실제 호환성, 대화형 앱 실행과
+설치/rollback 흐름은 아직 runtime으로 검증하지 않았다.
 
 필요한 host 도구는 POSIX `/bin/sh`와 GNU 계열 `base64`, `chmod`, `find`, `grep`, `realpath`, `sha256sum`,
 `stat`, `tar`(gzip/xz 지원), `tr`, 그리고 일반 파일 도구다. installer는 누락 도구를 자동 설치하거나
@@ -36,10 +37,10 @@ curl -fsSL https://raw.githubusercontent.com/Krminsung/CAT/main/install.sh | sud
 P14 packaging을 완료하면 Git에 포함되지 않는 `artifacts/`에 다음 파일이 생성된다.
 
 ```text
-cat-agent-cli-v0.1.1-linux-x64-install.sh
-cat-agent-cli-v0.1.1-linux-x64-install.sh.sha256
-cat-agent-cli-v0.1.1-linux-arm64-install.sh
-cat-agent-cli-v0.1.1-linux-arm64-install.sh.sha256
+cat-agent-cli-v0.1.2-linux-x64-install.sh
+cat-agent-cli-v0.1.2-linux-x64-install.sh.sha256
+cat-agent-cli-v0.1.2-linux-arm64-install.sh
+cat-agent-cli-v0.1.2-linux-arm64-install.sh.sha256
 SHA256SUMS
 ```
 
@@ -47,8 +48,8 @@ SHA256SUMS
 installer와 같은 경로에서 다음 예시의 파일명을 선택한다.
 
 ```bash
-sha256sum -c cat-agent-cli-v0.1.1-linux-x64-install.sh.sha256
-./cat-agent-cli-v0.1.1-linux-x64-install.sh
+sha256sum -c cat-agent-cli-v0.1.2-linux-x64-install.sh.sha256
+./cat-agent-cli-v0.1.2-linux-x64-install.sh
 ```
 
 installer 옆에서 함께 받은 checksum만으로 배포자의 신원을 증명할 수는 없다. checksum 파일의 값을
@@ -64,7 +65,7 @@ Release나 npm package를 게시하지 않는다.
 ```bash
 CAT_INSTALL_DIR="$HOME/apps/cat-agent-cli" \
 CAT_BIN_DIR="$HOME/bin" \
-./cat-agent-cli-v0.1.1-linux-x64-install.sh
+./cat-agent-cli-v0.1.2-linux-x64-install.sh
 ```
 
 기본 PATH 공개 이름은 `cat-tui`다. 기존 `cat-tui` 파일이나 다른 symlink가 있으면 덮어쓰지 않고
@@ -72,7 +73,7 @@ CAT_BIN_DIR="$HOME/bin" \
 않는다. 다음과 같이 명시한 경우에만 user-bin 안에서 시도하며, 그 이름이 이미 있으면 역시 보존한다.
 
 ```bash
-CAT_INSTALL_CAT_COMMAND=1 ./cat-agent-cli-v0.1.1-linux-x64-install.sh
+CAT_INSTALL_CAT_COMMAND=1 ./cat-agent-cli-v0.1.2-linux-x64-install.sh
 ```
 
 installer는 `/bin/cat`, `/usr/bin/cat`, shell profile과 시스템 package를 검사하거나 바꾸지 않는다.

@@ -4,8 +4,9 @@
 대화형 TUI와 한 번 실행하는 CLI, API-key-only provider profile, 세션 기록, 권한 확인, MCP,
 공개 웹 도구, background task와 managed Git worktree를 한 실행 경계 안에서 관리한다.
 
-> 검증 상태: 현재 구현은 단계별 TypeScript 정적 검사만 수행했고 런타임은 미검증이다. 실제 TUI,
-> provider API, 웹, MCP server, shell, SSH/clipboard와 설치본을 실행해 확인하지 않았다.
+> 검증 상태: 단계별 TypeScript 정적 검사와 v0.1.2 배포 JavaScript의 Node.js 22/24 구문 검사,
+> source checkout의 `./bin/cat --help` 시작 경로 확인만 수행한다. 실제 TUI, provider API, 웹,
+> MCP server, shell, SSH/clipboard와 standalone 설치본은 실행해 확인하지 않았다.
 
 ## 설치와 현재 배포 상태
 
@@ -17,7 +18,8 @@ curl -fsSL https://raw.githubusercontent.com/Krminsung/CAT/main/install.sh | sh
 ```
 
 이 bootstrap은 GitHub의 최신 정식 Release만 사용하며 installer와 같은 Release의 SHA-256 sidecar를
-검증한다. installer와 애플리케이션 runtime은 아직 실제 실행으로 검증하지 않았다.
+검증한다. source checkout의 `--help` 시작 경로 외에 installer, bundled runtime과 대화형 앱은 아직
+실제 실행으로 검증하지 않았다.
 
 소스 checkout의 필요 조건은 Node.js `22.19.0` 이상과 npm이다. 다음 순서로 고정 dependency를 설치하고
 TypeScript를 컴파일한 뒤 내부 launcher를 사용할 수 있다.
@@ -307,8 +309,8 @@ key 후보를 오류 출력 redaction에 먼저 등록하고, 새 provider catal
 
 ## 알려진 제한과 안전한 기대치
 
-- 정적 검사만 수행했고 런타임은 미검증이다. 구현 연결 확인은 실제 서비스 성공, terminal 호환성,
-  공격 내성 또는 운영 준비 완료를 뜻하지 않는다.
+- 정적 검사, 배포 JavaScript 구문 검사와 source checkout의 `--help` 시작 경로 확인만 수행했다.
+  이 제한된 확인은 실제 서비스 성공, terminal 호환성, 공격 내성 또는 운영 준비 완료를 뜻하지 않는다.
 - 실제 provider API, model 목록·streaming 차이와 과금은 확인하지 않았다. catalog endpoint는 호환을 위한
   초기값이며 provider의 현재 제공 상태를 보증하지 않는다.
 - MCP는 stdio transport와 두 protocol adapter만 구현한다. 설정 저장 성공은 server 실행·schema 호환·

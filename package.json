@@ -1,6 +1,6 @@
 {
   "name": "cat-agent-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A bounded terminal coding agent with explicit trust and permission boundaries",
   "private": true,
   "type": "module",
