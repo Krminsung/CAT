@@ -32,6 +32,10 @@ npm run package:installer
 [`docs/release/REPRODUCIBILITY.md`](docs/release/REPRODUCIBILITY.md)에 기록했다. 이 절차와 생성된
 installer는 아직 runtime으로 실행 검증하지 않았다.
 
+standalone installer는 일반 사용자뿐 아니라 root shell 또는 `sudo -H` 실행도 지원한다. root 설치본을
+root로 실행하면 cat이 시작하는 명령도 UID 0 권한을 가지며, `full-auto`여도 cat 내부 hard deny는
+유지된다. 시스템 전체 변경 위험이 있으므로 격리된 서버에서만 root 실행을 사용한다.
+
 이 문서의 나머지 예시는 설치 후 기본 PATH 이름인 `cat-tui`를 사용한다. source checkout에서는 이를
 `./bin/cat`으로 바꿔 실행한다. Unix 기본 명령과 충돌하는 `cat` PATH link는 설치 시
 `CAT_INSTALL_CAT_COMMAND=1`을 명시했을 때 user-bin 안에서만 시도한다.
