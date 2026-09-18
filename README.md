@@ -4,9 +4,9 @@
 대화형 TUI와 한 번 실행하는 CLI, API-key-only provider profile, 세션 기록, 권한 확인, MCP,
 공개 웹 도구, background task와 managed Git worktree를 한 실행 경계 안에서 관리한다.
 
-> 검증 상태: 단계별 TypeScript 정적 검사와 v0.1.2 배포 JavaScript의 Node.js 22/24 구문 검사,
-> source checkout의 `./bin/cat --help` 시작 경로 확인만 수행한다. 실제 TUI, provider API, 웹,
-> MCP server, shell, SSH/clipboard와 standalone 설치본은 실행해 확인하지 않았다.
+> 검증 범위: 로컬 모의 API와 실제 터미널 입력으로 custom 초기 설정, Chat/Responses 첫 응답,
+> 설정 재사용, 입력 오류·취소와 연결 전환을 확인한다. 실제 외부 provider와 웹·MCP·SSH 등의
+> 전체 기능 검증과는 구분하며, 실행 결과는 `docs/implementation/phases/P14-R08.md`에 기록한다.
 
 ## 설치와 현재 배포 상태
 
@@ -18,8 +18,8 @@ curl -fsSL https://raw.githubusercontent.com/Krminsung/CAT/main/install.sh | sh
 ```
 
 이 bootstrap은 GitHub의 최신 정식 Release만 사용하며 installer와 같은 Release의 SHA-256 sidecar를
-검증한다. source checkout의 `--help` 시작 경로 외에 installer, bundled runtime과 대화형 앱은 아직
-실제 실행으로 검증하지 않았다.
+검증한다. 설치본 검증은 Linux x64의 격리된 사용자 설치 경로와 로컬 모의 API를 대상으로 하며,
+외부 provider 전체나 다른 서버 환경의 호환성을 보증하지 않는다.
 
 소스 checkout의 필요 조건은 Node.js `22.19.0` 이상과 npm이다. 다음 순서로 고정 dependency를 설치하고
 TypeScript를 컴파일한 뒤 내부 launcher를 사용할 수 있다.
@@ -41,8 +41,7 @@ npm run package:installer
 설치본은 공식 Node.js v24.21.0, production dependency, `bin/cat`과 license 자료를 포함한다. artifact
 검증·설치, 기본 사용자 경로, update/rollback과 `cat` 충돌 정책은
 [`docs/release/INSTALL.md`](docs/release/INSTALL.md)를 따른다. 입력과 재현 범위는
-[`docs/release/REPRODUCIBILITY.md`](docs/release/REPRODUCIBILITY.md)에 기록했다. 이 절차와 생성된
-installer는 아직 runtime으로 실행 검증하지 않았다.
+[`docs/release/REPRODUCIBILITY.md`](docs/release/REPRODUCIBILITY.md)에 기록했다.
 
 standalone installer는 일반 사용자뿐 아니라 root shell 또는 `sudo -H` 실행도 지원한다. root 설치본을
 root로 실행하면 cat이 시작하는 명령도 UID 0 권한을 가지며, `full-auto`여도 cat 내부 hard deny는
@@ -313,8 +312,8 @@ key 후보를 오류 출력 redaction에 먼저 등록하고, 새 provider catal
 
 ## 알려진 제한과 안전한 기대치
 
-- 정적 검사, 배포 JavaScript 구문 검사와 source checkout의 `--help` 시작 경로 확인만 수행했다.
-  이 제한된 확인은 실제 서비스 성공, terminal 호환성, 공격 내성 또는 운영 준비 완료를 뜻하지 않는다.
+- 로컬 모의 API 기반 초기 설정·첫 대화 검증은 실제 외부 서비스 성공, 모든 terminal의 호환성,
+  공격 내성 또는 전체 기능 검증 완료를 뜻하지 않는다.
 - 실제 provider API, model 목록·streaming 차이와 과금은 확인하지 않았다. catalog endpoint는 호환을 위한
   초기값이며 provider의 현재 제공 상태를 보증하지 않는다.
 - MCP는 stdio transport와 두 protocol adapter만 구현한다. 설정 저장 성공은 server 실행·schema 호환·
@@ -327,9 +326,8 @@ key 후보를 오류 출력 redaction에 먼저 등록하고, 새 provider catal
   종료로 표시하지 않으므로 사용자가 OS 상태를 점검해야 할 수 있다.
 - local clipboard backend나 OSC52 지원 여부는 OS·terminal·SSH 환경에 따라 다르며 실제 환경에서
   검증하지 않았다. clipboard 읽기는 지원하지 않는다.
-- standalone installer 구성과 checksum 생성 경로는 포함하지만 installer, bundled Node와 설치·rollback은
-  실행 검증하지 않았다. 로컬 artifact가 만들어져도 npm/GitHub에 공개됐거나 운영 호환성이 확인됐다는
-  뜻이 아니다.
+- Linux arm64, root 설치, 설치 실패 시 rollback은 실행 검증하지 않았다. 로컬 artifact 생성과
+  GitHub Release 게시는 별도이며, 사용자 서버의 운영 호환성도 별도 확인이 필요하다.
 - package는 `UNLICENSED`이며 공개 사용·재배포 조건이 부여됐다고 해석하면 안 된다.
 
 ## 자주 만나는 오류

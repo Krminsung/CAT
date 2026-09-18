@@ -27,10 +27,10 @@
 `UNLICENSED`이고 공개 사용·재배포 권한이 부여됐다고 해석하면 안 된다. third-party와 Node.js의
 license는 `THIRD_PARTY_NOTICES.md`와 bundle 내부 자료를 따른다.
 
-최종 컴파일 뒤 Node.js 22/24로 전체 배포 JavaScript의 구문을 검사하고 source checkout의
-`./bin/cat --help` 시작 경로를 한 번 확인한다. 그 외 대화형 앱, TUI, provider, web, MCP,
-shell/process, worktree, SSH/clipboard, legacy import, installer 또는 standalone bundled runtime은
-실행해 검증하지 않았다. artifact 생성 성공도 실환경 설치·운영 준비나 보안 검증 완료를 뜻하지 않는다.
+v0.1.3의 실행 검증 대상은 로컬 모의 API 기반 custom 설정·모델 선택·첫 대화·연결 전환과
+Linux x64의 격리된 사용자 설치본이다. 실제 외부 provider, web, MCP, shell/process, worktree,
+SSH/clipboard, legacy import, root/arm64와 설치 rollback은 실행 검증하지 않았다.
+artifact 생성 성공도 모든 서버의 설치·운영 준비나 보안 검증 완료를 뜻하지 않는다.
 
 `v0.1.1`은 생성된 `dist/app/application.js`가 번들 Node.js 24에서 private name 구문 오류로 시작되지
 않았고 Node.js 22에서는 파일 멘션 정규식도 거부됐다. `v0.1.2`는 해당 배포본을 대체한다.
