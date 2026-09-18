@@ -35,10 +35,7 @@ import {
   type ModelContextProjection,
 } from "../context/index.js";
 import {
-  createModelCatalog,
   createProviderAdapter,
-  defaultProviderEndpoint,
-  requireProviderDefinition,
   validateManualModelId,
   type ProviderModel,
 } from "../providers/index.js";
@@ -64,7 +61,6 @@ import {
   loadSettings,
   readWorkspaceFileBytes,
   resolveStoragePaths,
-  validateApiKey,
   normalizeProfileName,
   type LoadedSettings,
   type SessionMetadata,
@@ -93,7 +89,7 @@ import {
   type ExtensionCatalog,
   type LoadedInstructions,
 } from "../extensions/index.js";
-import { FixedRetryBudget, ModelHttpTransport } from "../transport/index.js";
+import { ModelHttpTransport } from "../transport/index.js";
 import {
   CatTerminalScreen,
   SlashCommandAutocompleteProvider,
@@ -116,6 +112,7 @@ import type { CliManagementCommand, CliOptions } from "../cli/args.js";
 import type { CliOutput } from "../cli/output.js";
 import type { CliApplication } from "../cli/run.js";
 import { AuthService, type ResolvedProviderAuth } from "./auth-service.js";
+import { configureProviderInteractively, selectProviderModel } from "./provider-setup.js";
 import { LegacyImportService } from "./legacy-import.js";
 import { SessionCatalog } from "./session-catalog.js";
 import {
@@ -728,34 +725,31 @@ async function configureMissingAuth(
   }
   return await bootstrapScreen(workspace, "Provider 연결 필요", async (screen) => {
     const overlays = new TerminalOverlayController(screen);
-    const requestedProvider = options.provider ?? settings.values.provider;
-    const providerId = requestedProvider ?? await overlays.chooseProvider();
-    if (!providerId) throw new CancelledError("Provider 선택을 취소했습니다.");
-    const definition = requireProviderDefinition(providerId);
-    if (!definition.defaults) {
-      throw new ConfigurationError(
-        "custom provider는 endpoint와 protocol이 필요합니다. `cat-tui auth setup --provider custom ...`을 사용하세요.",
-      );
+    let requestedProvider = options.provider ?? settings.values.provider;
+    while (true) {
+      const providerId = requestedProvider ?? await overlays.chooseProvider();
+      if (!providerId) throw new CancelledError("Provider 선택을 취소했습니다.");
+      requestedProvider = undefined;
+      try {
+        return await configureProviderInteractively({
+          screen, auth, provider: providerId,
+          profile: options.profile ?? settings.values.profile ?? providerId,
+          environment, activate: true,
+          ...(options.baseUrl === undefined ? {} : { baseUrl: options.baseUrl }),
+          ...(options.model === undefined ? {} : { model: options.model }),
+          onSecret: (apiKey) => { output.addKnownSecrets([apiKey]); },
+        });
+      } catch (error) {
+        if (screen.state !== "running") throw error;
+        if (error instanceof CancelledError) {
+          screen.setStatus("설정을 취소했습니다. Provider를 다시 선택하세요.");
+        } else if (error instanceof ConfigurationError) {
+          await screen.showInformation({ title: "연결 설정 확인", message: error.message });
+        } else {
+          throw error;
+        }
+      }
     }
-    const profile = options.profile ?? settings.values.profile ?? definition.id;
-    const apiKey = validateApiKey(await overlays.requestApiKey(definition.displayName));
-    output.addKnownSecrets([apiKey]);
-    screen.addKnownSecrets([apiKey]);
-    const defaults = defaultProviderEndpoint(definition.id);
-    const baseUrl = options.baseUrl ?? defaults.baseUrl;
-    await auth.configure({
-      name: profile,
-      provider: definition.id,
-      protocol: defaults.protocol,
-      baseUrl,
-      modelsPath: defaults.modelsPath,
-      generationPath: defaults.generationPath,
-      ...(options.model === undefined ? {} : { model: options.model }),
-      apiKey,
-      endpointSource: options.baseUrl === undefined ? "provider_default" : "user",
-      activate: true,
-    });
-    return await auth.resolve({ profile, provider: definition.id, environment });
   });
 }
 
@@ -834,23 +828,24 @@ async function initialIdentity(
       "비대화형 실행에는 --model 또는 profile/settings의 model 설정이 필요합니다.",
     );
   }
-  const models = await createModelCatalog({
-    profile: auth.profile,
-    credential: auth.credential,
-    transport,
-  }).list({ signal: new AbortController().signal, retryBudget: new FixedRetryBudget(2) });
-  if (models.length === 0) {
-    throw new ConfigurationError(
-      "Provider가 model 목록을 반환하지 않았습니다. --model로 model ID를 직접 지정하세요.",
-    );
-  }
-  const selected = await bootstrapScreen(workspace, "Model 선택 필요", async (screen) =>
-    await new TerminalOverlayController(screen).chooseModel(models)
-  );
+  const selected = await bootstrapScreen(workspace, "Model 선택 필요", async (screen) => {
+    while (true) {
+      const result = await selectProviderModel(screen, auth, transport, new AbortController().signal);
+      if (result) return result;
+      const choice = await screen.requestSelection({
+        title: "모델 설정을 취소했습니다",
+        options: [
+          { value: "retry", label: "모델 다시 선택" },
+          { value: "exit", label: "설정을 저장하고 종료" },
+        ],
+      });
+      if (choice === "exit") return undefined;
+    }
+  });
   if (!selected) throw new CancelledError("Model 선택을 취소했습니다.");
-  const saved = await profiles.save({ ...auth.profile, model: selected }, true);
+  const saved = await profiles.save({ ...auth.profile, model: selected.model }, true);
   auth = await authService.resolve({ profile: saved.name, environment });
-  return Object.freeze({ auth, model: selected, models });
+  return Object.freeze({ auth, model: selected.model, models: selected.models });
 }
 
 class AgentApplicationRuntime {
@@ -1798,17 +1793,6 @@ class AgentApplicationRuntime {
     return this.#models.find((model) => model.id === this.#model);
   }
 
-  async #listModels(
-    auth: ResolvedProviderAuth = this.#auth,
-    signal: AbortSignal = this.#signal(),
-  ): Promise<readonly ProviderModel[]> {
-    return await createModelCatalog({
-      profile: auth.profile,
-      credential: auth.credential,
-      transport: this.transport,
-    }).list({ signal, retryBudget: new FixedRetryBudget(2) });
-  }
-
   async #activate(
     auth: ResolvedProviderAuth,
     model: string,
@@ -2492,57 +2476,31 @@ class AgentApplicationRuntime {
     }
     const providerId = parts[0] ?? await this.#requiredOverlays().chooseProvider(this.#signal());
     if (!providerId) return;
-    const definition = requireProviderDefinition(providerId);
-    if (!definition.defaults) {
-      throw new ConfigurationError(
-        "custom provider는 `cat-tui auth setup --provider custom ...`으로 연결하세요.",
-      );
-    }
-    const profileName = normalizeProfileName(parts[1] ?? definition.id);
+    const profileName = normalizeProfileName(parts[1] ?? providerId);
     if (profileName === this.#auth.profile.name) {
       throw new ConfigurationError(
         "현재 실행이 사용하는 profile은 /connect에서 덮어쓸 수 없습니다. " +
         "다른 profile 이름을 사용하거나 종료 후 auth setup으로 갱신하세요.",
       );
     }
-    const apiKey = validateApiKey(await this.#requiredOverlays().requestApiKey(
-      definition.displayName,
-      this.#signal(),
-    ));
-    await this.#registerKnownSecrets([apiKey]);
-    const defaults = defaultProviderEndpoint(definition.id);
-    const configured = await this.authService.configure({
-      name: profileName,
-      provider: definition.id,
-      protocol: defaults.protocol,
-      baseUrl: defaults.baseUrl,
-      modelsPath: defaults.modelsPath,
-      generationPath: defaults.generationPath,
-      apiKey,
-      endpointSource: "provider_default",
-      activate: false,
+    let auth = await configureProviderInteractively({
+      screen: this.#requiredScreen(), auth: this.authService,
+      provider: providerId, profile: profileName, environment: this.environment,
+      activate: false, signal: this.#signal(),
+      onSecret: (apiKey) => this.#registerKnownSecrets([apiKey]),
     });
-    let auth = await this.authService.resolve({
-      profile: configured.name,
-      environment: this.environment,
-    });
-    const models = await this.#listModels(auth, this.#signal());
-    if (models.length === 0) {
-      this.#requiredScreen().setStatus(
-        `Profile ${configured.name}은 저장했습니다. 다음 실행에서 --profile ${configured.name} --model <id>를 지정하세요.`,
-      );
-      return;
-    }
-    const selected = await this.#requiredOverlays().chooseModel(models, undefined, this.#signal());
+    const selected = await selectProviderModel(
+      this.#requiredScreen(), auth, this.transport, this.#signal(),
+    );
     if (!selected) {
       this.#requiredScreen().setStatus(
-        `Profile ${configured.name}은 저장했지만 model을 선택하지 않아 현재 연결을 유지합니다.`,
+        `Profile ${profileName}은 저장했지만 model을 선택하지 않아 현재 연결을 유지합니다.`,
       );
       return;
     }
-    const saved = await this.profiles.save({ ...auth.profile, model: selected }, true);
+    const saved = await this.profiles.save({ ...auth.profile, model: selected.model }, true);
     auth = await this.authService.resolve({ profile: saved.name, environment: this.environment });
-    await this.#activate(auth, selected, models);
+    await this.#activate(auth, selected.model, selected.models);
   }
 
   async #commandDisconnect(invocation: SlashCommandInvocation): Promise<void> {
@@ -2575,26 +2533,15 @@ class AgentApplicationRuntime {
         profile: fallback.profile.name,
         environment: this.environment,
       });
-      const models = fallback.profile.model
-        ? Object.freeze([])
-        : await this.#listModels(auth, this.#signal());
-      if (!fallback.profile.model && models.length === 0) {
-        this.#requiredScreen().setStatus(
-          "대체 profile의 model 목록이 비어 있어 연결을 계속할 수 없습니다. 종료합니다.",
-        );
-        this.#requiredScreen().stop();
-        return;
-      }
-      const model = fallback.profile.model ?? await this.#requiredOverlays().chooseModel(
-        models,
-        undefined,
-        this.#signal(),
-      );
-      if (!model) {
+      const selection = fallback.profile.model
+        ? { model: fallback.profile.model, models: [] }
+        : await selectProviderModel(this.#requiredScreen(), auth, this.transport, this.#signal());
+      if (!selection) {
         this.#requiredScreen().setStatus("대체 profile model 선택을 취소해 종료합니다.");
         this.#requiredScreen().stop();
         return;
       }
+      const { model, models } = selection;
       const selectedAuth = fallback.profile.model
         ? auth
         : await this.authService.resolve({
@@ -2625,25 +2572,16 @@ class AgentApplicationRuntime {
 
   async #commandModels(invocation: SlashCommandInvocation): Promise<void> {
     requireNoArgument(invocation);
-    const models = await this.#listModels(this.#auth, this.#signal());
-    if (models.length === 0) {
-      this.#requiredScreen().setStatus(
-        "Provider가 model 목록을 반환하지 않았습니다. /model <id>로 직접 지정하세요.",
-      );
-      return;
-    }
-    const selected = await this.#requiredOverlays().chooseModel(
-      models,
-      this.#model,
-      this.#signal(),
+    const selected = await selectProviderModel(
+      this.#requiredScreen(), this.#auth, this.transport, this.#signal(), this.#model,
     );
-    if (!selected || selected === this.#model) return;
-    const saved = await this.profiles.save({ ...this.#auth.profile, model: selected }, true);
+    if (!selected || selected.model === this.#model) return;
+    const saved = await this.profiles.save({ ...this.#auth.profile, model: selected.model }, true);
     const auth = await this.authService.resolve({
       profile: saved.name,
       environment: this.environment,
     });
-    await this.#activate(auth, selected, models);
+    await this.#activate(auth, selected.model, selected.models);
   }
 
   async #commandProvider(invocation: SlashCommandInvocation): Promise<void> {
@@ -2657,21 +2595,11 @@ class AgentApplicationRuntime {
     );
     if (!selected) return;
     const auth = await this.authService.resolve({ profile: selected, environment: this.environment });
-    const models = auth.profile.model
-      ? Object.freeze([])
-      : await this.#listModels(auth, this.#signal());
-    if (!auth.profile.model && models.length === 0) {
-      this.#requiredScreen().setStatus(
-        `선택한 profile은 바꾸지 않았습니다. 다음 실행에서 --profile ${auth.profile.name} --model <id>를 지정하세요.`,
-      );
-      return;
-    }
-    const model = auth.profile.model ?? await this.#requiredOverlays().chooseModel(
-      models,
-      undefined,
-      this.#signal(),
-    );
-    if (!model) return;
+    const selection = auth.profile.model
+      ? { model: auth.profile.model, models: [] }
+      : await selectProviderModel(this.#requiredScreen(), auth, this.transport, this.#signal());
+    if (!selection) return;
+    const { model, models } = selection;
     const selectedAuth = auth.profile.model
       ? auth
       : await this.authService.resolve({
