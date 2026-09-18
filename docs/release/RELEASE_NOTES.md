@@ -9,6 +9,7 @@
 - background task, managed Git worktree, SSH/OSC52 clipboard와 명시적 legacy import
 - Linux x64/arm64용 고정 Node.js v24.21.0 standalone installer 구성
 - root HOME에 설치하고 UID 0으로 cat과 하위 명령을 실행할 수 있는 root 설치 지원
+- 최신 정식 GitHub Release를 판별하고 architecture별 설치본을 검증·실행하는 공개 `install.sh`
 
 ## 배포 상태와 제한
 

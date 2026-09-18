@@ -11,6 +11,26 @@ runtime으로 검증하지 않았다.
 `stat`, `tar`(gzip/xz 지원), `tr`, 그리고 일반 파일 도구다. installer는 누락 도구를 자동 설치하거나
 `sudo`, apt/dnf/yum, 전역 npm을 사용하지 않는다.
 
+## GitHub에서 바로 설치
+
+공개 저장소의 최신 정식 Release는 다음 한 줄로 설치할 수 있다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Krminsung/CAT/main/install.sh | sh
+```
+
+`install.sh`는 Linux와 x64/arm64를 판별하고 GitHub의 최신 정식 Release에서 해당 installer와 SHA-256
+sidecar를 임시 경로에 내려받는다. checksum이 일치할 때만 installer를 실행하고 종료 시 임시 파일을
+제거한다. root shell에서 실행하면 root 설치가 되며, 일반 사용자 shell에서는 해당 사용자 HOME에
+설치한다. 일반 사용자 shell에서 root 설치를 명시하려면 다음과 같이 실행한다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Krminsung/CAT/main/install.sh | sudo -H sh
+```
+
+다운로드한 코드를 바로 실행하는 방식이므로 저장소와 Release를 신뢰할 때만 사용한다. 검토 후 실행하려면
+`install.sh`를 파일로 먼저 내려받아 내용을 확인하고 `/bin/sh install.sh`로 실행한다.
+
 ## artifact 확인과 설치
 
 P14 packaging을 완료하면 Git에 포함되지 않는 `artifacts/`에 다음 파일이 생성된다.
