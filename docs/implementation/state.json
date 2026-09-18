@@ -24,6 +24,20 @@
   },
   "nextAction": "Create cat/p14-packaging, push it, open the P14 pull request, review metadata and diff, then merge",
   "blocker": null,
+  "runtimeSetupFollowUp": {
+    "phase": "P14.R08",
+    "baseMainSha": "18b8aa401c1b33d9de6172b1bfe9225e74fa3d32",
+    "verifiedCodeSha": "eb4db690745eb32bb2c2e492a0de7ad56b115b0f",
+    "progressRef": "refs/cat-progress/P14-provider-setup",
+    "status": "VERIFIED",
+    "report": "docs/implementation/phases/P14-R08.md",
+    "buildAttempts": 2,
+    "syntaxChecks": "Node 22 and 24: 127 JavaScript files PASS",
+    "functionalChecks": "8 local API/PTTY scenarios PASS; isolated Linux x64 installer and bundled Chat/Responses startup PASS",
+    "publication": "PENDING_PR",
+    "releaseVersion": "v0.1.3",
+    "releaseStatus": "PREPARED_NOT_PUBLISHED"
+  },
   "reviewFollowUp": {
     "scope": ["R01", "R02", "R03", "R04"],
     "baseMainSha": "4abb0ea84c7f5306706e521cefc1729688c70b59",
