@@ -354,7 +354,7 @@ function frontmatter(
     const separator = line.indexOf(":");
     if (separator < 0) continue;
     const key = line.slice(0, separator).trim().toLowerCase();
-    const value = line.slice(separator + 1).trim().replace(/^['\"]+|['\"]+$/gu, "");
+    const value = line.slice(separator + 1).trim().replace(/^['"]+|['"]+$/gu, "");
     if (!key || key.length > 128 || Buffer.byteLength(value, "utf8") > 4_096) {
       throw new ConfigurationError("확장 frontmatter key 또는 값이 너무 큽니다.");
     }
