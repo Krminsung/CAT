@@ -28,22 +28,22 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "BLOCKED_VERIFY",
+    "status": "VERIFYING",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "BLOCKED_VERIFY",
+      "status": "VERIFYING",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
       "verification": "User authorized one build and one combined local UI/budget verification with 실행하고 검증하세요"
     },
     "verification": {
       "buildAttemptsUsed": 1,
-      "runtimeAttemptsUsed": 1,
+      "runtimeAttemptsUsed": 2,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "BUILD_PASS_RUNTIME_EXPECTATION_FAILED",
+      "result": "BUILD_PASS_RUNTIME_RETRY_RESERVED",
       "sourceCommitSha": "0b7f831",
       "targetCommitSha": "7e8bae5332193b2c3306d1539929b4ec9b4d1185",
       "command": "npm run build",
@@ -57,10 +57,28 @@
       ],
       "failedCase": "pty_text_then_tool_activity",
       "failureReason": "The harness required an intermediate assistant text that the existing web-evidence draft policy can suppress when tool calls are present; the application was waiting at the permission dialog, not crashing",
-      "pending": "Actual PTY tool execution and completion, long approval/resize, error/cancellation recovery, modal/raw focus, rename/resume and no-color flows"
+      "pending": "Actual PTY tool execution and completion, long approval/resize, error/cancellation recovery, modal/raw focus, rename/resume and no-color flows",
+      "runtimeAttempts": [
+        {
+          "attempt": 1,
+          "result": "FAIL_HARNESS_EXPECTATION",
+          "exitCode": 1,
+          "evidenceDirectory": "/tmp/cat-ui-r09-w_f_v2qy",
+          "failedCase": "pty_text_then_tool_activity"
+        },
+        {
+          "attempt": 2,
+          "authorization": "사용자가 검증 스크립트 수정 및 기존 빌드로 로컬 검증 추가 1회 요청에 네 진행하세요로 승인",
+          "result": "RESERVED",
+          "command": "timeout 180s python3 .git/cat-progress/P14-ui-flow.py",
+          "componentChecksRepeated": false,
+          "applicationCodeChanged": false,
+          "buildRepeated": false
+        }
+      ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Request approval to correct only the verification scenario and run one additional local PTY verification using the existing build; do not change application code, rebuild, retry or publish without new authorization"
+    "nextAction": "Run the reserved second local PTY verification once using the existing build; preserve earlier results, stop on failure and do not change application code, rebuild or publish"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
