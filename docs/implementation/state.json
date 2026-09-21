@@ -41,11 +41,14 @@
     },
     "verification": {
       "buildAttemptsUsed": 1,
-      "runtimeAttemptsUsed": 0,
+      "runtimeAttemptsUsed": 1,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "BUILD_RESERVED",
+      "result": "BUILD_PASS_RUNTIME_RESERVED",
       "sourceCommitSha": "0b7f831",
-      "command": "npm run build"
+      "targetCommitSha": "7e8bae5332193b2c3306d1539929b4ec9b4d1185",
+      "command": "npm run build",
+      "buildExitCode": 0,
+      "runtimeCommand": "python3 .git/cat-progress/P14-ui-flow.py"
     },
     "publication": "LOCAL_ONLY",
     "nextAction": "Run the single reserved build, then the authorized local UI/budget verification; do not retry on failure or publish"
