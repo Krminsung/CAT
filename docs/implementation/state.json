@@ -28,23 +28,23 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "IMPLEMENTING",
+    "status": "VERIFYING",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "IMPLEMENTING",
+      "status": "VERIFYING",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
       "verification": "User explicitly authorized the post-approval activity fix, one additional npm run build and one remaining local verification"
     },
     "verification": {
-      "buildAttemptsUsed": 1,
+      "buildAttemptsUsed": 2,
       "runtimeAttemptsUsed": 2,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "BUILD_PASS_RUNTIME_UI_STATE_FAILED",
-      "sourceCommitSha": "0b7f831",
+      "result": "APPROVAL_FIX_BUILD_RESERVED",
+      "sourceCommitSha": "d97e5faa3f62a271e747554b0330a1e6bf93cf7c",
       "targetCommitSha": "7e8bae5332193b2c3306d1539929b4ec9b4d1185",
       "command": "npm run build",
       "buildExitCode": 0,
@@ -59,6 +59,20 @@
       "failedCase": "pty_text_then_tool_activity",
       "failureReason": "Confirmed product UI defect: approval_required replaces the execution phase, but accepting permission does not restore it, so an active command still displays 권한 승인 기다리는 중",
       "pending": "Fix and verify the post-approval activity label; then complete long approval/resize, error/cancellation recovery, modal/raw focus, rename/resume and no-color PTY flows",
+      "buildAttempts": [
+        {
+          "attempt": 1,
+          "targetCommitSha": "7e8bae5332193b2c3306d1539929b4ec9b4d1185",
+          "result": "PASS",
+          "exitCode": 0
+        },
+        {
+          "attempt": 2,
+          "authorization": "사용자가 상태 표시 수정과 npm run build 추가 1회 및 남은 로컬 검증 1회를 명시적으로 승인",
+          "result": "RESERVED",
+          "command": "timeout 120s npm run build"
+        }
+      ],
       "runtimeAttempts": [
         {
           "attempt": 1,
@@ -89,7 +103,7 @@
       ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Commit the authorized display-only approval fix, reserve and execute one additional build and one local verification; keep earlier attempt records and do not publish"
+    "nextAction": "Execute the reserved second build once, then reserve the authorized third local verification if build succeeds; stop on failure and do not publish"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
