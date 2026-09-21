@@ -28,13 +28,13 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "VERIFYING",
+    "status": "BLOCKED_VERIFY",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "VERIFYING",
+      "status": "BLOCKED_VERIFY",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
       "verification": "User explicitly authorized the post-approval activity fix, one additional npm run build and one remaining local verification"
@@ -43,22 +43,23 @@
       "buildAttemptsUsed": 2,
       "runtimeAttemptsUsed": 4,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "BUILD_PASS_RUNTIME_FOURTH_ATTEMPT_RESERVED",
+      "result": "BUILD_PASS_RUNTIME_TRANSITION_ASSERTION_FAILED",
       "sourceCommitSha": "d97e5faa3f62a271e747554b0330a1e6bf93cf7c",
       "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
       "command": "npm run build",
       "buildExitCode": 0,
       "runtimeCommand": "python3 .git/cat-progress/P14-ui-flow.py",
       "runtimeExitCode": 1,
-      "evidenceDirectory": "/tmp/cat-ui-r09-attempt3-swvvscid",
+      "evidenceDirectory": "/tmp/cat-ui-r09-attempt4-cx_jg45x",
       "passed": [
         "Six component/budget cases: elapsed-time independence, cancellation/count limits/cleanup, dialog geometry/paging/resize, Unicode/redaction/raw text, activity states, JSON output",
         "Actual PTY: custom-provider initial setup against a loopback mock API, masked key entry, model selection and ASCII welcome",
-        "Second PTY pass observed local draft text, authorized command success, ten distinct spinner frames without premature completion, the next model response and final completion; the activity label assertion failed"
+        "Second PTY pass observed local draft text, authorized command success, ten distinct spinner frames without premature completion, the next model response and final completion; the activity label assertion failed",
+        "Fourth PTY pass observed the fixed label transition to 도구 실행 중 and continued animation/completion; the assertion incorrectly rejected an earlier approval frame in the captured transition window"
       ],
-      "failedCase": "fixture_setup",
-      "failureReason": "Harness expected the welcome ASCII after the session header in the output stream; the terminal painted ASCII first then updated only the header, so the forward-only matcher timed out despite both being displayed",
-      "pending": "The post-approval display fix compiled but was not reached by the third PTY attempt; verify it and all remaining PTY flows after correcting the fixture's output-order assumption",
+      "failedCase": "pty_text_then_tool_activity",
+      "failureReason": "Harness searched the entire post-key capture for any old approval label; a transition frame appeared before the corrected execution frames, so historical output was mistaken for the current state",
+      "pending": "The approval activity fix was exercised, but the combined pass failed; complete denial, long approval/resize, error/cancel recovery, modal/raw focus, rename/resume and no-color checks after correcting state-vs-history matching",
       "buildAttempts": [
         {
           "attempt": 1,
@@ -119,9 +120,19 @@
         {
           "attempt": 4,
           "authorization": "사용자가 검증 스크립트만 보완하고 기존 빌드로 로컬 검증 추가 1회 요청에 네 그렇게 진행하세요로 승인",
-          "result": "RESERVED",
+          "result": "FAIL_HARNESS_TRANSITION_WINDOW",
           "command": "timeout 180s python3 .git/cat-progress/P14-ui-flow.py",
+          "targetCommitSha": "fae10cd68dab872cf07f0533bbe5041d8566eb2d",
           "buildCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
+          "harnessSha256": "a4a668ebba86aa53ad89e1063c879b9096e91662e5e5ccf63e854dc847cb7159",
+          "exitCode": 1,
+          "evidenceDirectory": "/tmp/cat-ui-r09-attempt4-cx_jg45x",
+          "approvalFixExercised": true,
+          "executionLabelObserved": true,
+          "approvalLabelInEarlierTransitionFrame": true,
+          "toolStartedAndCompleted": true,
+          "spinnerFramesObservedDuringTool": 10,
+          "prematureCompletion": false,
           "applicationCodeChanged": false,
           "buildRepeated": false,
           "componentChecksRepeated": false
@@ -129,7 +140,7 @@
       ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Run the reserved fourth local verification once with order-independent matching for screen groups; preserve action boundaries and prior results, and do not rebuild, retry after failure or publish"
+    "nextAction": "Request approval to correct harness state-vs-history matching and complete remaining local verification, with at most two further harness-only retries if explicitly authorized; stop on product failures and do not change application code, rebuild or publish"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
