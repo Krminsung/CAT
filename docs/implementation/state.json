@@ -28,22 +28,22 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "BLOCKED_VERIFY",
+    "status": "VERIFYING",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "BLOCKED_VERIFY",
+      "status": "VERIFYING",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
       "verification": "User explicitly authorized the post-approval activity fix, one additional npm run build and one remaining local verification"
     },
     "verification": {
       "buildAttemptsUsed": 2,
-      "runtimeAttemptsUsed": 3,
+      "runtimeAttemptsUsed": 4,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "APPROVAL_FIX_BUILD_PASS_RUNTIME_FIXTURE_ORDER_FAILED",
+      "result": "BUILD_PASS_RUNTIME_FOURTH_ATTEMPT_RESERVED",
       "sourceCommitSha": "d97e5faa3f62a271e747554b0330a1e6bf93cf7c",
       "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
       "command": "npm run build",
@@ -115,11 +115,21 @@
           "failedCase": "fixture_setup",
           "approvalFixExercised": false,
           "componentChecksRepeated": false
+        },
+        {
+          "attempt": 4,
+          "authorization": "사용자가 검증 스크립트만 보완하고 기존 빌드로 로컬 검증 추가 1회 요청에 네 그렇게 진행하세요로 승인",
+          "result": "RESERVED",
+          "command": "timeout 180s python3 .git/cat-progress/P14-ui-flow.py",
+          "buildCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
+          "applicationCodeChanged": false,
+          "buildRepeated": false,
+          "componentChecksRepeated": false
         }
       ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Request approval to fix only the harness output-order assumption and perform one additional local verification using the existing successful build; no application changes, rebuild or publication are needed for this fixture issue"
+    "nextAction": "Run the reserved fourth local verification once with order-independent matching for screen groups; preserve action boundaries and prior results, and do not rebuild, retry after failure or publish"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
