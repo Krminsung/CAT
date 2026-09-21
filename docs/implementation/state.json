@@ -41,11 +41,11 @@
     },
     "verification": {
       "buildAttemptsUsed": 2,
-      "runtimeAttemptsUsed": 2,
+      "runtimeAttemptsUsed": 3,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "APPROVAL_FIX_BUILD_RESERVED",
+      "result": "APPROVAL_FIX_BUILD_PASS_RUNTIME_RESERVED",
       "sourceCommitSha": "d97e5faa3f62a271e747554b0330a1e6bf93cf7c",
-      "targetCommitSha": "7e8bae5332193b2c3306d1539929b4ec9b4d1185",
+      "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
       "command": "npm run build",
       "buildExitCode": 0,
       "runtimeCommand": "python3 .git/cat-progress/P14-ui-flow.py",
@@ -69,7 +69,9 @@
         {
           "attempt": 2,
           "authorization": "사용자가 상태 표시 수정과 npm run build 추가 1회 및 남은 로컬 검증 1회를 명시적으로 승인",
-          "result": "RESERVED",
+          "result": "PASS",
+          "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
+          "exitCode": 0,
           "command": "timeout 120s npm run build"
         }
       ],
@@ -99,11 +101,20 @@
           "componentChecksRepeated": false,
           "applicationCodeChanged": false,
           "buildRepeated": false
+        },
+        {
+          "attempt": 3,
+          "authorization": "사용자가 상태 표시 수정과 npm run build 추가 1회 및 남은 로컬 검증 1회를 명시적으로 승인",
+          "result": "RESERVED",
+          "command": "timeout 180s python3 .git/cat-progress/P14-ui-flow.py",
+          "buildCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
+          "harnessSha256": "fd0293838eb6e46392b42e4967144d2d01ab370d6af2658c9ba58e3a8626a60a",
+          "componentChecksRepeated": false
         }
       ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Execute the reserved second build once, then reserve the authorized third local verification if build succeeds; stop on failure and do not publish"
+    "nextAction": "Execute the reserved third local verification once against the successful second build; do not change application inputs, rerun or publish"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
