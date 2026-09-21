@@ -28,16 +28,16 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "BLOCKED_VERIFY",
+    "status": "IMPLEMENTING",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "BLOCKED_VERIFY",
+      "status": "IMPLEMENTING",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
-      "verification": "User authorized one build and one combined local UI/budget verification with 실행하고 검증하세요"
+      "verification": "User explicitly authorized the post-approval activity fix, one additional npm run build and one remaining local verification"
     },
     "verification": {
       "buildAttemptsUsed": 1,
@@ -89,7 +89,7 @@
       ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Request approval for the post-approval activity state fix, one additional npm run build and one local verification of the fix plus remaining PTY flows; do not modify code, rerun or publish before approval"
+    "nextAction": "Commit the authorized display-only approval fix, reserve and execute one additional build and one local verification; keep earlier attempt records and do not publish"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
