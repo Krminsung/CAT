@@ -155,9 +155,9 @@ export class TerminalInteractionPort
       message: boundedUtf8(
         `도구: ${request.toolName}\n` +
         `필요 권한: ${permissionRequirement(request)}\n` +
-        `범위 규칙: ${request.rule}\n\n` +
-        `실행 요약:\n${request.summary}\n\n` +
-        "프로젝트 저장은 현재 프로젝트의 이 규칙에만 적용됩니다.",
+        `\n실행할 작업:\n${request.summary}\n\n` +
+        "프로젝트 저장은 현재 프로젝트의 동일한 도구·범위에만 적용됩니다.\n" +
+        `범위 규칙: ${request.rule}`,
       ),
       options: request.choices.map((choice) => ({
         value: choice,

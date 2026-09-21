@@ -2,6 +2,8 @@ import {
   Editor,
   matchesKey,
   stripTerminalSequences,
+  truncateToWidth,
+  visibleWidth,
   type EditorOptions,
   type EditorTheme,
   type TUI,
@@ -48,6 +50,8 @@ export interface TerminalInputHost {
   notice(message: string): void;
   render(): void;
   reportFailure(error: unknown): void;
+  busyChanged?(busy: boolean): void;
+  cancellationRequested?(): void;
 }
 
 interface BoundedInputEvent {
@@ -126,6 +130,15 @@ export class BoundedEditor extends Editor {
     private readonly limitReached: () => void,
   ) {
     super(tui, theme, options);
+  }
+
+  override render(width: number): string[] {
+    const rows = super.render(width);
+    if (rows[0] && /^─+$/u.test(stripTerminalSequences(rows[0]))) {
+      const label = truncateToWidth(this.disableSubmit ? "── 작업 진행 중 " : "── 나의 입력 ", width, "");
+      rows[0] = label + "─".repeat(Math.max(0, width - visibleWidth(label)));
+    }
+    return rows;
   }
 
   override handleInput(data: string): void {
@@ -208,6 +221,7 @@ export class TerminalInputController {
     this.#busy = busy;
     if (!busy) this.#cancelRequested = false;
     this.#host.editor.disableSubmit = busy;
+    this.#host.busyChanged?.(busy);
     this.#host.render();
   }
 
@@ -310,6 +324,7 @@ export class TerminalInputController {
   #requestCancellation(): void {
     if (this.#cancelRequested) return;
     this.#cancelRequested = true;
+    this.#host.cancellationRequested?.();
     this.#host.notice("현재 요청을 취소하는 중입니다.");
     this.#runAction(this.#actions.cancelRun);
   }

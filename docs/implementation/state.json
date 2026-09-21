@@ -31,6 +31,14 @@
     "status": "REVIEWED",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
+    "uiFollowUp": {
+      "step": "P14.R09.UI",
+      "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
+      "status": "REVIEWED",
+      "report": "docs/implementation/phases/P14-R09-UI.md",
+      "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
+      "verification": "Combined build and local UI/runtime verification requested; not yet authorized or run"
+    },
     "verification": {
       "buildAttemptsUsed": 0,
       "runtimeAttemptsUsed": 0,
@@ -38,7 +46,7 @@
       "result": "NOT_RUN"
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Await explicit approval for one build and one focused runtime regression verification; no release packaging or publication performed"
+    "nextAction": "Await explicit approval for one combined build and one local UI/budget regression verification; no release packaging or publication performed"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
