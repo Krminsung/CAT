@@ -28,25 +28,27 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "REVIEWED",
+    "status": "VERIFYING",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "REVIEWED",
+      "status": "VERIFYING",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
-      "verification": "Combined build and local UI/runtime verification requested; not yet authorized or run"
+      "verification": "User authorized one build and one combined local UI/budget verification with 실행하고 검증하세요"
     },
     "verification": {
-      "buildAttemptsUsed": 0,
+      "buildAttemptsUsed": 1,
       "runtimeAttemptsUsed": 0,
-      "authorization": "REQUESTED_NOT_GRANTED",
-      "result": "NOT_RUN"
+      "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
+      "result": "BUILD_RESERVED",
+      "sourceCommitSha": "0b7f831",
+      "command": "npm run build"
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Await explicit approval for one combined build and one local UI/budget regression verification; no release packaging or publication performed"
+    "nextAction": "Run the single reserved build, then the authorized local UI/budget verification; do not retry on failure or publish"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
