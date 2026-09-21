@@ -28,13 +28,13 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "VERIFYING",
+    "status": "VERIFIED",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "VERIFYING",
+      "status": "VERIFIED",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
       "verification": "User explicitly authorized the post-approval activity fix, one additional npm run build and one remaining local verification"
@@ -43,23 +43,24 @@
       "buildAttemptsUsed": 2,
       "runtimeAttemptsUsed": 5,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "BUILD_PASS_RUNTIME_FIFTH_ATTEMPT_RESERVED",
+      "result": "PASS_LOCAL_SCOPED_VERIFICATION",
       "sourceCommitSha": "d97e5faa3f62a271e747554b0330a1e6bf93cf7c",
       "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
       "command": "npm run build",
       "buildExitCode": 0,
-      "runtimeCommand": "python3 .git/cat-progress/P14-ui-flow.py",
-      "runtimeExitCode": 1,
-      "evidenceDirectory": "/tmp/cat-ui-r09-attempt4-cx_jg45x",
+      "runtimeCommand": "timeout 180s python3 .git/cat-progress/P14-ui-flow.py 5",
+      "runtimeExitCode": 0,
+      "evidenceDirectory": "/tmp/cat-ui-r09-attempt5-la_lch6t",
       "passed": [
-        "Six component/budget cases: elapsed-time independence, cancellation/count limits/cleanup, dialog geometry/paging/resize, Unicode/redaction/raw text, activity states, JSON output",
-        "Actual PTY: custom-provider initial setup against a loopback mock API, masked key entry, model selection and ASCII welcome",
-        "Second PTY pass observed local draft text, authorized command success, ten distinct spinner frames without premature completion, the next model response and final completion; the activity label assertion failed",
-        "Fourth PTY pass observed the fixed label transition to 도구 실행 중 and continued animation/completion; the assertion incorrectly rejected an earlier approval frame in the captured transition window"
+        "Six unchanged component/budget cases passed in attempt 1: elapsed-time independence, cancellation/count limits/cleanup, dialog geometry/paging/resize, Unicode/redaction/raw text, activity states and JSON output; reused without repetition",
+        "Attempt 5 actual PTY: fixture setup and seven UI scenarios passed using a loopback mock API, fake credentials and temporary workspace",
+        "Approval-to-execution activity transition, ten distinct execution spinner frames, no premature completion, tool and next-model completion, denial without execution",
+        "Rename, long approval paging, narrow-window Enter blocking and resize, provider error and in-flight cancellation recovery, modal/raw focus, session resume, --no-color and NO_COLOR, clean application exit"
       ],
-      "failedCase": "pty_text_then_tool_activity",
-      "failureReason": "Harness searched the entire post-key capture for any old approval label; a transition frame appeared before the corrected execution frames, so historical output was mistaken for the current state",
-      "pending": "The approval activity fix was exercised, but the combined pass failed; complete denial, long approval/resize, error/cancel recovery, modal/raw focus, rename/resume and no-color checks after correcting state-vs-history matching",
+      "failedCase": null,
+      "failureReason": null,
+      "pending": null,
+      "scopeLimitations": "Local PTY and mock API only; no paid/provider production API, real long-duration server run, new installer, other runtime/architecture or release verification",
       "buildAttempts": [
         {
           "attempt": 1,
@@ -82,6 +83,8 @@
         "maximumNewAttempts": 3,
         "reservedAttempts": 1,
         "harnessOnlyRetriesRemaining": 2,
+        "harnessOnlyRetriesUsed": 0,
+        "closedReason": "Initial execution under this authorization passed; unused retries will not be executed",
         "stopOnProductFailure": true,
         "applicationChangesAllowed": false,
         "rebuildAllowed": false,
@@ -151,9 +154,23 @@
         {
           "attempt": 5,
           "authorization": "스크립트 보완 후 실행 1회 및 스크립트 자체 오류에 한한 최대 2회 추가 재시도 중 첫 실행",
-          "result": "RESERVED",
+          "result": "PASS",
           "command": "timeout 180s python3 .git/cat-progress/P14-ui-flow.py 5",
+          "targetCommitSha": "80e4778563cfa083b8cacf2fdd23f5ee4f649a09",
           "buildCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
+          "harnessSha256": "e853ca67e248c75f97f19a50cdcefdf2f47edf4cd6b574bdf91ed1f2279ceb92",
+          "exitCode": 0,
+          "evidenceDirectory": "/tmp/cat-ui-r09-attempt5-la_lch6t",
+          "passedCases": [
+            "fixture_setup",
+            "pty_text_then_tool_activity",
+            "pty_denied_approval",
+            "pty_title_and_long_approval_resize",
+            "pty_provider_error_and_cancel",
+            "pty_modal_focus_and_raw",
+            "pty_resume_and_no_color",
+            "pty_no_color_environment"
+          ],
           "applicationCodeChanged": false,
           "buildRepeated": false,
           "componentChecksRepeated": false
@@ -161,7 +178,7 @@
       ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Run reserved attempt 5; diagnose any failure before using at most two authorized harness-only retries; stop on product failure, do not change application code, rebuild or publish"
+    "nextAction": "Report successful scoped local verification; preserve source/build and evidence, do not spend unused retries or package/push/merge/release without a publication request"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",

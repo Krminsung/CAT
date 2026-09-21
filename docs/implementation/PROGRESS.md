@@ -394,3 +394,12 @@ Linux arm64 installer는 44,350,829 bytes / SHA-256
 통합 `SHA256SUMS`로 두 파일을 다시 확인해 모두 일치했다. 임시 stage가 남지 않았고 tracked source와
 root lockfile은 바뀌지 않았다. 설치본, bundled Node와 앱 runtime은 실행하지 않았으며 artifact는
 Git에 추가하지 않는다.
+
+## P14.R09 후속 작업 — 2026-09-21
+
+전체 작업의 고정 시간 제한 제거와 TUI 가시성 개선은 로컬 검증을 마쳤다(`VERIFIED`, `LOCAL_ONLY`).
+승인 후 상태 표시 수정본 빌드와 실제 PTY의 남은 UI 시나리오가 통과했다. 누적 build 2회,
+runtime 5회에 이전 실패를 포함하며 마지막 승인에서 허용한 스크립트 오류용 재시도 2회는
+사용하지 않았다. 외부 API·실제 장시간 서버·새 installer 검증과 공개 배포는 수행하지 않았다.
+상세 증거·검증 범위·실패 이력은 [P14.R09.UI](phases/P14-R09-UI.md)와
+`state.json`의 `runtimeBudgetFollowUp`을 따른다. 실행 코드와 빌드 입력은 고정된 상태다.
