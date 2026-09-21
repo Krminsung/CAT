@@ -169,8 +169,7 @@ function sameRunLimits(left: AgentRunLimits, right: AgentRunLimits): boolean {
     left.maxRecoveryAttempts === right.maxRecoveryAttempts &&
     left.maxSameRecoveryKind === right.maxSameRecoveryKind &&
     left.maxCompactions === right.maxCompactions &&
-    left.maxStopContinuations === right.maxStopContinuations &&
-    left.wallClockMs === right.wallClockMs;
+    left.maxStopContinuations === right.maxStopContinuations;
 }
 
 const MAX_INITIAL_MESSAGES = 1_000;

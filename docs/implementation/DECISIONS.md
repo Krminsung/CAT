@@ -142,7 +142,7 @@
 
 ## D016 — 단일 실행 소유권과 공통 예산
 
-- 상태: 승인됨
+- 상태: 승인됨. 전체 시간 제한 부분은 2026-09-21의 D041로 변경됨.
 - 결정: process 안의 session별 coordinator가 동시에 하나의 run만 소유한다. owner loop는
   명시적인 상태 전이를 따르고 모델 첫 요청과 transport 재시도가 같은 모델 시도 예산을
   소비한다. wall-clock timer와 caller 취소는 하나의 signal로 하위 경계에 전달한다.
@@ -448,3 +448,14 @@
   `cat-tui`이며 `cat`은 명시적 opt-in일 때만 시도하고 충돌은 보존한다. shell profile, system `cat`, OS
   package manager와 global npm을 바꾸거나 설치 후 app/version smoke를 실행하지 않는다. checksum은
   무결성 자료이지 배포자 신원 증명으로 과장하지 않고 실제 installer/runtime 동작은 미검증으로 남긴다.
+
+## D041 — 전체 작업의 고정 시간 제한 제거
+
+- 상태: 2026-09-21 사용자 후속 지시로 승인됨.
+- 결정: `RunBudgetController`의 고정 10분 제한, 타이머, 시간 비교와 `wall_clock` 종료 원인을
+  제거한다. 일반 실행과 자동·수동 compaction이 같은 변경을 적용받는다. 전체 작업의 경과 시간이나
+  승인 대기만으로 중단하지 않으며 새로운 고정 시간 제한으로 대체하지 않는다.
+- 결과: 사용자 취소 전파, 종료 시 listener·lease 정리, turn·모델·도구·복구 횟수와 중복 실행 방지를
+  유지한다. 개별 HTTP 요청·도구·hook·background task의 timeout/deadline은 변경하지 않는다.
+  JSON 출력의 `budget.deadlineAt` 필드는 유지하되 시간 제한 없음을 `null`로 표시한다.
+  D016·D018과 P05 당시 기록의 전체 run timer 설명보다 이 변경을 우선한다.

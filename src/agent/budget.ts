@@ -21,8 +21,7 @@ export type RunBudgetExhaustion =
   | "tool_calls"
   | "recovery_attempts"
   | "compactions"
-  | "stop_continuations"
-  | "wall_clock";
+  | "stop_continuations";
 
 export interface AgentRunLimits {
   readonly maxTurns: number;
@@ -32,7 +31,6 @@ export interface AgentRunLimits {
   readonly maxSameRecoveryKind: number;
   readonly maxCompactions: number;
   readonly maxStopContinuations: number;
-  readonly wallClockMs: number;
 }
 
 export const DEFAULT_AGENT_RUN_LIMITS: AgentRunLimits = Object.freeze({
@@ -43,7 +41,6 @@ export const DEFAULT_AGENT_RUN_LIMITS: AgentRunLimits = Object.freeze({
   maxSameRecoveryKind: 1,
   maxCompactions: 1,
   maxStopContinuations: 1,
-  wallClockMs: 10 * 60 * 1_000,
 });
 
 const LIMIT_BOUNDS = Object.freeze({
@@ -54,7 +51,6 @@ const LIMIT_BOUNDS = Object.freeze({
   maxSameRecoveryKind: [0, 20],
   maxCompactions: [0, 10],
   maxStopContinuations: [0, 10],
-  wallClockMs: [1_000, 60 * 60 * 1_000],
 } satisfies Record<keyof AgentRunLimits, readonly [number, number]>);
 
 function boundedInteger(
@@ -97,7 +93,6 @@ export function resolveAgentRunLimits(
       merged.maxStopContinuations,
       "maxStopContinuations",
     ),
-    wallClockMs: boundedInteger(merged.wallClockMs, "wallClockMs"),
   });
 }
 
@@ -110,7 +105,7 @@ export interface RunBudgetControllerOptions {
 /** Compaction, Stop hook과 web 복구가 공유하는 run 소유 예산 port다. */
 export interface AgentExtensionBudgetPort extends RetryBudgetPort {
   readonly signal: AbortSignal;
-  readonly deadlineAt: number;
+  readonly deadlineAt: null;
   consumeModelRequest(): void;
   consumeToolCall(): void;
   tryConsumeRecovery(kind: RecoveryKind): boolean;
@@ -131,13 +126,10 @@ const RECOVERY_KIND_PATTERN = /^[a-z][a-z0-9_]{0,63}$/u;
 
 export class RunBudgetController implements AgentExtensionBudgetPort {
   readonly limits: AgentRunLimits;
-  readonly #now: () => number;
   readonly #startedAt: number;
-  readonly #deadlineAt: number;
   readonly #controller = new AbortController();
   readonly #callerSignal: AbortSignal | undefined;
   readonly #callerAbortListener: (() => void) | undefined;
-  readonly #timer: NodeJS.Timeout;
   readonly #used: MutableRunBudget = {
     turns: 0,
     modelRequests: 0,
@@ -153,12 +145,10 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
 
   constructor(options: RunBudgetControllerOptions = {}) {
     this.limits = resolveAgentRunLimits(options.limits);
-    this.#now = options.now ?? Date.now;
-    this.#startedAt = this.#now();
+    this.#startedAt = (options.now ?? Date.now)();
     if (!Number.isSafeInteger(this.#startedAt) || this.#startedAt < 0) {
       throw new ConfigurationError("실행 시작 시간이 올바르지 않습니다.");
     }
-    this.#deadlineAt = this.#startedAt + this.limits.wallClockMs;
     this.#callerSignal = options.signal;
     this.#callerAbortListener = options.signal
       ? () => {
@@ -173,10 +163,6 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
         once: true,
       });
     }
-    this.#timer = setTimeout(() => {
-      this.#markExhausted("wall_clock");
-    }, this.limits.wallClockMs);
-    this.#timer.unref();
   }
 
   get signal(): AbortSignal {
@@ -187,12 +173,11 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
     return this.#startedAt;
   }
 
-  get deadlineAt(): number {
-    return this.#deadlineAt;
+  get deadlineAt(): null {
+    return null;
   }
 
   get exhaustion(): RunBudgetExhaustion | undefined {
-    this.#refreshDeadline();
     return this.#exhaustion;
   }
 
@@ -205,10 +190,9 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
   }
 
   snapshot(): RunBudget {
-    this.#refreshDeadline();
     return Object.freeze({
       ...this.#used,
-      deadlineAt: this.#deadlineAt,
+      deadlineAt: this.deadlineAt,
     });
   }
 
@@ -217,7 +201,6 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
   }
 
   assertActive(): void {
-    this.#refreshDeadline();
     if (this.#exhaustion) {
       throw new BudgetExhaustedError(
         `실행 예산이 소진되었습니다: ${this.#exhaustion}`,
@@ -286,7 +269,6 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
   cleanup(): boolean {
     if (this.#cleaned) return false;
     this.#cleaned = true;
-    clearTimeout(this.#timer);
     if (this.#callerSignal && this.#callerAbortListener) {
       this.#callerSignal.removeEventListener(
         "abort",
@@ -299,7 +281,6 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
 
   #tryConsumeRecovery(kind: RecoveryKind): boolean {
     if (!RECOVERY_KIND_PATTERN.test(kind)) return false;
-    this.#refreshDeadline();
     if (this.#controller.signal.aborted || this.#cleaned) return false;
     if (
       this.#used.recoveryAttempts >= this.limits.maxRecoveryAttempts ||
@@ -334,7 +315,6 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
     maximum: number,
     exhaustion: RunBudgetExhaustion,
   ): boolean {
-    this.#refreshDeadline();
     if (this.#controller.signal.aborted || this.#cleaned) return false;
     if (this.#used[counter] >= maximum) {
       this.#markExhausted(exhaustion);
@@ -342,16 +322,6 @@ export class RunBudgetController implements AgentExtensionBudgetPort {
     }
     this.#used[counter] += 1;
     return true;
-  }
-
-  #refreshDeadline(): void {
-    if (
-      !this.#exhaustion &&
-      !this.#cleaned &&
-      this.#now() >= this.#deadlineAt
-    ) {
-      this.#markExhausted("wall_clock");
-    }
   }
 
   #markExhausted(exhaustion: RunBudgetExhaustion): void {

@@ -24,6 +24,22 @@
   },
   "nextAction": "Create cat/p14-packaging, push it, open the P14 pull request, review metadata and diff, then merge",
   "blocker": null,
+  "runtimeBudgetFollowUp": {
+    "phase": "P14.R09",
+    "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
+    "progressRef": "refs/cat-progress/P14-run-budget",
+    "status": "REVIEWED",
+    "report": "docs/implementation/phases/P14-R09.md",
+    "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
+    "verification": {
+      "buildAttemptsUsed": 0,
+      "runtimeAttemptsUsed": 0,
+      "authorization": "REQUESTED_NOT_GRANTED",
+      "result": "NOT_RUN"
+    },
+    "publication": "LOCAL_ONLY",
+    "nextAction": "Await explicit approval for one build and one focused runtime regression verification; no release packaging or publication performed"
+  },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
     "baseMainSha": "18b8aa401c1b33d9de6172b1bfe9225e74fa3d32",

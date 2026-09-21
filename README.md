@@ -139,6 +139,10 @@ HTTP endpoint는 내부 개발 환경에서 `--allow-insecure-http`까지 명시
 | 프로젝트 사용자 설정 신뢰 | 검토 후 `--trust-workspace` |
 | 출력 조정 | `--verbose`, `--no-color` |
 
+전체 작업에는 고정 실행 시간 제한이 없으며, 계획 진행이나 승인 대기를 포함해 10분이 지났다는
+이유만으로 중단하지 않는다. 개별 API 요청·도구의 timeout, 사용자 취소와 turn·모델 요청·도구 호출·
+복구 횟수 제한은 그대로 적용된다. JSON 결과의 `budget.deadlineAt`은 시간 제한이 없음을 뜻하는 `null`이다.
+
 `--resume`과 `--continue`, 그리고 이 둘과 `--worktree`는 함께 사용할 수 없다. `json`과
 `stream-json` 출력은 `--print`에서만 사용할 수 있다. 비밀값이 여러 토큰에 나뉘어 노출되는 것을 막기 위해
 텍스트는 완성된 `text_complete` 이벤트에서 전체 redaction 후 전달한다. 원시 `text_delta`는 TUI의

@@ -413,7 +413,7 @@ interface RunBudget {
   toolCalls: number;
   recoveryAttempts: number;
   compactions: number;
-  deadlineAt: number;
+  deadlineAt: null; // 전체 실행 시간 제한 없음
 }
 
 interface ToolExecutionContext {
@@ -675,9 +675,9 @@ npm 없는 설치본은 **개발 중 실행하지 않고** P14에서 구성한�
 | 복구 경로 전체 | run당 최대 2회, 같은 종류는 최대 1회 |
 | Stop hook continuation | 최대 1회이며 복구 전체 2회 안에 포함 |
 | 자동 compaction | run당 최대 1회, 모델 HTTP 예산도 소비 |
-| 전체 wall clock | 기본 10분. 실행 중 timer로 종료하며 다른 timeout보다 우선 |
+| 전체 wall clock | 제한 없음. 2026-09-21 사용자 지시에 따라 고정 10분 제한과 run timer 제거 |
 
-`--max-turns`만 크게 바꿔도 나머지 상한을 자동 해제하지 않는다. 필요한 고급 상한은 명시적 설정으로만 변경한다. 승인 대기 시간도 wall clock에 포함하고 만료 시 이를 명확히 보여준다. 재개는 사용자의 새 입력에 의한 새 run이며 이미 발생한 부작용을 자동 재현하지 않는다.
+`--max-turns`만 크게 바꿔도 나머지 횟수 상한을 자동 해제하지 않는다. 필요한 고급 상한은 명시적 설정으로만 변경한다. 승인 대기·compaction·계획 실행의 누적 시간으로 run을 종료하지 않는다. 개별 모델 HTTP 요청·도구·hook 등의 timeout과 사용자 취소는 유지한다. 중단 후 재개는 사용자의 새 입력에 의한 새 run이며 이미 발생한 부작용을 자동 재현하지 않는다.
 
 모델 HTTP 재시도 책임은 transport 하나에만 둔다. 연결 전 실패와 제한적인 429/5xx에 한정하고 `Retry-After`와 남은 deadline을 존중한다. 응답 스트림을 소비한 뒤에는 모델 출력을 숨기고 새 응답으로 교체하지 않는다. tool 실행이나 MCP mutation은 idempotency가 보장되지 않으면 자동 재시도하지 않는다. 서버에서 처리 여부를 알 수 없는 결과는 `실행 여부 불명`으로 표시한다.
 
