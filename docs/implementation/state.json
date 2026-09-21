@@ -28,22 +28,22 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "BLOCKED_VERIFY",
+    "status": "VERIFYING",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "BLOCKED_VERIFY",
+      "status": "VERIFYING",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
       "verification": "User explicitly authorized the post-approval activity fix, one additional npm run build and one remaining local verification"
     },
     "verification": {
       "buildAttemptsUsed": 2,
-      "runtimeAttemptsUsed": 4,
+      "runtimeAttemptsUsed": 5,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "BUILD_PASS_RUNTIME_TRANSITION_ASSERTION_FAILED",
+      "result": "BUILD_PASS_RUNTIME_FIFTH_ATTEMPT_RESERVED",
       "sourceCommitSha": "d97e5faa3f62a271e747554b0330a1e6bf93cf7c",
       "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
       "command": "npm run build",
@@ -76,6 +76,17 @@
           "command": "timeout 120s npm run build"
         }
       ],
+      "currentRuntimeAuthorization": {
+        "authorization": "사용자가 스크립트 보완 후 1회 실행하고 스크립트 자체 오류에 한해서 최대 2회 재시도를 명시적으로 승인",
+        "firstAttempt": 5,
+        "maximumNewAttempts": 3,
+        "reservedAttempts": 1,
+        "harnessOnlyRetriesRemaining": 2,
+        "stopOnProductFailure": true,
+        "applicationChangesAllowed": false,
+        "rebuildAllowed": false,
+        "publicationAllowed": false
+      },
       "runtimeAttempts": [
         {
           "attempt": 1,
@@ -136,11 +147,21 @@
           "applicationCodeChanged": false,
           "buildRepeated": false,
           "componentChecksRepeated": false
+        },
+        {
+          "attempt": 5,
+          "authorization": "스크립트 보완 후 실행 1회 및 스크립트 자체 오류에 한한 최대 2회 추가 재시도 중 첫 실행",
+          "result": "RESERVED",
+          "command": "timeout 180s python3 .git/cat-progress/P14-ui-flow.py 5",
+          "buildCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
+          "applicationCodeChanged": false,
+          "buildRepeated": false,
+          "componentChecksRepeated": false
         }
       ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Request approval to correct harness state-vs-history matching and complete remaining local verification, with at most two further harness-only retries if explicitly authorized; stop on product failures and do not change application code, rebuild or publish"
+    "nextAction": "Run reserved attempt 5; diagnose any failure before using at most two authorized harness-only retries; stop on product failure, do not change application code, rebuild or publish"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
