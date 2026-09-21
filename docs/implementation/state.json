@@ -177,8 +177,22 @@
         }
       ]
     },
-    "publication": "LOCAL_ONLY",
-    "nextAction": "Report successful scoped local verification; preserve source/build and evidence, do not spend unused retries or package/push/merge/release without a publication request"
+    "publication": "AWAITING_VERSION_BUILD_APPROVAL",
+    "releaseFollowUp": {
+      "version": "v0.1.4",
+      "authorization": "사용자가 커밋하고 푸시후 공개 배포하세요로 push·PR·main 병합·공개 Release 게시를 요청",
+      "status": "AWAITING_VERSION_BUILD_APPROVAL",
+      "reason": "The next release needs version.ts and package metadata updated from 0.1.3; an additional build requires explicit approval under the repository rules",
+      "additionalBuildAuthorized": false,
+      "packagingAttemptsUsed": 0,
+      "plannedBranch": "cat/p14-ui-runtime",
+      "repository": "Krminsung/CAT",
+      "remoteBaseSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
+      "remotePreflight": "Public repository, authenticated Krminsung ADMIN, merge commits enabled, no open PR, no workflows, no main protection/rulesets; planned branch and v0.1.4 tag absent",
+      "existingDistManifest": ".git/cat-progress/P14-ui-dist-before-release.sha256",
+      "versionBuildPlan": "Change only version metadata and release documentation, build once, compare all dist hashes except version outputs, reuse the successful UI verification and package once"
+    },
+    "nextAction": "Wait for explicit approval of v0.1.4 version metadata change, one additional build and one packaging run, then perform the requested push/PR/main merge/public release; no remote writes performed yet"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
