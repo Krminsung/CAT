@@ -28,13 +28,13 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "VERIFYING",
+    "status": "BLOCKED_VERIFY",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "VERIFYING",
+      "status": "BLOCKED_VERIFY",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
       "verification": "User explicitly authorized the post-approval activity fix, one additional npm run build and one remaining local verification"
@@ -43,22 +43,22 @@
       "buildAttemptsUsed": 2,
       "runtimeAttemptsUsed": 3,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "APPROVAL_FIX_BUILD_PASS_RUNTIME_RESERVED",
+      "result": "APPROVAL_FIX_BUILD_PASS_RUNTIME_FIXTURE_ORDER_FAILED",
       "sourceCommitSha": "d97e5faa3f62a271e747554b0330a1e6bf93cf7c",
       "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
       "command": "npm run build",
       "buildExitCode": 0,
       "runtimeCommand": "python3 .git/cat-progress/P14-ui-flow.py",
       "runtimeExitCode": 1,
-      "evidenceDirectory": "/tmp/cat-ui-r09-attempt2-rj2eef3f",
+      "evidenceDirectory": "/tmp/cat-ui-r09-attempt3-swvvscid",
       "passed": [
         "Six component/budget cases: elapsed-time independence, cancellation/count limits/cleanup, dialog geometry/paging/resize, Unicode/redaction/raw text, activity states, JSON output",
         "Actual PTY: custom-provider initial setup against a loopback mock API, masked key entry, model selection and ASCII welcome",
         "Second PTY pass observed local draft text, authorized command success, ten distinct spinner frames without premature completion, the next model response and final completion; the activity label assertion failed"
       ],
-      "failedCase": "pty_text_then_tool_activity",
-      "failureReason": "Confirmed product UI defect: approval_required replaces the execution phase, but accepting permission does not restore it, so an active command still displays 권한 승인 기다리는 중",
-      "pending": "Fix and verify the post-approval activity label; then complete long approval/resize, error/cancellation recovery, modal/raw focus, rename/resume and no-color PTY flows",
+      "failedCase": "fixture_setup",
+      "failureReason": "Harness expected the welcome ASCII after the session header in the output stream; the terminal painted ASCII first then updated only the header, so the forward-only matcher timed out despite both being displayed",
+      "pending": "The post-approval display fix compiled but was not reached by the third PTY attempt; verify it and all remaining PTY flows after correcting the fixture's output-order assumption",
       "buildAttempts": [
         {
           "attempt": 1,
@@ -105,16 +105,21 @@
         {
           "attempt": 3,
           "authorization": "사용자가 상태 표시 수정과 npm run build 추가 1회 및 남은 로컬 검증 1회를 명시적으로 승인",
-          "result": "RESERVED",
+          "result": "FAIL_HARNESS_OUTPUT_ORDER",
           "command": "timeout 180s python3 .git/cat-progress/P14-ui-flow.py",
+          "targetCommitSha": "0f86e8d3863c655f63d0a25601497b98bcce6326",
           "buildCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
           "harnessSha256": "fd0293838eb6e46392b42e4967144d2d01ab370d6af2658c9ba58e3a8626a60a",
+          "exitCode": 1,
+          "evidenceDirectory": "/tmp/cat-ui-r09-attempt3-swvvscid",
+          "failedCase": "fixture_setup",
+          "approvalFixExercised": false,
           "componentChecksRepeated": false
         }
       ]
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Execute the reserved third local verification once against the successful second build; do not change application inputs, rerun or publish"
+    "nextAction": "Request approval to fix only the harness output-order assumption and perform one additional local verification using the existing successful build; no application changes, rebuild or publication are needed for this fixture issue"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
