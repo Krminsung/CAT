@@ -28,13 +28,13 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "VERIFYING",
+    "status": "BLOCKED_VERIFY",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
       "step": "P14.R09.UI",
       "baseCommitSha": "8b6c75b8731901e3ffbe71611423ca7edeaf79d1",
-      "status": "VERIFYING",
+      "status": "BLOCKED_VERIFY",
       "report": "docs/implementation/phases/P14-R09-UI.md",
       "scope": "ASCII welcome, persistent activity, role-separated messages, session titles and opaque scrollable dialogs",
       "verification": "User authorized one build and one combined local UI/budget verification with 실행하고 검증하세요"
@@ -43,15 +43,24 @@
       "buildAttemptsUsed": 1,
       "runtimeAttemptsUsed": 1,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "BUILD_PASS_RUNTIME_RESERVED",
+      "result": "BUILD_PASS_RUNTIME_EXPECTATION_FAILED",
       "sourceCommitSha": "0b7f831",
       "targetCommitSha": "7e8bae5332193b2c3306d1539929b4ec9b4d1185",
       "command": "npm run build",
       "buildExitCode": 0,
-      "runtimeCommand": "python3 .git/cat-progress/P14-ui-flow.py"
+      "runtimeCommand": "python3 .git/cat-progress/P14-ui-flow.py",
+      "runtimeExitCode": 1,
+      "evidenceDirectory": "/tmp/cat-ui-r09-w_f_v2qy",
+      "passed": [
+        "Six component/budget cases: elapsed-time independence, cancellation/count limits/cleanup, dialog geometry/paging/resize, Unicode/redaction/raw text, activity states, JSON output",
+        "Actual PTY: custom-provider initial setup against a loopback mock API, masked key entry, model selection and ASCII welcome"
+      ],
+      "failedCase": "pty_text_then_tool_activity",
+      "failureReason": "The harness required an intermediate assistant text that the existing web-evidence draft policy can suppress when tool calls are present; the application was waiting at the permission dialog, not crashing",
+      "pending": "Actual PTY tool execution and completion, long approval/resize, error/cancellation recovery, modal/raw focus, rename/resume and no-color flows"
     },
     "publication": "LOCAL_ONLY",
-    "nextAction": "Run the single reserved build, then the authorized local UI/budget verification; do not retry on failure or publish"
+    "nextAction": "Request approval to correct only the verification scenario and run one additional local PTY verification using the existing build; do not change application code, rebuild, retry or publish without new authorization"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
