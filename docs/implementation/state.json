@@ -28,7 +28,7 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "VERIFIED",
+    "status": "VERIFYING",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
@@ -40,10 +40,10 @@
       "verification": "User explicitly authorized the post-approval activity fix, one additional npm run build and one remaining local verification"
     },
     "verification": {
-      "buildAttemptsUsed": 2,
+      "buildAttemptsUsed": 3,
       "runtimeAttemptsUsed": 5,
       "authorization": "사용자가 실행하고 검증하세요로 요청한 빌드 1회와 로컬 UI·시간 제한 검증 1회를 승인",
-      "result": "PASS_LOCAL_SCOPED_VERIFICATION",
+      "result": "RELEASE_VERSION_BUILD_RESERVED",
       "sourceCommitSha": "d97e5faa3f62a271e747554b0330a1e6bf93cf7c",
       "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
       "command": "npm run build",
@@ -74,6 +74,13 @@
           "result": "PASS",
           "targetCommitSha": "7615acf454a4ebd903842d3b15d46611e357ebdd",
           "exitCode": 0,
+          "command": "timeout 120s npm run build"
+        },
+        {
+          "attempt": 3,
+          "authorization": "2026-09-22 안내된 v0.1.4 배포 절차 진행 재지시",
+          "sourceCommitSha": "49efa66786aeecfbbfa6e300d8a7e79baf403451",
+          "result": "RESERVED",
           "command": "timeout 120s npm run build"
         }
       ],
@@ -181,7 +188,7 @@
     "releaseFollowUp": {
       "version": "v0.1.4",
       "authorization": "버전 반영·build 1회·package:installer 1회가 필요한 배포 절차를 안내한 뒤 사용자가 push하고 메인에pr해서 merge하고 공개배포 하세요로 해당 절차 진행을 재지시",
-      "status": "PREPARING_RELEASE",
+      "status": "BUILD_RESERVED",
       "reason": null,
       "additionalBuildAuthorized": true,
       "packagingAuthorized": true,
@@ -193,7 +200,7 @@
       "existingDistManifest": ".git/cat-progress/P14-ui-dist-before-release.sha256",
       "versionBuildPlan": "Change only version metadata and release documentation, build once, compare all dist hashes except version outputs, reuse the successful UI verification and package once"
     },
-    "nextAction": "Commit version-only release metadata and documentation, reserve build 3 and one installer packaging run, then push the release branch, open and merge its main PR, and publish v0.1.4"
+    "nextAction": "Run reserved build 3 once, compare generated dist hashes to the verified version, then reserve installer packaging; do not retry build or repeat runtime tests"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
