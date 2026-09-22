@@ -28,7 +28,7 @@
     "phase": "P14.R09",
     "baseMainSha": "94d46c6c11464ec7612abf9aeacca0790d74d212",
     "progressRef": "refs/cat-progress/P14-run-budget",
-    "status": "PACKAGING",
+    "status": "VERIFIED",
     "report": "docs/implementation/phases/P14-R09.md",
     "scope": "Remove the total run wall-clock limit; retain cancellation, count limits and per-operation timeouts",
     "uiFollowUp": {
@@ -186,17 +186,26 @@
         }
       ]
     },
-    "publication": "PREPARING_RELEASE",
+    "publication": "READY_FOR_PR",
     "releaseFollowUp": {
       "version": "v0.1.4",
       "authorization": "버전 반영·build 1회·package:installer 1회가 필요한 배포 절차를 안내한 뒤 사용자가 push하고 메인에pr해서 merge하고 공개배포 하세요로 해당 절차 진행을 재지시",
-      "status": "PACKAGING_RESERVED",
+      "status": "READY_FOR_PR",
       "reason": null,
       "additionalBuildAuthorized": true,
       "packagingAuthorized": true,
       "packagingAttemptsUsed": 1,
       "packagingCommand": "npm run package:installer",
-      "packagingResult": "RESERVED",
+      "packagingResult": "PASS",
+      "packagingExitCode": 0,
+      "packagingCommitSha": "e4791d6c3b9d8153647de5be741e921af94eac59",
+      "artifactDirectory": "artifacts",
+      "installerSha256": {
+        "linuxX64": "0fee6eb6dadf64716e3cadf746979e73a91fd714f63e9ce6dea345265fedbf1f",
+        "linuxArm64": "b16305ff837cf8d0bd5e2bc96e84efba9268de4c3631f4e5b432abaf7fe212ac"
+      },
+      "artifactIntegrity": "Both installer SHA-256 values match SHA256SUMS; unchanged install.sh copied as the sixth release asset; no installer execution",
+      "publicationReceipt": ".git/cat-progress/v0.1.4-publication.json",
       "distComparison": "387 files compared: 385 identical to the successful UI build; only dist/core/version.js and dist/core/version.d.ts changed to 0.1.4; no added or removed files",
       "previousArtifactsBackup": ".git/cat-progress/artifacts-v0.1.3-before-v0.1.4",
       "plannedBranch": "cat/p14-ui-runtime",
@@ -206,7 +215,7 @@
       "existingDistManifest": ".git/cat-progress/P14-ui-dist-before-release.sha256",
       "versionBuildPlan": "Change only version metadata and release documentation, build once, compare all dist hashes except version outputs, reuse the successful UI verification and package once"
     },
-    "nextAction": "Preserve existing v0.1.3 artifacts and run reserved installer packaging once; do not rebuild or repeat runtime tests"
+    "nextAction": "Push cat/p14-ui-runtime, open and merge the main PR, verify Git tree and ancestry, publish v0.1.4 with six assets; record actual PR/merge/release identifiers in the ignored publication receipt and PR comment without rebuilding"
   },
   "runtimeSetupFollowUp": {
     "phase": "P14.R08",
