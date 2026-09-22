@@ -3,8 +3,6 @@ import {
   CURSOR_MARKER,
   ProcessTerminal,
   ScrollView,
-  SelectList,
-  Text,
   TuiAltScreen,
   VStack,
   truncateToWidth,
@@ -44,6 +42,8 @@ import {
 } from "./raw-view.js";
 import { SecretInputPanel } from "./secret-input.js";
 import { TextInputPanel } from "./text-input.js";
+import { FullscreenDialog, SelectionPanel } from "./dialog.js";
+import { RunActivity, ScreenHeader, WelcomePanel, decorateScreenLine, sessionDisplayName } from "./presentation.js";
 import {
   safeTerminalLine,
   sanitizeTerminalText,
@@ -137,6 +137,7 @@ export interface CatTerminalScreenOptions {
   readonly secrets?: readonly string[];
   readonly clipboard?: ClipboardWriter;
   readonly environment?: NodeJS.ProcessEnv;
+  readonly noColor?: boolean;
 }
 
 interface ActiveModal {
@@ -328,6 +329,7 @@ class ComponentBoundary implements Component {
     private readonly redactor: TerminalTextRedactor,
     private readonly failureHandler: ComponentFailureHandler,
     private readonly preserveCursor = false,
+    private readonly decorate?: (line: string, width: number) => string,
   ) {
     this.wantsKeyRelease = component.wantsKeyRelease === true;
   }
@@ -342,7 +344,8 @@ class ComponentBoundary implements Component {
       for (let index = 0; index < maximumRows; index += 1) {
         const row = rendered[index];
         if (typeof row !== "string") throw new Error("구성 요소가 문자열이 아닌 행을 반환했습니다.");
-        rows.push(safeRenderedLine(row, safeWidth, this.redactor, this.preserveCursor));
+        const safe = safeRenderedLine(row, safeWidth, this.redactor, this.preserveCursor);
+        rows.push(this.decorate ? this.decorate(safe, safeWidth) : safe);
       }
       if (rendered.length > maximumRows) rows.push("… [화면 행 제한으로 생략]");
       return rows;
@@ -384,8 +387,9 @@ class FocusableComponentBoundary extends ComponentBoundary implements Focusable 
     label: string,
     redactor: TerminalTextRedactor,
     failureHandler: ComponentFailureHandler,
+    decorate?: (line: string, width: number) => string,
   ) {
-    super(focusableComponent, label, redactor, failureHandler, true);
+    super(focusableComponent, label, redactor, failureHandler, true, decorate);
   }
 
   get focused(): boolean {
@@ -415,70 +419,6 @@ class BoundedSingleLine implements Component {
 
   render(width: number): string[] {
     return [truncateToWidth(this.#text, normalizedRenderWidth(width), "…")];
-  }
-}
-
-class SelectionPanel implements Component {
-  readonly #heading: Text;
-  readonly #list: SelectList;
-  readonly #footer: Text;
-
-  constructor(options: {
-    readonly title: string;
-    readonly message?: string;
-    readonly items: SelectItem[];
-  }) {
-    const heading = options.message
-      ? `${options.title}\n\n${options.message}`
-      : options.title;
-    this.#heading = new Text(heading, 0, 0);
-    this.#list = new SelectList(
-      options.items,
-      Math.min(10, options.items.length),
-      EDITOR_THEME.selectList,
-    );
-    this.#footer = new Text("Enter로 선택 · Esc로 취소", 0, 0);
-  }
-
-  set onSelect(callback: ((item: SelectItem) => void) | undefined) {
-    if (callback === undefined) delete this.#list.onSelect;
-    else this.#list.onSelect = callback;
-  }
-
-  set onCancel(callback: (() => void) | undefined) {
-    if (callback === undefined) delete this.#list.onCancel;
-    else this.#list.onCancel = callback;
-  }
-
-  set onSelectionChange(callback: ((item: SelectItem) => void) | undefined) {
-    if (callback === undefined) delete this.#list.onSelectionChange;
-    else this.#list.onSelectionChange = callback;
-  }
-
-  handleInput(data: string): void {
-    this.#list.handleInput(data);
-  }
-
-  invalidate(): void {
-    this.#heading.invalidate();
-    this.#list.invalidate();
-    this.#footer.invalidate();
-  }
-
-  render(width: number): string[] {
-    return [
-      ...this.#heading.render(width),
-      "",
-      ...this.#list.render(width),
-      "",
-      ...this.#footer.render(width),
-    ];
-  }
-
-  dispose(): void {
-    delete this.#list.onSelect;
-    delete this.#list.onCancel;
-    delete this.#list.onSelectionChange;
   }
 }
 
@@ -598,8 +538,10 @@ export class CatTerminalScreen {
   readonly #clipboard: ClipboardWriter;
   readonly #redactor: ScreenRedactor;
   readonly #tui: NativeSelectionTui;
-  readonly #header: BoundedSingleLine;
+  readonly #header: ScreenHeader;
   readonly #status: BoundedSingleLine;
+  readonly #activity: RunActivity;
+  readonly #color: boolean;
   readonly #transcript: Container;
   readonly #transcriptModel: TerminalTranscript;
   readonly #scroll: ScrollView;
@@ -618,6 +560,7 @@ export class CatTerminalScreen {
   #activeSecret: ActiveModal | undefined;
   #activeSelection: ActiveModal | undefined;
   #clipboardCopy: AbortController | undefined;
+  #activityTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(options: CatTerminalScreenOptions) {
     this.#terminal = options.terminal ?? new ProcessTerminal();
@@ -629,6 +572,9 @@ export class CatTerminalScreen {
       ...(options.environment === undefined ? {} : { environment: options.environment }),
     });
     this.#redactor = new ScreenRedactor(configuredScreenRedactor(options));
+    const environment = options.environment ?? process.env;
+    this.#color = !options.noColor && environment.NO_COLOR === undefined && environment.TERM !== "dumb";
+    this.#activity = new RunActivity(this.#redactor);
     this.#transcript = new Container();
     this.#transcriptModel = new TerminalTranscript(this.#transcript, {
       sanitize: (text, maximumBytes, singleLine = false) => singleLine
@@ -643,18 +589,19 @@ export class CatTerminalScreen {
     this.#tui = new NativeSelectionTui(this.#terminal, (error) => {
       this.#captureComponentFailure("render", "화면 renderer", error);
     });
-    this.#header = new BoundedSingleLine(
+    this.#header = new ScreenHeader(
       `${PRODUCT_NAME} v${VERSION} · ${options.model} · ${options.workspace}`,
       this.#redactor,
     );
+    if (options.sessionId === "setup") this.#header.setSession("초기 설정", "연결 준비");
     this.#status = new BoundedSingleLine(
-      options.status ?? `세션 ${options.sessionId} · 준비`,
+      options.status ?? "Enter 보내기 · Ctrl+J 줄바꿈 · Ctrl+O 상세 · /help 도움말",
       this.#redactor,
     );
     this.#editor = new BoundedEditor(
       this.#tui,
       EDITOR_THEME,
-      { paddingX: 0, autocompleteMaxVisible: 8 },
+      { paddingX: 1, autocompleteMaxVisible: 8 },
       () => this.setStatus("입력이 허용된 크기 제한에 도달했습니다."),
     );
     this.#editor.disableSubmit = true;
@@ -663,12 +610,20 @@ export class CatTerminalScreen {
       "입력 편집기",
       this.#redactor,
       componentFailure,
+      (line, width) => decorateScreenLine(line, width, "editor", this.#color),
     );
+    const welcome = new WelcomePanel();
     const transcriptBoundary = new ComponentBoundary(
-      this.#transcript,
+      {
+        render: (width) => this.#transcriptModel.size === 0
+          ? welcome.render(width) : this.#transcript.render(width),
+        invalidate: () => { welcome.invalidate(); this.#transcript.invalidate(); },
+      },
       "대화 기록",
       this.#redactor,
       componentFailure,
+      false,
+      (line, width) => decorateScreenLine(line, width, "transcript", this.#color),
     );
     this.#scroll = new ScrollView(transcriptBoundary, {
       follow: "end",
@@ -681,16 +636,25 @@ export class CatTerminalScreen {
       "머리글",
       this.#redactor,
       componentFailure,
+      false,
+      (line, width) => decorateScreenLine(line, width, "header", this.#color),
     );
     const statusBoundary = new ComponentBoundary(
       this.#status,
       "상태 표시줄",
       this.#redactor,
       componentFailure,
+      false,
+      (line, width) => decorateScreenLine(line, width, "status", this.#color),
+    );
+    const activityBoundary = new ComponentBoundary(
+      this.#activity, "실행 상태", this.#redactor, componentFailure, false,
+      (line, width) => decorateScreenLine(line, width, "activity", this.#color),
     );
     this.#tui.setLayoutRoot(new VStack([
-      { component: headerBoundary, basis: 1, grow: 0, shrink: 0, minSize: 1, maxSize: 1 },
+      { component: headerBoundary, basis: 3, grow: 0, shrink: 1, minSize: 1, maxSize: 3 },
       { component: this.#scroll, basis: 0, grow: 1, shrink: 1, minSize: 1 },
+      { component: activityBoundary, basis: 1, grow: 0, shrink: 0, minSize: 1, maxSize: 1 },
       { component: this.#editorBoundary, basis: "auto", grow: 0, shrink: 1, minSize: 3 },
       { component: statusBoundary, basis: 1, grow: 0, shrink: 0, minSize: 1, maxSize: 1 },
     ]));
@@ -796,6 +760,9 @@ export class CatTerminalScreen {
   stop(): void {
     if (this.#state === "stopped" || this.#state === "stopping") return;
     this.#state = "stopping";
+    if (this.#activityTimer) clearInterval(this.#activityTimer);
+    this.#activityTimer = undefined;
+    this.#activity.setBusy(false);
     const rawViewError = this.#rawView.cancel();
     this.#clipboardCopy?.abort();
     this.#activeSelection?.cancel(new CancelledError("터미널 화면이 닫혀 선택을 취소했습니다."));
@@ -857,13 +824,44 @@ export class CatTerminalScreen {
       notice: (message) => this.setStatus(message),
       render: () => this.requestRender(),
       reportFailure: (error) => this.reportApplicationFailure(error),
+      busyChanged: (busy) => this.#updateActivity(busy),
+      cancellationRequested: () => { this.#activity.cancelRequested(); this.requestRender(); },
     };
     this.#inputController = new TerminalInputController(host, configuration);
     return this.#inputController;
   }
 
   setBusy(busy: boolean): void {
-    this.#inputController?.setBusy(busy);
+    if (this.#inputController) this.#inputController.setBusy(busy);
+    else this.#updateActivity(busy);
+  }
+
+  #updateActivity(busy: boolean): void {
+    if (this.#state === "stopped" || this.#state === "stopping") return;
+    this.#activity.setBusy(busy);
+    if (busy && !this.#activityTimer) {
+      this.#activityTimer = setInterval(() => this.requestRender(), 120);
+      this.#activityTimer.unref();
+    } else if (!busy && this.#activityTimer) {
+      clearInterval(this.#activityTimer);
+      this.#activityTimer = undefined;
+    }
+    this.requestRender();
+  }
+
+  setActivity(text: string): void {
+    this.#activity.setPhase(text);
+    this.requestRender();
+  }
+
+  setActivityOutcome(outcome: "cancelled" | "failed"): void {
+    this.#activity.setOutcome(outcome);
+    this.requestRender();
+  }
+
+  setSession(name: string | undefined, mode: string): void {
+    this.#header.setSession(sessionDisplayName(name), mode);
+    this.requestRender();
   }
 
   requestSecret(options: SecretPromptOptions): Promise<string> {
@@ -907,10 +905,11 @@ export class CatTerminalScreen {
         redactor: this.#redactor,
       });
       const boundary = new FocusableComponentBoundary(
-        panel,
+        new FullscreenDialog(panel, () => this.#terminal),
         "비밀 입력",
         this.#redactor,
         (operation, label, error) => this.#captureComponentFailure(operation, label, error),
+        (line, width) => decorateScreenLine(line, width, "modal", this.#color),
       );
       let overlay: OverlayHandle | undefined;
       let settled = false;
@@ -922,6 +921,7 @@ export class CatTerminalScreen {
         options.signal?.removeEventListener("abort", abort);
         panel.dispose();
         this.#inputController?.setModalInput(false);
+        this.#activity.setModal(false);
         if (this.#activeSecret === active) this.#activeSecret = undefined;
         try {
           overlay?.hide();
@@ -959,6 +959,7 @@ export class CatTerminalScreen {
 
       this.#activeSecret = active;
       this.#inputController?.setModalInput(true);
+      this.#activity.setModal(true);
       options.signal?.addEventListener("abort", abort, { once: true });
       if (options.signal?.aborted) {
         abort();
@@ -966,10 +967,9 @@ export class CatTerminalScreen {
       }
       try {
         overlay = this.#tui.showOverlay(boundary, {
-          width: "80%",
-          minWidth: 24,
-          maxHeight: 12,
-          margin: 1,
+          width: "100%",
+          maxHeight: "100%",
+          margin: 0,
         });
         this.#tui.setFocus(boundary);
         this.requestRender();
@@ -1032,12 +1032,15 @@ export class CatTerminalScreen {
         title,
         ...(message === undefined ? {} : { message }),
         items,
+        size: () => this.#terminal,
       });
       const boundary = new ComponentBoundary(
-        panel,
+        new FullscreenDialog(panel, () => this.#terminal),
         "선택 입력",
         this.#redactor,
         (operation, label, error) => this.#captureComponentFailure(operation, label, error),
+        false,
+        (line, width) => decorateScreenLine(line, width, "modal", this.#color),
       );
       let overlay: OverlayHandle | undefined;
       let settled = false;
@@ -1049,6 +1052,7 @@ export class CatTerminalScreen {
         options.signal?.removeEventListener("abort", abort);
         panel.dispose();
         this.#inputController?.setModalInput(false);
+        this.#activity.setModal(false);
         if (this.#activeSelection === active) this.#activeSelection = undefined;
         try {
           overlay?.hide();
@@ -1069,6 +1073,7 @@ export class CatTerminalScreen {
         },
       };
       panel.onSelectionChange = () => this.requestRender();
+      panel.onChange = () => this.requestRender();
       panel.onCancel = () => active.cancel(new CancelledError("선택을 취소했습니다."));
       panel.onSelect = (item) => {
         if (settled) return;
@@ -1079,6 +1084,7 @@ export class CatTerminalScreen {
 
       this.#activeSelection = active;
       this.#inputController?.setModalInput(true);
+      this.#activity.setModal(true);
       options.signal?.addEventListener("abort", abort, { once: true });
       if (options.signal?.aborted) {
         abort();
@@ -1086,10 +1092,9 @@ export class CatTerminalScreen {
       }
       try {
         overlay = this.#tui.showOverlay(boundary, {
-          width: "88%",
-          minWidth: 32,
-          maxHeight: 20,
-          margin: 1,
+          width: "100%",
+          maxHeight: "100%",
+          margin: 0,
         });
         this.#tui.setFocus(boundary);
         this.requestRender();
@@ -1171,7 +1176,9 @@ export class CatTerminalScreen {
   consumeAgentEvent(event: AgentEvent): void {
     if (this.#state === "stopped" || this.#state === "stopping") return;
     try {
+      this.#activity.consume(event);
       this.#transcriptModel.consumeAgentEvent(event);
+      this.requestRender();
     } catch (error) {
       this.#captureComponentFailure("render", "agent event transcript", error);
     }

@@ -155,9 +155,9 @@ export class TerminalInteractionPort
       message: boundedUtf8(
         `도구: ${request.toolName}\n` +
         `필요 권한: ${permissionRequirement(request)}\n` +
-        `범위 규칙: ${request.rule}\n\n` +
-        `실행 요약:\n${request.summary}\n\n` +
-        "프로젝트 저장은 현재 프로젝트의 이 규칙에만 적용됩니다.",
+        `\n실행할 작업:\n${request.summary}\n\n` +
+        "프로젝트 저장은 현재 프로젝트의 동일한 도구·범위에만 적용됩니다.\n" +
+        `범위 규칙: ${request.rule}`,
       ),
       options: request.choices.map((choice) => ({
         value: choice,
@@ -168,6 +168,13 @@ export class TerminalInteractionPort
     });
     if (!request.choices.includes(selected as ApprovalChoice)) {
       throw new ConfigurationError("승인 화면이 올바르지 않은 결정을 반환했습니다.");
+    }
+    // Closing the modal alone does not clear the approval_required activity phase.
+    // Update only the display; authorization and revalidation remain with the executor.
+    if (!signal.aborted) {
+      this.screen.setActivity(selected === "deny"
+        ? "도구 실행 거부 · 결과 정리 중"
+        : `도구 실행 중 · ${request.toolName}`);
     }
     return selected as ApprovalChoice;
   }

@@ -95,6 +95,7 @@ import {
   SlashCommandAutocompleteProvider,
   type TerminalInputController,
 } from "../tui/index.js";
+import { sessionDisplayName } from "../tui/presentation.js";
 import {
   SLASH_COMMAND_NAMES,
   SlashCommandRegistry,
@@ -590,12 +591,16 @@ async function bootstrapScreen<T>(
   workspace: string,
   status: string,
   use: (screen: CatTerminalScreen) => Promise<T>,
+  noColor = false,
+  environment: NodeJS.ProcessEnv = process.env,
 ): Promise<T> {
   const screen = new CatTerminalScreen({
     model: "설정 중",
     workspace,
     sessionId: "setup",
     status,
+    noColor,
+    environment,
   });
   screen.start();
   try {
@@ -609,6 +614,7 @@ async function bootstrapScreen<T>(
 async function requestWorkspaceTrust(
   paths: StoragePaths,
   reasons: readonly string[],
+  noColor: boolean,
 ): Promise<void> {
   await bootstrapScreen(paths.workspace, "Workspace trust 확인 필요", async (screen) => {
     const selected = await screen.requestSelection({
@@ -635,11 +641,11 @@ async function requestWorkspaceTrust(
     if (selected !== "trust") {
       throw new CancelledError("Workspace를 신뢰하지 않아 실행을 종료했습니다.");
     }
-  });
+  }, noColor);
 }
 
 class ManagementSecretPrompt implements AuthSecretPromptPort {
-  constructor(readonly workspace: string) {}
+  constructor(readonly workspace: string, readonly environment: NodeJS.ProcessEnv) {}
 
   async requestSecret(options: {
     readonly label: string;
@@ -647,7 +653,7 @@ class ManagementSecretPrompt implements AuthSecretPromptPort {
     readonly signal?: AbortSignal;
   }): Promise<string> {
     return await bootstrapScreen(this.workspace, "API key 보안 입력", async (screen) =>
-      await screen.requestSecret(options)
+      await screen.requestSecret(options), false, this.environment,
     );
   }
 }
@@ -700,7 +706,7 @@ async function resolveTrust(
       );
     }
     const grant = await ExplicitTrustGrant.fromUser(paths.workspace, "interactive");
-    await requestWorkspaceTrust(paths, customization.reasons);
+    await requestWorkspaceTrust(paths, customization.reasons, options.noColor);
     await store.trust(grant);
     trusted = true;
   }
@@ -750,7 +756,7 @@ async function configureMissingAuth(
         }
       }
     }
-  });
+  }, options.noColor, environment);
 }
 
 async function initialIdentity(
@@ -841,7 +847,7 @@ async function initialIdentity(
       });
       if (choice === "exit") return undefined;
     }
-  });
+  }, options.noColor, environment);
   if (!selected) throw new CancelledError("Model 선택을 취소했습니다.");
   const saved = await profiles.save({ ...auth.profile, model: selected.model }, true);
   auth = await authService.resolve({ profile: saved.name, environment });
@@ -1196,6 +1202,7 @@ class AgentApplicationRuntime {
       }
       await this.#executePrompt(text, controller.signal);
     } catch (error) {
+      this.screen?.setActivityOutcome(error instanceof CancelledError ? "cancelled" : "failed");
       this.#requiredScreen().setStatus(
         error instanceof CancelledError
           ? `취소됨: ${error.message}`
@@ -1208,13 +1215,19 @@ class AgentApplicationRuntime {
 
   async #dispatchShortcut(command: string): Promise<void> {
     if (this.#activeController) return;
-    await this.#trackInteractiveInput(command);
+    this.#input?.setBusy(true);
+    try {
+      await this.#trackInteractiveInput(command);
+    } finally {
+      this.#input?.setBusy(false);
+    }
   }
 
   #cyclePermissionMode(current: PermissionMode): PermissionMode {
     const index = PERMISSION_ORDER.indexOf(current);
     const next = PERMISSION_ORDER[(index + 1) % PERMISSION_ORDER.length] ?? "ask";
     this.policy.setMode(next);
+    this.#refreshHeader();
     return next;
   }
 
@@ -1377,6 +1390,7 @@ class AgentApplicationRuntime {
         const safeFirstLine = new Redactor(this.#knownSecrets).redact(firstLine);
         const name = [...safeFirstLine].slice(0, 48).join("");
         const renamed = await this.lifecycle.rename(this.#handle, name);
+        this.screen?.setSession(this.#handle.metadata.name, this.policy.mode);
         if (renamed.transcriptStatus === "record_failed") {
           this.screen?.setStatus(`세션 이름 기록 경고: ${renamed.transcriptError ?? "알 수 없음"}`);
         }
@@ -1419,6 +1433,7 @@ class AgentApplicationRuntime {
         signal,
       });
       this.screen?.setStatus("모델 context 상한에 맞춰 대화를 한 번 압축하는 중입니다.");
+      this.screen?.setActivity("대화 컨텍스트 압축 중");
       let compacted: ContextCompactionResult;
       try {
         compacted = await this.#compactProjection(
@@ -1461,6 +1476,7 @@ class AgentApplicationRuntime {
         throw error;
       }
       this.screen?.setStatus("대화 압축을 기록하고 현재 요청을 계속합니다.");
+      this.screen?.setActivity("압축 완료 · 요청 이어가는 중");
     }
     if (!projection.readyForModel) {
       sharedBudget?.cleanup();
@@ -1899,7 +1915,7 @@ class AgentApplicationRuntime {
     if (!this.screen) return;
     const tasks = this.backgroundTasks.overview(this.sessionId);
     const taskSummary = tasks.active > 0 || tasks.unconfirmed > 0
-      ? ` · 작업 ${tasks.active}${tasks.unconfirmed > 0 ? ` · 미확정 ${tasks.unconfirmed}` : ""}`
+      ? ` · 백그라운드 ${tasks.active}${tasks.unconfirmed > 0 ? ` · 미확정 ${tasks.unconfirmed}` : ""}`
       : "";
     this.screen.setHeader(
       `cat · ${this.#auth.profile.provider}/${this.#model}${taskSummary} · ${this.paths.workspace}`,
@@ -1927,9 +1943,7 @@ class AgentApplicationRuntime {
   #refreshHeader(): void {
     if (!this.screen) return;
     this.#refreshHeaderLine();
-    this.screen.setStatus(
-      `세션 ${this.sessionId}${this.#handle.metadata.name ? ` · ${this.#handle.metadata.name}` : ""} · ${this.policy.mode}`,
-    );
+    this.screen.setSession(this.#handle.metadata.name, this.policy.mode);
   }
 
   async #restoreScreen(): Promise<void> {
@@ -2035,10 +2049,11 @@ class AgentApplicationRuntime {
       sessions
         .map((entry) => ({
           sessionId: entry.record.metadata.sessionId,
-          label: entry.record.metadata.name ?? entry.record.metadata.sessionId,
+          label: sessionDisplayName(entry.record.metadata.name ?? "이름 없는 대화"),
           description:
             `${entry.record.metadata.model} · ` +
-            entry.record.metadata.updatedAt.slice(0, 19).replace("T", " "),
+            entry.record.metadata.updatedAt.slice(0, 16).replace("T", " ") +
+            ` · #${entry.record.metadata.sessionId.slice(0, 6)}`,
         })),
       this.#signal(),
     );
@@ -2316,6 +2331,7 @@ class AgentApplicationRuntime {
       signal: this.#signal(),
     });
     this.#requiredScreen().setStatus("현재 대화를 한 번 압축하는 중입니다.");
+    this.#requiredScreen().setActivity("대화 컨텍스트 압축 중");
     const result = await this.#compactProjection(
       "manual",
       projection,
@@ -2889,6 +2905,7 @@ async function composeRuntime(
           redactor: screenRedactor,
           secrets: [activeApiKey],
           environment,
+          noColor: options.noColor,
         });
     const terminalPort = screen ? new TerminalInteractionPort(screen) : undefined;
     const interactions = new AgentInteractionHub({
@@ -3185,7 +3202,7 @@ export class CatCliApplication implements CliApplication {
       output.addKnownSecrets(knownSecrets);
       return await new AuthManagementController({
         auth,
-        secrets: new ManagementSecretPrompt(workspace),
+        secrets: new ManagementSecretPrompt(workspace, this.#environment),
       }).run(args, output);
     });
   }

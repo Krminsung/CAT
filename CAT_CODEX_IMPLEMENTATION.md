@@ -413,7 +413,7 @@ interface RunBudget {
   toolCalls: number;
   recoveryAttempts: number;
   compactions: number;
-  deadlineAt: number;
+  deadlineAt: null; // 전체 실행 시간 제한 없음
 }
 
 interface ToolExecutionContext {
@@ -593,6 +593,13 @@ pi-tui 기반 alternate-screen 화면을 유지하고 입력창·대화·상태�
 - 모델·프로파일·세션·승인·선택 질문은 overlay로 제공한다. API key 입력은 masking하고 transcript·history·clipboard에 자동 남기지 않는다.
 - 창 크기 변경, provider 오류, abort, 예상치 못한 예외에서도 raw mode·cursor·alternate screen을 복원한다. stdout/stderr TTY 여부를 각각 판단한다.
 
+2026-09-21 사용자 후속 UI 개선 지시를 적용한다. 새 대화에 고양이 ASCII 시작 화면을 표시하고,
+사용자·CAT 메시지를 역할 이름과 테두리로 구분한다. 입력창 위의 고정 진행 표시는 입력 처리 전체의
+busy 상태를 따르며 응답 텍스트 종료만으로 완료를 표시하지 않는다. 세션은 제목을 우선 보여주되
+저장·재개 식별자는 변경하지 않는다. 권한·선택 overlay는 불투명 배경과 스크롤 가능한 본문을 갖고,
+선택지를 본문 때문에 화면 밖으로 밀어내지 않는다. 색상은 외부 escape를 제거한 뒤 화면이 생성하며
+`--no-color`와 `NO_COLOR`를 존중한다. 자세한 변경·미검증 범위는 P14.R09.UI 기록을 따른다.
+
 ### 7.7 세션, 기록, 컨텍스트, rewind
 
 세션 메타데이터, 모델 중립 transcript, UI event를 구분한다. schema version을 기록하고 user/assistant/tool 관계와 tool call ID를 보존한다. 저장 파일 권한은 가능한 환경에서 0600, secret을 포함하는 사용자 디렉터리는 0700을 사용한다. 권한 설정 실패를 비밀 로그와 함께 숨기지 않는다.
@@ -675,9 +682,9 @@ npm 없는 설치본은 **개발 중 실행하지 않고** P14에서 구성한�
 | 복구 경로 전체 | run당 최대 2회, 같은 종류는 최대 1회 |
 | Stop hook continuation | 최대 1회이며 복구 전체 2회 안에 포함 |
 | 자동 compaction | run당 최대 1회, 모델 HTTP 예산도 소비 |
-| 전체 wall clock | 기본 10분. 실행 중 timer로 종료하며 다른 timeout보다 우선 |
+| 전체 wall clock | 제한 없음. 2026-09-21 사용자 지시에 따라 고정 10분 제한과 run timer 제거 |
 
-`--max-turns`만 크게 바꿔도 나머지 상한을 자동 해제하지 않는다. 필요한 고급 상한은 명시적 설정으로만 변경한다. 승인 대기 시간도 wall clock에 포함하고 만료 시 이를 명확히 보여준다. 재개는 사용자의 새 입력에 의한 새 run이며 이미 발생한 부작용을 자동 재현하지 않는다.
+`--max-turns`만 크게 바꿔도 나머지 횟수 상한을 자동 해제하지 않는다. 필요한 고급 상한은 명시적 설정으로만 변경한다. 승인 대기·compaction·계획 실행의 누적 시간으로 run을 종료하지 않는다. 개별 모델 HTTP 요청·도구·hook 등의 timeout과 사용자 취소는 유지한다. 중단 후 재개는 사용자의 새 입력에 의한 새 run이며 이미 발생한 부작용을 자동 재현하지 않는다.
 
 모델 HTTP 재시도 책임은 transport 하나에만 둔다. 연결 전 실패와 제한적인 429/5xx에 한정하고 `Retry-After`와 남은 deadline을 존중한다. 응답 스트림을 소비한 뒤에는 모델 출력을 숨기고 새 응답으로 교체하지 않는다. tool 실행이나 MCP mutation은 idempotency가 보장되지 않으면 자동 재시도하지 않는다. 서버에서 처리 여부를 알 수 없는 결과는 `실행 여부 불명`으로 표시한다.
 

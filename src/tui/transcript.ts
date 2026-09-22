@@ -15,6 +15,7 @@ import type { JsonValue } from "../core/json.js";
 import type { ConversationMessage } from "../core/messages.js";
 import type { ToolExecutionResult } from "../core/tools.js";
 import type { StoredTranscriptRecord } from "../storage/sessions.js";
+import { messageFrame, sessionDisplayName } from "./presentation.js";
 
 const MAX_ENTRIES = 512;
 const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
@@ -27,6 +28,7 @@ const MAX_STREAM_CHUNKS = 1_024;
 const MAX_PLAN_STEPS = 100;
 const MAX_RESTORE_RECORDS = 2_000;
 const MAX_TRACKED_RUNS = 64;
+const MAX_ENTRY_RENDER_ROWS = 512;
 const DEFAULT_RAW_SNAPSHOT_BYTES = 2 * 1024 * 1024;
 const SENSITIVE_FIELD = /^(?:api[_ -]?key|authorization|cookie|set-cookie|password|passwd|secret|token|access[_ -]?token|refresh[_ -]?token|credentials?)$/iu;
 const REDACTED = "[REDACTED]";
@@ -161,11 +163,14 @@ function resultDetail(result: ToolExecutionResult): string {
 abstract class CachedTranscriptEntry implements TranscriptEntryComponent {
   protected readonly text = new Text("", 0, 0);
   protected dirty = true;
+  #renderedWidth = 0;
+  #rendered: string[] = [];
 
   abstract get byteSize(): number;
   abstract get active(): boolean;
   protected abstract displayText(): string;
   abstract rawText(): string;
+  protected get role(): "user" | "assistant" | undefined { return undefined; }
 
   invalidate(): void {
     this.dirty = true;
@@ -173,16 +178,24 @@ abstract class CachedTranscriptEntry implements TranscriptEntryComponent {
   }
 
   render(width: number): string[] {
+    if (!this.dirty && width === this.#renderedWidth) return this.#rendered;
     if (this.dirty) {
       this.text.setText(this.displayText());
       this.dirty = false;
     }
-    return this.text.render(Math.max(1, width));
+    const role = this.role;
+    const allRows = this.text.render(Math.max(1, role && width >= 8 ? width - 4 : width));
+    const rows = allRows.slice(0, MAX_ENTRY_RENDER_ROWS);
+    if (allRows.length > rows.length) rows.push("… 화면 표시 생략 · /raw에서 원문 확인");
+    this.#renderedWidth = width;
+    this.#rendered = role ? messageFrame(rows, width, role) : rows;
+    return this.#rendered;
   }
 
   dispose(): void {
     this.text.setText("");
     this.dirty = false;
+    this.#rendered = [];
   }
 }
 
@@ -196,16 +209,18 @@ class StaticTextEntry extends CachedTranscriptEntry {
     text: string,
     maximumBytes: number,
     sanitize: TerminalTranscriptOptions["sanitize"],
+    private readonly messageRole?: "user" | "assistant",
   ) {
     super();
     const safe = sanitize(text, maximumBytes);
-    this.#display = `${prefix}${safe.replaceAll("\n", `\n${" ".repeat(visibleWidth(prefix))}`)}`;
-    this.#raw = this.#display;
+    this.#display = messageRole ? safe : `${prefix}${safe.replaceAll("\n", `\n${" ".repeat(visibleWidth(prefix))}`)}`;
+    this.#raw = messageRole ? `${messageRole === "user" ? "나" : "CAT"}\n${safe}` : this.#display;
     this.#bytes = Buffer.byteLength(safe, "utf8");
   }
 
   get byteSize(): number { return this.#bytes; }
   get active(): boolean { return false; }
+  protected override get role(): "user" | "assistant" | undefined { return this.messageRole; }
   protected displayText(): string { return this.#display; }
   rawText(): string { return this.#raw; }
 }
@@ -225,6 +240,7 @@ class StreamingAssistantEntry extends CachedTranscriptEntry {
 
   get byteSize(): number { return this.#bytes; }
   get active(): boolean { return !this.#completed; }
+  protected override get role(): "assistant" { return "assistant"; }
 
   append(delta: string): boolean {
     if (this.#completed || !delta) return false;
@@ -263,12 +279,12 @@ class StreamingAssistantEntry extends CachedTranscriptEntry {
 
   protected displayText(): string {
     const value = this.#completed ? this.#materialized : this.#safeText();
-    return `• ${value.replaceAll("\n", "\n  ")}`;
+    return value;
   }
 
   rawText(): string {
     const value = this.#completed ? this.#materialized : this.#safeText();
-    return `• ${value.replaceAll("\n", "\n  ")}`;
+    return `CAT\n${value}`;
   }
 
   override dispose(): void {
@@ -467,7 +483,7 @@ export class TerminalTranscript {
   get byteSize(): number { return this.#totalBytes; }
 
   addUser(text: string): void {
-    this.#add("text", new StaticTextEntry("› ", text, MAX_TEXT_ENTRY_BYTES, this.#sanitize));
+    this.#add("text", new StaticTextEntry("", text, MAX_TEXT_ENTRY_BYTES, this.#sanitize, "user"));
   }
 
   addText(text: string): void {
@@ -475,7 +491,7 @@ export class TerminalTranscript {
   }
 
   addAssistant(text: string): void {
-    this.#add("text", new StaticTextEntry("• ", text, MAX_TEXT_ENTRY_BYTES, this.#sanitize));
+    this.#add("text", new StaticTextEntry("", text, MAX_TEXT_ENTRY_BYTES, this.#sanitize, "assistant"));
   }
 
   addNotice(level: TranscriptNoticeLevel, code: string, message: string): void {
@@ -488,7 +504,7 @@ export class TerminalTranscript {
   }
 
   addResume(display: ResumeTranscriptDisplay): void {
-    const title = display.name ?? display.sessionId;
+    const title = sessionDisplayName(display.name);
     const parts = [
       title,
       display.provider,
@@ -698,10 +714,13 @@ export class TerminalTranscript {
       });
       this.#touch(entry);
     }
-    this.addResume({
-      ...display,
-      restoredRecords: selected.length,
-    });
+    if (selected.length > 0 || display.name) {
+      this.addResume({ ...display, restoredRecords: selected.length });
+    } else {
+      for (const notice of display.notices?.slice(0, 32) ?? []) {
+        this.addNotice("warning", "resume", notice.message);
+      }
+    }
   }
 
   rawSnapshot(maximumBytes = DEFAULT_RAW_SNAPSHOT_BYTES): RawTranscriptSnapshot {

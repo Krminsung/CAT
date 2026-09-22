@@ -15,7 +15,8 @@ export interface RunBudget {
   readonly recoveryAttempts: number;
   readonly compactions: number;
   readonly stopContinuations: number;
-  readonly deadlineAt: number;
+  /** 전체 실행 시간 제한 없음. JSON 출력의 필드는 유지한다. */
+  readonly deadlineAt: null;
 }
 
 export interface RunIdentity {
