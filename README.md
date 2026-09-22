@@ -329,8 +329,12 @@ key 후보를 오류 출력 redaction에 먼저 등록하고, 새 provider catal
 
 ## 알려진 제한과 안전한 기대치
 
-- 로컬 모의 API 기반 초기 설정·첫 대화 검증은 실제 외부 서비스 성공, 모든 terminal의 호환성,
+- 로컬 모의 API와 실제 PTY에서 초기 설정, 진행 표시·승인·거부·취소, 긴 권한 창·resize,
+  오류 복귀, 대화 이름·재개, 원문 보기·무색상 표시를 확인했다. 이 검증은 실제 외부 서비스 성공,
+  모든 terminal의 호환성,
   공격 내성 또는 전체 기능 검증 완료를 뜻하지 않는다.
+- 전체 시간 제한 제거는 가상 시계로 확인했으며 실제 장시간 서버 운용 시험은 아니다.
+  v0.1.4 새 설치본은 별도로 실행하지 않았다.
 - 실제 provider API, model 목록·streaming 차이와 과금은 확인하지 않았다. catalog endpoint는 호환을 위한
   초기값이며 provider의 현재 제공 상태를 보증하지 않는다.
 - MCP는 stdio transport와 두 protocol adapter만 구현한다. 설정 저장 성공은 server 실행·schema 호환·
