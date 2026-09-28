@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.R11.PACKAGING",
+  "currentStep": "P14.R11.PUBLISH",
   "status": "VERIFIED",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "a4ceb49d1a5604e605762a24d2b143d9eca5a86b",
+  "lastCommitSha": "144d653dd3dea0b6bf1dee174d285eb145ec996f",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
@@ -22,7 +22,7 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Run the reserved installer packaging once, push/open/merge the main PR and publish v0.1.6; source and bundle inputs are frozen; skip all runtime checks and do not update the server",
+  "nextAction": "Push cat/p14-web-language, open and merge the main PR, publish v0.1.6 with six digest-matched assets, and record the result in the ignored receipt and PR comment; no rebuild/runtime checks/server update",
   "blocker": null,
   "webLanguageFollowUp": {
     "phase": "P14.R11",
@@ -48,13 +48,22 @@
       "runtimeDisposition": "SKIPPED_BY_USER_REQUEST",
       "previousBudgets": "All existing P14 and follow-up attempt histories remain unchanged; no new execution budget inferred from the follow-up ID"
     },
-    "publication": "PREPARING_RELEASE",
+    "publication": "READY_FOR_PR",
     "release": {
       "version": "v0.1.6",
       "authorization": "사용자가 빌드 실행 및 검증 없이 배포를 요청한 뒤, 설치본 반영에 필요한 배포용 빌드 1회 → 설치본 포장 → PR·병합·공개 배포만 진행하고 테스트·앱 실행을 생략하는 제안에 네로 승인함",
       "packagingAuthorized": true,
       "packagingAttemptsUsed": 1,
-      "packagingResult": "RESERVED",
+      "packagingResult": "PASS",
+      "packagingCommand": "npm run package:installer",
+      "packagingCommitSha": "144d653dd3dea0b6bf1dee174d285eb145ec996f",
+      "packagingExitCode": 0,
+      "packagingStartedAt": "2026-09-28T04:07:04Z",
+      "packagingCompletionObservedAt": "2026-09-28T04:07:28Z",
+      "installerSha256": {
+        "linuxX64": "7e7f4e64c2ba721f1945dab9218d68b6dd0049cd462534766bd15a6260d4da31",
+        "linuxArm64": "727f6aac37e33b198f4c368e690f08ac2d1e06bc32e34da9398f9c6b0ce6946d"
+      },
       "plannedBranch": "cat/p14-web-language",
       "publicationReceipt": ".git/cat-progress/v0.1.6-publication.json",
       "previousArtifactsBackup": ".git/cat-progress/artifacts-v0.1.5-before-v0.1.6",
