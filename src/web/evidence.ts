@@ -175,6 +175,7 @@ export class WebEvidenceRun {
   readonly #attemptedFetchUrls = new Set<string>();
   #webAttempted = false;
   #searchAttempted = false;
+  #emptySearchReason: "no_results" | "no_relevant_results" | undefined;
   #webDenied = false;
 
   constructor(
@@ -268,6 +269,10 @@ export class WebEvidenceRun {
         content.content_trust !== "untrusted_public_web" ||
         !Array.isArray(content.results)
       ) return;
+      if (
+        content.results.length === 0 &&
+        (content.empty_reason === "no_results" || content.empty_reason === "no_relevant_results")
+      ) this.#emptySearchReason = content.empty_reason;
       for (const value of content.results) {
         const item = record(value);
         const candidate = typeof item?.source_url === "string"
@@ -369,6 +374,15 @@ export class WebEvidenceRun {
       return { action: "accept" };
     }
     if (clarification(text)) return { action: "needs_user_context" };
+    if (
+      this.#emptySearchReason &&
+      this.#opened.length === 0 &&
+      this.#fetchCandidates().length === 0
+    ) {
+      // One search was consumed and there is no URL to fetch. A model recovery
+      // cannot create source evidence and must not ask for an identical retry.
+      return { action: "use_host_limitation" };
+    }
     if (this.#webAttempted && HONEST_LIMITATION.test(text)) {
       const evidenceCanImprove = !this.#webDenied &&
         (
@@ -436,6 +450,12 @@ export class WebEvidenceRun {
     if (relevant.length > 0) {
       return "실제 공개 원문을 열었지만 답변의 주장과 출처 인용을 안전하게 연결하지 못해 현재 정보에 대한 답을 확정할 수 없습니다. " +
         `검토한 자료: ${relevant.slice(0, 3).map((source) => source.finalUrl).join(", ")}`;
+    }
+    if (this.#emptySearchReason === "no_relevant_results") {
+      return "검색 결과는 받았지만 요청과 관련된 원문 후보를 선별하지 못했습니다. 원문 근거를 확보하지 못해 현재 정보의 답을 확정할 수 없습니다.";
+    }
+    if (this.#emptySearchReason === "no_results") {
+      return "공개 웹 검색을 완료했지만 결과 URL을 찾지 못했습니다. 원문을 확인하지 못해 현재 정보의 답을 확정할 수 없습니다.";
     }
     return this.#webAttempted
       ? "공개 웹 조회를 시도했지만 답을 뒷받침하는 실제 원문 근거를 확보하지 못해 현재 정보에 대한 답을 확정할 수 없습니다."

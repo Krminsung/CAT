@@ -243,6 +243,26 @@ async function runSearchSource(
   }
 }
 
+function filterSearchAttempt(query: string, attempt: SearchAttempt): SearchAttempt {
+  const results = relevantSearchResults(query, attempt.results);
+  return {
+    ...attempt,
+    results,
+    ...(attempt.results.length > 0 && results.length === 0
+      ? {
+          diagnostic: {
+            provider: attempt.sourceName,
+            outcome: "no_relevant_results",
+            source_url: attempt.sourceUrl,
+            discovered_count: attempt.results.length,
+            retained_count: 0,
+            message: "검색 결과 URL은 받았지만 요청의 핵심 검색어와 일치하는 결과가 없어 제외했습니다.",
+          },
+        }
+      : {}),
+  };
+}
+
 function searchSuccess(
   query: string,
   results: readonly PublicSearchResult[],
@@ -317,13 +337,15 @@ export function registerPublicWebTools(
         let everyFailureRetryable = true;
         try {
           for (const source of readerSources) {
-            const attempt = await runSearchSource(source, maximum, transport, context.signal);
+            const attempt = filterSearchAttempt(
+              query,
+              await runSearchSource(source, maximum, transport, context.signal),
+            );
             responded ||= attempt.responded;
             if (!attempt.responded) everyFailureRetryable &&= attempt.retryable;
             if (attempt.diagnostic) diagnostics.push(attempt.diagnostic);
-            const results = relevantSearchResults(query, attempt.results);
-            const selected = { ...attempt, results };
-            if (!fallback && results.length > 0) fallback = selected;
+            const results = attempt.results;
+            if (!fallback && results.length > 0) fallback = attempt;
             if (topSearchResultMatchesQuery(query, results)) {
               return searchSuccess(
                 query,
@@ -340,19 +362,14 @@ export function registerPublicWebTools(
             url: `https://www.bing.com/search?${bingParameters.toString()}`,
             parse: parseBingHtmlResults,
           };
-          const direct = await runSearchSource(
-            directSource,
-            maximum,
-            transport,
-            context.signal,
+          const direct = filterSearchAttempt(
+            query,
+            await runSearchSource(directSource, maximum, transport, context.signal),
           );
           responded ||= direct.responded;
           if (!direct.responded) everyFailureRetryable &&= direct.retryable;
           if (direct.diagnostic) diagnostics.push(direct.diagnostic);
-          const directResults = relevantSearchResults(query, direct.results);
-          if (directResults.length > 0) {
-            fallback = { ...direct, results: directResults };
-          }
+          if (direct.results.length > 0) fallback = direct;
         } catch (error) {
           return publicWebFailure(error, context.signal);
         }
@@ -380,6 +397,9 @@ export function registerPublicWebTools(
           results: [],
           count: 0,
           engine: "web",
+          empty_reason: diagnostics.some((item) => item.outcome === "no_relevant_results")
+            ? "no_relevant_results"
+            : "no_results",
           diagnostics,
           content_trust: "untrusted_public_web",
           next_step: "검색 근거가 없습니다. 같은 검색을 반복하지 말고 검색어를 구체화하거나 근거 부족을 명시하세요.",

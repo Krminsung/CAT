@@ -15,7 +15,7 @@ const TYPO_FILLER = [...KOREAN_FILLER].filter((word) => word.length >= 3);
 const ENGLISH_FILLER = /(?<![\p{L}\p{N}_.-])(?:please|tell\s+me|how\s+is|how's|what\s+is|what's|(?:can|could|would)\s+you)(?![\p{L}\p{N}_]|[.-][\p{L}\p{N}])/giu;
 const KOREAN_WORD = /(?<![\p{L}\p{N}_.-])[가-힣]+(?![\p{L}\p{N}_]|[.-][\p{L}\p{N}])/gu;
 const KOREAN_PARTICLE = /(?:에서는|으로는|에서|에는|으로|은|는|을|를|의|에)$/u;
-const WEATHER_COMPOUND_TERM = /강수확률|강수량|체감기온|체감온도|날씨|날시|기온|강수|예보|습도/gu;
+const WEATHER_COMPOUND_TERM = /일기예보|기상예보|강수확률|강수량|체감기온|체감온도|날씨|날시|기온|강수|예보|습도/gu;
 const WEATHER_PARTICLE_ONLY = /^(?:에서는|으로는|에서|에는|으로|은|는|이|가|을|를|도|의|에)$/u;
 const WEATHER_TIME_PREFIX = /^(오늘|내일|모레|어제|지금|현재)(?:은|는|도|의)?(?=[가-힣])/u;
 const WEATHER_TIME_SUFFIX = /([가-힣])(오늘|내일|모레|어제|지금|현재)(?:은|는|도|의)?$/u;
@@ -108,7 +108,7 @@ export function searchAnchorToken(value: string, weather = false): string {
 }
 
 export function isWeatherQuery(value: string): boolean {
-  return /날씨|날시|기온|강수|체감온도|습도|\b(?:weather|temperature)\b/iu.test(value.normalize("NFC"));
+  return /날씨|날시|기온|강수|체감온도|예보|습도|\b(?:weather|temperature)\b/iu.test(value.normalize("NFC"));
 }
 
 export function hasWeatherContent(value: string): boolean {

@@ -128,6 +128,17 @@ function resultStatus(result: ToolExecutionResult): string {
   }
 }
 
+function resultSummary(name: string, result: ToolExecutionResult): string {
+  if (name !== "web_search" || result.status !== "success") return "";
+  const content = result.output.content;
+  if (!content || typeof content !== "object" || Array.isArray(content)) return "";
+  const count = content.count;
+  if (typeof count !== "number" || !Number.isInteger(count) || count < 0 || count > 10) return "";
+  return count === 0 && content.empty_reason === "no_relevant_results"
+    ? "관련 결과 0건"
+    : `검색 결과 ${count}건`;
+}
+
 function resultDetail(result: ToolExecutionResult): string {
   let detail: string;
   switch (result.status) {
@@ -338,6 +349,7 @@ class ToolTranscriptEntry extends CachedTranscriptEntry {
   finish(result: ToolExecutionResult): void {
     if (this.#finished) return;
     this.#status = resultStatus(result);
+    this.#summary = this.#sanitize(resultSummary(this.#name, result), 16 * 1024, true);
     this.#detail = this.#sanitize(resultDetail(result), MAX_TOOL_DETAIL_BYTES);
     this.#finished = true;
     this.dirty = true;
