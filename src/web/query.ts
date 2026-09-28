@@ -107,7 +107,7 @@ export class PublicWebInputGuard {
         "과도하게 중첩 인코딩된 내용이 있어 공개 검색을 차단했습니다.",
       );
     }
-    let query = decoded.values.at(-1) ?? redactedRaw;
+    let query = (decoded.values.at(-1) ?? redactedRaw).normalize("NFC");
     for (const secret of this.#secrets) {
       const protectedValues = decodedVariants(secret);
       if (!protectedValues.fullyDecoded) {
@@ -116,7 +116,7 @@ export class PublicWebInputGuard {
         );
       }
       for (const protectedValue of protectedValues.values) {
-        query = query.replaceAll(protectedValue, " ");
+        query = query.replaceAll(protectedValue.normalize("NFC"), " ");
       }
     }
     query = query

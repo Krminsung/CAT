@@ -11,8 +11,8 @@ const KOREAN_FILLER = new Set([
   "줘", "줘요", "주세요", "주실래요", "주시겠어요", "좀", "쫌", "혹시", "제발",
 ]);
 const TYPO_FILLER = [...KOREAN_FILLER].filter((word) => word.length >= 3);
-const ENGLISH_FILLER = /(?<![\p{L}\p{N}_.-])(?:please|tell\s+me|how\s+is|how's|what\s+is|what's|(?:can|could|would)\s+you)(?![\p{L}\p{N}_.-])/giu;
-const KOREAN_WORD = /(?<![\p{L}\p{N}_.-])[가-힣]+(?![\p{L}\p{N}_.-])/gu;
+const ENGLISH_FILLER = /(?<![\p{L}\p{N}_.-])(?:please|tell\s+me|how\s+is|how's|what\s+is|what's|(?:can|could|would)\s+you)(?![\p{L}\p{N}_]|[.-][\p{L}\p{N}])/giu;
+const KOREAN_WORD = /(?<![\p{L}\p{N}_.-])[가-힣]+(?![\p{L}\p{N}_]|[.-][\p{L}\p{N}])/gu;
 const KOREAN_PARTICLE = /(?:에서는|으로는|에서|에는|으로|은|는|을|를|의|에)$/u;
 
 /** Bounded, linear comparison: one insertion, deletion, substitution or swap. */
@@ -62,7 +62,7 @@ export function searchAnchorToken(value: string): string {
 }
 
 export function isWeatherQuery(value: string): boolean {
-  return /날씨|날시|기온|강수|예보|\b(?:weather|temperature|forecast)\b/iu.test(value.normalize("NFC"));
+  return /날씨|날시|기온|강수|\b(?:weather|temperature)\b/iu.test(value.normalize("NFC"));
 }
 
 export function hasWeatherContent(value: string): boolean {

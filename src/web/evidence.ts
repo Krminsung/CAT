@@ -6,6 +6,12 @@ import { boundedWebText } from "./content.js";
 import { normalizePublicWebUrl } from "./public-http.js";
 import { PublicWebInputGuard } from "./query.js";
 import { searchAnchors } from "./search.js";
+import {
+  hasWeatherContent,
+  isWeatherQuery,
+  matchingSearchAnchors,
+  normalizeSearchLanguage,
+} from "./language.js";
 
 const WEB_TOOL_NAMES = new Set(["fetch_url", "web_search"]);
 const NO_WEB_REQUEST = /(?:(?:웹|인터넷)(?:은|는|을|를|도)?\s*(?:(?:검색|조회|탐색|브라우징|사용|접속|연결)(?:은|는|을|를|도)?\s*)?(?:하지\s*마|하지\s*말|쓰지\s*마|쓰지\s*말|금지|없이)|(?:검색|조회)(?:은|는|을|를|도)?\s*(?:하지\s*마|하지\s*말|금지|없이)|(?:웹|인터넷)\s*없이|외부(?:로)?\s*(?:전송|접속|연결)(?:은|는|을|를|도)?\s*(?:하지\s*마|하지\s*말|금지)|\b(?:do not|don't|never)\s+(?:search|browse)(?:\s+the)?\s*(?:web|internet)?|\b(?:do not|don't|never)\s+(?:use|access)\s+(?:the\s+)?(?:web|internet)|\b(?:without|no)\s+(?:web\s+search|internet|browsing)|\boffline\s+only\b|\bdo\s+not\s+send\s+(?:this|anything)\s+externally\b)/iu;
@@ -26,7 +32,6 @@ const TEXT_TRANSFORM = /^(?:다음|아래|이)\s*(?:문장|텍스트|글|내용|
 const CASUAL_MESSAGE = /^(?:안녕(?:하세요|하십니까)?|반가워(?:요)?|고마워(?:요)?|고맙습니다|감사(?:합니다|해요)?|수고했어(?:요)?|잘\s*부탁(?:해|해요|드립니다)|좋아(?:요)?|알겠(?:어|어요|습니다)|오케이|네|넵|응|그래|ㅇㅇ|ㅎ+|ㅋ+|잘\s*자|좋은\s*아침|hello|hi|hey|thanks|thank\s+you|ok(?:ay)?|yes|bye|good\s+(?:morning|night))[\s.!?~,…👍🙂😊]*$/iu;
 const WEB_FOLLOWUP = /^(?:뉴스에서\s*들었는데|기사에서\s*봤는데|진짜|정말|없다고|그거|그게|그\s*모델|더\s*알려줘|자세히\s*알려줘|are\s+you\s+sure|really)[.!?\s]*$/iu;
 const PRIVATE_MATERIAL = /```|-----BEGIN [A-Z0-9 ]{0,32}PRIVATE KEY-----|\bBearer\s+\S+|(?<![\p{L}\p{N}_])@[\p{L}\p{N}_./-]+|(?<![\p{L}\p{N}_])[\p{L}\p{N}_.+-]+@[\p{L}\p{N}_.-]+|(?:~\/|\/(?:home|Users|private|var|etc)\/|[A-Za-z]:\\)\S+/iu;
-const WEATHER_REQUEST = /날씨|기온|강수|\bweather\b|\btemperature\b/iu;
 const HONEST_LIMITATION = /확인(?:할\s*수|하지)\s*없|검증하지\s*못|근거(?:가|를)\s*(?:부족|찾지\s*못)|답을\s*확정하기\s*어렵|알\s*수\s*없|unverified|could(?:n't|\s+not)\s+verify|insufficient\s+evidence|unable\s+to\s+confirm/iu;
 const PUBLIC_ENTITY_QUESTION = /뭐|무엇|어떤|누가|언제|알려|설명|\b(?:what|who|when|available|explain|tell)\b/iu;
 const MAX_POLICY_PROMPT_BYTES = 64 * 1024;
@@ -97,12 +102,10 @@ function userPrompts(messages: readonly ConversationMessage[]): string[] {
 }
 
 function weatherNeedsLocation(value: string): boolean {
-  if (!WEATHER_REQUEST.test(value)) return false;
-  const remainder = value
-    .replace(/날씨|기온|강수|예보|오늘|내일|현재|지금|어디|검색해|검색|어때(?:요)?|알려\s*(?:줘요?|주세요)|\b(?:weather|temperature|today|tomorrow|current|now|please|tell\s+me|forecast|search|what(?:'s|\s+is)|how(?:'s|\s+is)|in|for|at)\b/giu, " ")
-    .replace(/[\s?!.]+/gu, "")
-    .trim();
-  return !remainder || /^(?:은|는|이|가|을|를|도|의|로|으로|에서|에는)+$/u.test(remainder);
+  const normalized = normalizeSearchLanguage(value)
+    .replace(GENERIC_SEARCH_FILLER, " ")
+    .replace(/(?<![가-힣])(?:어디|은|는|이|가|을|를|도|의|로|으로|에서|에는)(?![가-힣])/gu, " ");
+  return isWeatherQuery(normalized) && searchAnchors(normalized).length === 0;
 }
 
 function publicDirectUrls(
@@ -312,13 +315,14 @@ export class WebEvidenceRun {
       const requestedUrl = normalizePublicWebUrl(requestedValue).href;
       const finalUrl = normalizePublicWebUrl(finalValue).href;
       const direct = this.#directUrls.has(requestedUrl);
-      const haystack = `${String(content.title ?? "")} ${finalUrl} ${content.text}`
-        .toLowerCase()
-        .replace(/[^a-z0-9가-힣]/gu, "");
-      const matches = this.#anchors.filter((anchor) => haystack.includes(anchor)).length;
+      const document = `${String(content.title ?? "")} ${content.text}`;
+      const matches = matchingSearchAnchors(this.#anchors, document);
+      const weather = isWeatherQuery(this.disposition.publicQuery);
+      const required = weather ? this.#anchors.length : Math.min(2, this.#anchors.length);
+      // A cleaned-up question still needs its factual target in the opened
+      // page. Weather also needs weather content, not just the city's name.
       const relevant = direct ||
-        this.#anchors.length === 0 ||
-        matches >= Math.min(2, this.#anchors.length);
+        (matches >= required && (!weather || hasWeatherContent(document)));
       if (
         this.#opened.length < 16 &&
         !this.#opened.some((source) => source.finalUrl === finalUrl)
@@ -460,16 +464,20 @@ export class WebEvidencePolicy {
     const policyPrevious = previousTooLarge
       ? previous.slice(0, MAX_POLICY_PROMPT_BYTES)
       : previous;
+    // Canonical language forms also apply to prohibitions/local scope. Keep
+    // the original strings for URL extraction and secret filtering below.
+    const languageCurrent = policyCurrent.normalize("NFC");
+    const languagePrevious = policyPrevious.normalize("NFC");
     const directUrlSelection = promptTooLarge
       ? { rejected: true, urls: [] }
       : publicDirectUrls(policyCurrent, this.inputGuard);
     const directUrls = directUrlSelection.urls;
-    const followup = WEB_FOLLOWUP.test(policyCurrent) &&
+    const followup = WEB_FOLLOWUP.test(languageCurrent) &&
       (
-        CURRENT_PUBLIC_FACT.test(policyPrevious) ||
+        CURRENT_PUBLIC_FACT.test(languagePrevious) || isWeatherQuery(languagePrevious) ||
         (
-          VERSIONED_PUBLIC_ENTITY.test(policyPrevious) &&
-          PUBLIC_ENTITY_QUESTION.test(policyPrevious)
+          VERSIONED_PUBLIC_ENTITY.test(languagePrevious) &&
+          PUBLIC_ENTITY_QUESTION.test(languagePrevious)
         )
       );
     const protectedPrevious = followup &&
@@ -478,27 +486,28 @@ export class WebEvidencePolicy {
         this.inputGuard.containsProtectedData(policyPrevious) ||
         PRIVATE_MATERIAL.test(policyPrevious)
       );
-    const noWeb = NO_WEB_REQUEST.test(policyCurrent) ||
-      (followup && NO_WEB_REQUEST.test(policyPrevious));
+    const noWeb = NO_WEB_REQUEST.test(languageCurrent) ||
+      (followup && NO_WEB_REQUEST.test(languagePrevious));
     const privateContext = promptTooLarge ||
       directUrlSelection.rejected ||
       this.inputGuard.containsProtectedData(policyCurrent) ||
       PRIVATE_MATERIAL.test(policyCurrent) ||
       protectedPrevious;
-    const explicitSyntax = EXPLICIT_WEB_REQUEST.test(policyCurrent);
+    const explicitSyntax = EXPLICIT_WEB_REQUEST.test(languageCurrent);
     const explicit = explicitSyntax || directUrls.length > 0;
-    const genericSearch = GENERIC_SEARCH_REQUEST.test(policyCurrent) ||
-      ENGLISH_SEARCH_REQUEST.test(policyCurrent);
-    const textTransform = TEXT_TRANSFORM.test(policyCurrent);
-    const localTarget = LOCAL_SCOPE.test(policyCurrent) ||
-      LOCAL_ACTION.test(policyCurrent) ||
-      LOCAL_SEARCH_REQUEST.test(policyCurrent) ||
-      LOCAL_PHASE_REFERENCE.test(policyCurrent);
+    const genericSearch = GENERIC_SEARCH_REQUEST.test(languageCurrent) ||
+      ENGLISH_SEARCH_REQUEST.test(languageCurrent);
+    const textTransform = TEXT_TRANSFORM.test(languageCurrent);
+    const localTarget = LOCAL_SCOPE.test(languageCurrent) ||
+      LOCAL_ACTION.test(languageCurrent) ||
+      LOCAL_SEARCH_REQUEST.test(languageCurrent) ||
+      LOCAL_PHASE_REFERENCE.test(languageCurrent);
     const local = localTarget || (textTransform && directUrls.length === 0);
-    const currentPublicFact = CURRENT_PUBLIC_FACT.test(policyCurrent) ||
+    const currentPublicFact = CURRENT_PUBLIC_FACT.test(languageCurrent) ||
+      isWeatherQuery(languageCurrent) ||
       (
-        VERSIONED_PUBLIC_ENTITY.test(policyCurrent) &&
-        PUBLIC_ENTITY_QUESTION.test(policyCurrent)
+        VERSIONED_PUBLIC_ENTITY.test(languageCurrent) &&
+        PUBLIC_ENTITY_QUESTION.test(languageCurrent)
       );
     const evidenceRequested = (explicitSyntax && !noWeb) ||
       followup ||
@@ -529,7 +538,7 @@ export class WebEvidencePolicy {
     } else if (needsUserContext) {
       reason = "needs_user_context";
       allowsWebTools = false;
-    } else if (CASUAL_MESSAGE.test(policyCurrent)) {
+    } else if (CASUAL_MESSAGE.test(languageCurrent)) {
       reason = "casual";
       allowsWebTools = false;
     } else if (!explicitSyntax && local) {
