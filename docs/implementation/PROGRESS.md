@@ -403,3 +403,12 @@ runtime 5회에 이전 실패를 포함하며 마지막 승인에서 허용한 �
 사용하지 않았다. 외부 API·실제 장시간 서버·새 installer 검증과 공개 배포는 수행하지 않았다.
 상세 증거·검증 범위·실패 이력은 [P14.R09.UI](phases/P14-R09-UI.md)와
 `state.json`의 `runtimeBudgetFollowUp`을 따른다. 실행 코드와 빌드 입력은 고정된 상태다.
+
+## P14.R10 후속 작업 — 2026-09-28
+
+이전 P14.R09는 PR #19에서 `21fd6f8cf46856848b7f93192d4edfd34148d538`로 병합됐고
+v0.1.4로 공개됐다. 실제 완료 근거는 해당 PR comment와 로컬 publication receipt에 있다.
+이후 원격 웹 검색 장애를 진단하여 공유 BlockList의 mapped IPv6 규칙이 공개 IPv4까지 차단하는
+결함을 확인했다. 사용자의 수정·업데이트 요청에 따라 IPv4/IPv6 목록을 분리했으며 보호 대역은 유지한다.
+수정본은 아직 빌드·실행하지 않았고 추가 검증·포장 승인 대기다. 서버 설치본은 변경하지 않았다.
+상세 범위는 [P14.R10](phases/P14-R10.md)과 `state.json`의 `webAddressFollowUp`을 따른다.
