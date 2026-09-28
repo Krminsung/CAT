@@ -339,8 +339,9 @@ key 후보를 오류 출력 redaction에 먼저 등록하고, 새 provider catal
   초기값이며 provider의 현재 제공 상태를 보증하지 않는다.
 - MCP는 stdio transport와 두 protocol adapter만 구현한다. 설정 저장 성공은 server 실행·schema 호환·
   도구 성공을 뜻하지 않는다.
-- 공개 웹 검색 backend와 HTML parsing은 외부 서비스 변화에 영향을 받을 수 있으며 실제 검색·fetch를
-  검증하지 않았다. 결과 본문은 신뢰되지 않은 자료다.
+- v0.1.5에서 공개 IPv4 주소의 오차단을 수정했다. 수정본의 웹 검색·fetch 확인 범위와 실제 결과는
+  `docs/implementation/phases/P14-R10.md` 및 GitHub Release 기록을 따른다. 검색 backend와
+  HTML parsing은 외부 서비스 변화에 영향을 받으며 결과 본문은 신뢰되지 않은 자료다.
 - `/rewind`는 현재 process가 관리하고 이후 변경되지 않은 파일 checkpoint만 복원한다. shell, network,
   MCP, background process 부작용이나 임의의 사용자 변경을 되돌리지 않는다.
 - background task 종료 요청과 SSH 종료는 cleanup 확인에 실패할 수 있다. 확인되지 않은 process를 성공

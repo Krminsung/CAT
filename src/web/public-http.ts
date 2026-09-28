@@ -53,7 +53,10 @@ const RESERVED_HOST_SUFFIXES = [
   ".test",
 ] as const;
 
-const NON_PUBLIC_ADDRESSES = new BlockList();
+// BlockList applies IPv4-mapped IPv6 rules to IPv4 addresses as well.
+// Keep families separate so ::ffff:0:0/96 does not block every public IPv4 address.
+const NON_PUBLIC_IPV4_ADDRESSES = new BlockList();
+const NON_PUBLIC_IPV6_ADDRESSES = new BlockList();
 for (const [network, prefix] of [
   ["0.0.0.0", 8],
   ["10.0.0.0", 8],
@@ -71,7 +74,7 @@ for (const [network, prefix] of [
   ["224.0.0.0", 4],
   ["240.0.0.0", 4],
 ] as const) {
-  NON_PUBLIC_ADDRESSES.addSubnet(network, prefix, "ipv4");
+  NON_PUBLIC_IPV4_ADDRESSES.addSubnet(network, prefix, "ipv4");
 }
 for (const [network, prefix] of [
   ["::", 128],
@@ -89,7 +92,7 @@ for (const [network, prefix] of [
   ["fec0::", 10],
   ["ff00::", 8],
 ] as const) {
-  NON_PUBLIC_ADDRESSES.addSubnet(network, prefix, "ipv6");
+  NON_PUBLIC_IPV6_ADDRESSES.addSubnet(network, prefix, "ipv6");
 }
 
 export type PublicWebFailureReason =
@@ -186,8 +189,8 @@ function reservedHostname(hostname: string): boolean {
 
 export function isPublicIpAddress(address: string): boolean {
   const family = isIP(address);
-  if (family === 4) return !NON_PUBLIC_ADDRESSES.check(address, "ipv4");
-  if (family === 6) return !NON_PUBLIC_ADDRESSES.check(address, "ipv6");
+  if (family === 4) return !NON_PUBLIC_IPV4_ADDRESSES.check(address, "ipv4");
+  if (family === 6) return !NON_PUBLIC_IPV6_ADDRESSES.check(address, "ipv6");
   return false;
 }
 
