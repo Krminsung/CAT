@@ -5,6 +5,11 @@ import {
   parseHtmlDocument,
 } from "./content.js";
 import { normalizePublicWebUrl } from "./public-http.js";
+import {
+  matchingSearchAnchors,
+  normalizeSearchLanguage,
+  searchAnchorToken,
+} from "./language.js";
 
 const MAX_SEARCH_CANDIDATES = 2_048;
 
@@ -14,6 +19,7 @@ const SEARCH_STOP_WORDS = new Set([
   "an",
   "and",
   "are",
+  "at",
   "available",
   "be",
   "can",
@@ -31,6 +37,7 @@ const SEARCH_STOP_WORDS = new Set([
   "face",
   "find",
   "for",
+  "forecast",
   "from",
   "get",
   "github",
@@ -51,6 +58,7 @@ const SEARCH_STOP_WORDS = new Set([
   "minister",
   "new",
   "news",
+  "now",
   "of",
   "official",
   "on",
@@ -67,13 +75,16 @@ const SEARCH_STOP_WORDS = new Set([
   "stock",
   "tell",
   "the",
+  "temperature",
   "today",
+  "tomorrow",
   "version",
   "web",
   "weather",
   "weights",
   "what",
   "when",
+  "where",
   "who",
   "with",
   "you",
@@ -83,6 +94,12 @@ const SEARCH_STOP_WORDS = new Set([
   "가격",
   "깃허브",
   "날씨",
+  "날시",
+  "기온",
+  "강수",
+  "예보",
+  "내일",
+  "모레",
   "뉴스",
   "다운로드",
   "대해",
@@ -97,6 +114,7 @@ const SEARCH_STOP_WORDS = new Set([
   "뭐",
   "설명",
   "어떤",
+  "어디",
   "언제",
   "얼마",
   "어제",
@@ -292,21 +310,21 @@ export function parseDuckDuckGoReaderResults(
 }
 
 export function searchAnchors(query: string): string[] {
-  const latin: string[] = [];
-  const korean: string[] = [];
-  const withoutDomains = query.replace(/\bsite:\S+/giu, " ");
-  for (const raw of withoutDomains.match(/[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+/gu) ?? []) {
-    const value = raw.toLowerCase().replace(/[^a-z0-9가-힣]/gu, "");
+  const anchors: string[] = [];
+  const withoutDomains = normalizeSearchLanguage(query).replace(/\bsite:\S+/giu, " ");
+  for (const raw of withoutDomains.match(/[A-Za-z0-9][A-Za-z0-9._-]*(?:[가-힣]+)?|[가-힣]+/gu) ?? []) {
+    const value = searchAnchorToken(raw);
     if (
       !value ||
       SEARCH_STOP_WORDS.has(value) ||
+      SEARCH_STOP_WORDS.has(value.replace(/(?:이|가|도)$/u, "")) ||
       /^20\d{2}$/u.test(value) ||
       (value.length === 1 && !/^\d$/u.test(value))
     ) continue;
-    const target = /[a-z0-9]/u.test(value) ? latin : korean;
-    if (!target.includes(value)) target.push(value);
+    if (!anchors.includes(value)) anchors.push(value);
   }
-  return (latin.length > 0 ? latin : korean).slice(0, 4);
+  // A Latin word must not discard the Korean location or subject in the query.
+  return anchors.slice(0, 4);
 }
 
 export function relevantSearchResults(
@@ -328,10 +346,10 @@ export function relevantSearchResults(
       domains.length > 0 &&
       !domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))
     ) return [];
-    const haystack = `${result.title} ${result.url} ${result.snippet}`
-      .toLowerCase()
-      .replace(/[^a-z0-9가-힣]/gu, "");
-    const score = anchors.filter((anchor) => haystack.includes(anchor)).length;
+    const score = matchingSearchAnchors(
+      anchors,
+      `${result.title} ${result.url} ${result.snippet}`,
+    );
     return anchors.length > 0 && score === 0 ? [] : [{ result, score }];
   }).sort((left, right) => right.score - left.score).map((item) => item.result);
 }
@@ -344,8 +362,8 @@ export function topSearchResultMatchesQuery(
   if (!first) return false;
   const anchors = searchAnchors(query);
   if (anchors.length === 0) return true;
-  const top = `${first.title} ${first.url} ${first.snippet}`
-    .toLowerCase()
-    .replace(/[^a-z0-9가-힣]/gu, "");
-  return anchors.some((anchor) => top.includes(anchor));
+  return matchingSearchAnchors(
+    anchors,
+    `${first.title} ${first.url} ${first.snippet}`,
+  ) > 0;
 }

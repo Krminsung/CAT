@@ -1,6 +1,7 @@
 import { PermissionDeniedError } from "../core/errors.js";
 import { isSensitiveEnvironmentName } from "../security/environment.js";
 import { normalizePublicWebUrl } from "./public-http.js";
+import { normalizeSearchLanguage } from "./language.js";
 
 const MAX_SECRETS = 512;
 const MAX_SECRET_BYTES = 8 * 1024;
@@ -9,8 +10,6 @@ const MAX_SEARCH_QUERY_CODE_POINTS = 500;
 const MAX_PERCENT_DECODE_PASSES = 8;
 const REDACTION_MARKER = "[REDACTED]";
 const SENSITIVE_QUERY_PARAMETER = /^(?:api[_-]?key|access[_-]?token|auth(?:orization)?|bearer|client[_-]?secret|code|cookie|credential|key|password|passwd|private[_-]?key|refresh[_-]?token|secret|sig|signature|token|x-amz-credential|x-amz-security-token|x-amz-signature)$/iu;
-
-const CONVERSATIONAL_FILLER = /(?<![A-Za-z0-9가-힣])(?:어때(?:요)?|어떤가요|어떻습니까|어떻게\s*돼(?:요)?|알려\s*(?:줘요?|주세요)|설명해\s*(?:줘요?|주세요)|궁금해(?:요)?|좀|혹시|please|tell\s+me|how\s+is|how's|what\s+is|what's)(?![A-Za-z0-9가-힣])/giu;
 
 interface DecodedVariants {
   readonly values: readonly string[];
@@ -85,7 +84,8 @@ export class PublicWebInputGuard {
       return !protectedValues.fullyDecoded ||
         candidates.values.some((candidate) =>
           protectedValues.values.some((protectedValue) =>
-            candidate.includes(protectedValue)
+            candidate.includes(protectedValue) ||
+            candidate.normalize("NFC").includes(protectedValue.normalize("NFC"))
           )
         );
     });
@@ -107,7 +107,7 @@ export class PublicWebInputGuard {
         "과도하게 중첩 인코딩된 내용이 있어 공개 검색을 차단했습니다.",
       );
     }
-    let query = decoded.values.at(-1) ?? redactedRaw;
+    let query = (decoded.values.at(-1) ?? redactedRaw).normalize("NFC");
     for (const secret of this.#secrets) {
       const protectedValues = decodedVariants(secret);
       if (!protectedValues.fullyDecoded) {
@@ -116,7 +116,7 @@ export class PublicWebInputGuard {
         );
       }
       for (const protectedValue of protectedValues.values) {
-        query = query.replaceAll(protectedValue, " ");
+        query = query.replaceAll(protectedValue.normalize("NFC"), " ");
       }
     }
     query = query
@@ -131,11 +131,18 @@ export class PublicWebInputGuard {
       .replace(/\b[A-Za-z0-9.-]+\.(?:internal|local|localhost|home\.arpa|onion)\b/giu, " ")
       .replace(/(?<![\p{L}\p{N}_])(?:@[\p{L}\p{N}_./-]+|(?:~\/|\/|[A-Za-z]:\\)[^\s]+)/gu, " ")
       .replaceAll(REDACTION_MARKER, " ")
-      .replace(CONVERSATIONAL_FILLER, " ")
       .replace(/[\p{Cc}\p{Cf}]/gu, " ")
       .replace(/\s+/gu, " ")
       .replace(/^[ ?!.]+|[ ?!.]+$/gu, "")
       .trim();
+    query = normalizeSearchLanguage(query)
+      .replace(/^[ ?!.]+|[ ?!.]+$/gu, "")
+      .trim();
+    if (this.containsProtectedData(query)) {
+      throw new PermissionDeniedError(
+        "검색어 정규화 뒤 보호 데이터가 발견되어 공개 검색을 차단했습니다.",
+      );
+    }
     if (!query) {
       throw new PermissionDeniedError(
         "민감하거나 비공개인 내용을 제거한 뒤 공개 검색어가 남지 않았습니다.",
