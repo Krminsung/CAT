@@ -35,13 +35,18 @@
     "diagnosis": "Deployed v0.1.4 web_search diagnostics show DNS destination rejection; Node built-in-only remote diagnosis confirmed ::ffff:0:0/96 in a shared BlockList blocks ordinary public IPv4",
     "sourceStatus": "FIXED_PENDING_VERIFICATION",
     "verification": {
-      "result": "BUILD_RESERVED",
+      "result": "BUILD_PASS_RUNTIME_RESERVED",
       "additionalBuildAuthorized": true,
       "additionalBuildAttemptsUsed": 1,
       "buildSourceCommitSha": "65a99948f15b6c0947eb4e1a1130da55319763ec",
       "buildCommand": "timeout 120s npm run build",
+      "buildCommitSha": "2f90921f5d5c10c1f7018e3a9e00b7171c60f3da",
+      "buildExitCode": 0,
       "additionalRuntimeAuthorized": true,
-      "additionalRuntimeAttemptsUsed": 0,
+      "additionalRuntimeAttemptsUsed": 1,
+      "runtimeScript": ".git/cat-progress/P14-web-address-verify.mjs",
+      "runtimeScriptSha256": "fec9282f205c2642d7889c4085661cbec6beef88823097d095593c429baf6146",
+      "runtimeInputSha256": "8986e6599a518e00fd163fb076f8a2cc9a54d3fcd9e31e9e76abfede0bb35e50",
       "previousBudgets": "Existing P14 verification and all follow-up histories remain unchanged; this work does not reset any budget"
     },
     "release": {
@@ -54,7 +59,7 @@
       "postInstallVerificationAttemptsUsed": 0,
       "serverUpdate": "NOT_STARTED"
     },
-    "nextAction": "Reserve and run build once, verify IP classification and actual web tools once before packaging, then PR/main merge and publish v0.1.5; preserve all prior budgets and stop on failure"
+    "nextAction": "Run reserved IP classification and actual web verification once in isolated remote staging before packaging; no build repetition or runtime retry"
   },
   "runtimeBudgetFollowUp": {
     "phase": "P14.R09",
