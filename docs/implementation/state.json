@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.R13.2",
-  "status": "IMPLEMENTING",
+  "currentStep": "P14.R13.REVIEWED",
+  "status": "REVIEWED",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "a7e6041a27bfd9afa4bb0d42ff5610cbbfe93ab3",
+  "lastCommitSha": "bbaa04f20015620fc3c97492ed4da1729a87334c",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
@@ -22,14 +22,16 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Restore model-led search, bounded alternatives, reply classification and common tool capability guidance; review source without execution or publication",
+  "nextAction": "Report the locally committed common harness-flow fixes and parity gaps. Build/runtime/publication were not performed and require further instruction; do not claim complete Claude Code equivalence",
   "blocker": null,
   "harnessParityFollowUp": {
     "phase": "P14.R13",
     "baseCommitSha": "2bd247a16abaa899526a89aab80592ae40f6841a",
     "baseMainSha": "8a3bc407d64271b9640f2161b2da4e0aaf8288a5",
     "progressRef": "refs/cat-progress/P14-harness-flow",
-    "status": "IMPLEMENTING",
+    "status": "REVIEWED",
+    "sourceStatus": "IMPLEMENTED_NOT_EXECUTED",
+    "scope": "Model-selected queries, lexical ranking without rejection, eight distinct web requests, reply kinds and user text preservation, follow-up intent and bounded local/MCP capability guidance",
     "report": "docs/implementation/phases/P14-R13.md",
     "authorization": "사용자가 날씨 전용 보완이 아닌 원본 하네스의 공통 실행 흐름과 기능 동등성 방향으로 진행하도록 승인함",
     "verification": {

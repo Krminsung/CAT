@@ -1,6 +1,14 @@
 import type { JsonObject } from "./json.js";
 import type { ToolExecutionResult } from "./tools.js";
 
+/** Model reply metadata is not a tool call, permission, or proof of a claim. */
+export type AssistantReplyKind = "answer" | "direct" | "clarification" | "unavailable";
+
+export interface AssistantReply {
+  readonly kind: AssistantReplyKind | "unclassified";
+  readonly text: string;
+}
+
 export interface TextContent {
   type: "text";
   text: string;
