@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.R11.PUBLISH",
-  "status": "VERIFIED",
+  "currentStep": "P14.R12.1",
+  "status": "IMPLEMENTING",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "144d653dd3dea0b6bf1dee174d285eb145ec996f",
+  "lastCommitSha": "8a3bc407d64271b9640f2161b2da4e0aaf8288a5",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
@@ -22,8 +22,25 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Push cat/p14-web-language, open and merge the main PR, publish v0.1.6 with six digest-matched assets, and record the result in the ignored receipt and PR comment; no rebuild/runtime checks/server update",
+  "nextAction": "Complete shared compound-weather normalization and related search diagnostics/status fixes, review source and preserve Korean commits; do not build, execute checks or publish without further instruction",
   "blocker": null,
+  "webSpacingFollowUp": {
+    "phase": "P14.R12",
+    "baseMainSha": "8a3bc407d64271b9640f2161b2da4e0aaf8288a5",
+    "progressRef": "refs/cat-progress/P14-web-spacing",
+    "status": "IMPLEMENTING",
+    "report": "docs/implementation/phases/P14-R12.md",
+    "scope": "Compound Korean weather queries, shared query/evidence normalization, empty-search diagnostics and completed-tool summaries",
+    "authorization": "사용자가 관련 사례를 선제적으로 보완해 수정하도록 요청함. 이전 실행 검증 생략 지시를 유지하며 새로운 build/runtime/packaging/publication은 승인되지 않음",
+    "verification": {
+      "result": "NOT_RUN",
+      "buildAttemptsUsed": 0,
+      "runtimeAttemptsUsed": 0,
+      "additionalExecutionAuthorized": false,
+      "previousBudgets": "All existing P14 follow-up histories remain unchanged; R12 does not create a new execution budget"
+    },
+    "publication": "LOCAL_ONLY"
+  },
   "webLanguageFollowUp": {
     "phase": "P14.R11",
     "baseMainSha": "7d3543f22c002c4cc860d37187bb4bddd7b410d6",
