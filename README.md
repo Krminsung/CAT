@@ -342,6 +342,10 @@ key 후보를 오류 출력 redaction에 먼저 등록하고, 새 provider catal
 - v0.1.5에서 공개 IPv4 주소의 오차단을 수정했다. 수정본의 웹 검색·fetch 확인 범위와 실제 결과는
   `docs/implementation/phases/P14-R10.md` 및 GitHub Release 기록을 따른다. 검색 backend와
   HTML parsing은 외부 서비스 변화에 영향을 받으며 결과 본문은 신뢰되지 않은 자료다.
+- v0.1.6은 대화 표현의 오타·조사·한영 혼합 검색어로 원문 근거가 잘못 탈락하는 흐름을 보완했다.
+  지역·날씨 주제와 실제 원문 인용 조건은 유지한다. 사용자 요청에 따라 배포용 빌드·포장만 수행하며
+  이번 수정의 테스트·앱 실행·실시간 웹·모델 답변 검증은 하지 않는다. 모든 오타의 자동 교정을
+  보장하지 않으며 자세한 범위는 `docs/implementation/phases/P14-R11.md`를 따른다.
 - `/rewind`는 현재 process가 관리하고 이후 변경되지 않은 파일 checkpoint만 복원한다. shell, network,
   MCP, background process 부작용이나 임의의 사용자 변경을 되돌리지 않는다.
 - background task 종료 요청과 SSH 종료는 cleanup 확인에 실패할 수 있다. 확인되지 않은 process를 성공
