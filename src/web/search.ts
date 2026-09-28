@@ -359,7 +359,9 @@ export function relevantSearchResults(
       anchors,
       `${result.title} ${result.url} ${result.snippet}`,
     );
-    return anchors.length > 0 && score === 0 ? [] : [{ result, score }];
+    // Lexical overlap is a ranking hint, not a semantic acceptance test.
+    // Translations, aliases and spelling variants may have no shared tokens.
+    return [{ result, score }];
   }).sort((left, right) => right.score - left.score).map((item) => item.result);
 }
 

@@ -134,6 +134,7 @@ function resultSummary(name: string, result: ToolExecutionResult): string {
   if (!content || typeof content !== "object" || Array.isArray(content)) return "";
   const count = content.count;
   if (typeof count !== "number" || !Number.isInteger(count) || count < 0 || count > 10) return "";
+  if (count === 0 && content.empty_reason === "no_domain_results") return "지정 도메인 결과 0건";
   return count === 0 && content.empty_reason === "no_relevant_results"
     ? "관련 결과 0건"
     : `검색 결과 ${count}건`;

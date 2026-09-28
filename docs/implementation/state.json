@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.R13.1",
+  "currentStep": "P14.R13.2",
   "status": "IMPLEMENTING",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "2bd247a16abaa899526a89aab80592ae40f6841a",
+  "lastCommitSha": "a7e6041a27bfd9afa4bb0d42ff5610cbbfe93ab3",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
