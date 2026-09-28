@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.R12.REVIEWED",
-  "status": "REVIEWED",
+  "currentStep": "P14.R13.1",
+  "status": "IMPLEMENTING",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "d3562f023707f3828dabac3020f54e7ce1f9ecbc",
+  "lastCommitSha": "2bd247a16abaa899526a89aab80592ae40f6841a",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
@@ -22,8 +22,25 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Source fixes and review are complete and preserved locally. Report build/runtime/publication were not performed; any additional execution or release requires further user instruction",
+  "nextAction": "Restore model-led search, bounded alternatives, reply classification and common tool capability guidance; review source without execution or publication",
   "blocker": null,
+  "harnessParityFollowUp": {
+    "phase": "P14.R13",
+    "baseCommitSha": "2bd247a16abaa899526a89aab80592ae40f6841a",
+    "baseMainSha": "8a3bc407d64271b9640f2161b2da4e0aaf8288a5",
+    "progressRef": "refs/cat-progress/P14-harness-flow",
+    "status": "IMPLEMENTING",
+    "report": "docs/implementation/phases/P14-R13.md",
+    "authorization": "사용자가 날씨 전용 보완이 아닌 원본 하네스의 공통 실행 흐름과 기능 동등성 방향으로 진행하도록 승인함",
+    "verification": {
+      "result": "NOT_RUN",
+      "additionalExecutionAuthorized": false,
+      "buildAttemptsUsed": 0,
+      "runtimeAttemptsUsed": 0,
+      "previousBudgets": "All earlier P14 budgets remain unchanged; this follow-up does not authorize execution"
+    },
+    "publication": "LOCAL_ONLY"
+  },
   "webSpacingFollowUp": {
     "phase": "P14.R12",
     "baseMainSha": "8a3bc407d64271b9640f2161b2da4e0aaf8288a5",
