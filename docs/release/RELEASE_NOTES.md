@@ -1,4 +1,14 @@
-# cat-agent-cli 0.1.4 배포 기록
+# cat-agent-cli 0.1.5 배포 기록
+
+## 공개 웹 주소 판별 수정
+
+- 공개 IPv4까지 비공개 주소로 판단해 모든 검색 backend를 차단하던 오류를 수정했다.
+- IPv4와 IPv6의 BlockList를 분리해 mapped IPv6 차단 규칙이 일반 IPv4에 적용되지 않도록 했다.
+- 사설·loopback·link-local·metadata·mapped IPv6 차단 대역은 유지한다. DNS/redirect 전체 검사,
+  검증 IP 고정 연결, TLS hostname 확인, 프록시 정책과 권한 정책은 변경하지 않았다.
+- 검색 backend 자체의 가용성이나 외부 사이트의 접근 제한을 우회하는 변경은 아니다.
+- 이번 수정의 실행 검증·포장·지정 서버 업데이트 결과는 저장소의
+  `docs/implementation/phases/P14-R10.md`와 최종 GitHub Release 기록을 따른다.
 
 ## 대화 화면과 진행 상태 개선
 
@@ -42,9 +52,9 @@ v0.1.4 변경은 실제 PTY와 로컬 모의 API로 초기 설정, 승인 후 �
 가상 시계·사용자 취소·횟수 예산 검사로 확인했다. 자세한 범위와 이전 실패 이력은
 `docs/implementation/phases/P14-R09-UI.md`를 따른다.
 
-버전 정보 반영을 위한 빌드와 설치본 포장은 기존 성공한 UI 실행 검증과 구분한다. 새 v0.1.4 설치본,
+이전 v0.1.4 배포에서는 버전 반영 빌드·포장과 기존 성공한 UI 실행 검증을 구분했다. v0.1.4 설치본,
 실제 외부 provider, 실제 장시간 서버 작업, web, MCP, worktree, SSH/clipboard, legacy import,
-root/arm64와 설치 rollback은 이번에 실행 검증하지 않았다. v0.1.3의 Linux x64 설치본 검증 결과를
+root/arm64와 설치 rollback은 당시 실행 검증하지 않았다. v0.1.3의 Linux x64 설치본 검증 결과를
 새 설치본의 실행 결과로 간주하지 않는다.
 artifact 생성 성공도 모든 서버의 설치·운영 준비나 보안 검증 완료를 뜻하지 않는다.
 
