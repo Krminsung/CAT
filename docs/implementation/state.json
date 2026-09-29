@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.R13.RELEASE_PACKAGING",
+  "currentStep": "P14.R13.RELEASE_READY",
   "status": "VERIFIED",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "a36c29d6467aa6693c35f96a8bc5b18bd6af59d9",
+  "lastCommitSha": "1951950fdb3d41d06b63ee63d7475a8c085b4fe2",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
@@ -22,7 +22,7 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Preserve old artifacts and execute the reserved single packaging operation using the successful v0.1.7 dist, then push/PR/merge/publish without rebuilding, runtime execution or server installation",
+  "nextAction": "Push cat/p14-harness-flow, open and review the main PR, merge preserving commits and publish the six v0.1.7 assets; record completion in the PR and ignored receipt without rebuilding or running the app",
   "blocker": null,
   "harnessParityFollowUp": {
     "phase": "P14.R13",
@@ -53,7 +53,7 @@
       "runtimeDisposition": "NOT_AUTHORIZED_NOT_RUN",
       "previousBudgets": "All earlier P14 budgets remain unchanged; only the explicitly authorized R13 build is reserved once, without runtime execution or retries"
     },
-    "publication": "AUTHORIZED_NOT_PUBLISHED",
+    "publication": "READY_FOR_PR",
     "release": {
       "version": "v0.1.7",
       "authorization": "2026-09-29 푸시·배포 요청 후 v0.1.7 버전 입력 변경과 npm run build 추가 1회, 포장·푸시·PR/main 병합·공개 Release 진행 제안에 사용자가 '네 변경하세요'로 승인함",
@@ -61,8 +61,17 @@
       "packagingAuthorized": true,
       "packagingAttemptsUsed": 1,
       "packagingMaximumAttempts": 1,
-      "packagingResult": "RESERVED",
+      "packagingResult": "PASS",
       "packagingCommand": "npm run package:installer",
+      "packagingCommitSha": "1951950fdb3d41d06b63ee63d7475a8c085b4fe2",
+      "packagingExitCode": 0,
+      "packagingStartedAt": "2026-09-29T04:26:30Z",
+      "packagingCompletionObservedAt": "2026-09-29T04:26:43Z",
+      "packagingWarnings": "gzip emitted its deprecated GZIP environment variable warning for each architecture; packaging completed successfully without retry",
+      "installerSha256": {
+        "linuxX64": "bb524610ee2beb23f91291ea4824e3938953d99a9c175f17f56c5bc2eaa5280b",
+        "linuxArm64": "7b083268cee8de1bfec0f9c086fe5fd912df6b0ce7be8f56d62570787b98db2f"
+      },
       "additionalBuildAuthorized": true,
       "additionalBuildAttemptsUsed": 1,
       "additionalBuildMaximumAttempts": 1,
@@ -74,7 +83,7 @@
       "additionalBuildStartedAt": "2026-09-29T04:25:38Z",
       "additionalBuildCompletionObservedAt": "2026-09-29T04:25:47Z",
       "lockfileSha256": "07057394cc1a775fd823065c145137871aa35fa0271dab9af91f18e6a520b53a",
-      "result": "PACKAGING_RESERVED",
+      "result": "READY_FOR_PR",
       "publicationReceipt": ".git/cat-progress/v0.1.7-publication.json",
       "previousArtifactsBackup": ".git/cat-progress/artifacts-v0.1.6-before-v0.1.7",
       "remotePreflight": "Public Krminsung/CAT, authenticated Krminsung with push permission and merge commits enabled; no workflows, rulesets, main protection or open PR; main remains 8a3bc407d64271b9640f2161b2da4e0aaf8288a5; planned branch and v0.1.7 tag absent; latest public Release is v0.1.6",
