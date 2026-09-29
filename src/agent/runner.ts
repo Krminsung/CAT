@@ -60,6 +60,8 @@ import {
   type SessionRunCoordinator,
 } from "./run-state.js";
 import { RepeatedToolExecutionGuard } from "./progress.js";
+import { parseAssistantReply } from "./reply.js";
+import { capabilityFeedback } from "./capability.js";
 import {
   ToolCallNormalizer,
   type NativeToolCall,
@@ -412,6 +414,7 @@ class TextDeltaGate {
   #prefixIndex = 0;
   #prefixConfirmed = false;
   readonly #holdUntilFinish: boolean;
+  readonly #fallbackEnabled: boolean;
 
   constructor(
     journal: AgentEventJournal,
@@ -420,7 +423,7 @@ class TextDeltaGate {
   ) {
     this.#journal = journal;
     this.#holdUntilFinish = holdUntilFinish;
-    this.#released = !fallbackEnabled && !holdUntilFinish;
+    this.#fallbackEnabled = fallbackEnabled;
   }
 
   push(text: string): void {
@@ -436,8 +439,14 @@ class TextDeltaGate {
       if (!this.#sawNonWhitespace) {
         if (character.trim().length === 0) continue;
         this.#sawNonWhitespace = true;
+        if (character === "{") {
+          // Reply metadata must never leak as JSON fragments, including when
+          // web tools and text tool fallback are disabled.
+          this.#prefixConfirmed = true;
+          return;
+        }
       }
-      if (character === TEXT_TOOL_FALLBACK_PREFIX[this.#prefixIndex]) {
+      if (this.#fallbackEnabled && character === TEXT_TOOL_FALLBACK_PREFIX[this.#prefixIndex]) {
         this.#prefixIndex += 1;
         if (this.#prefixIndex === TEXT_TOOL_FALLBACK_PREFIX.length) {
           this.#prefixConfirmed = true;
@@ -728,13 +737,45 @@ export class AgentRunner {
         nativeCalls: turn.nativeCalls,
         tools,
       });
-      let visibleText = normalized.visibleText;
+      const finalReply = normalized.calls.length === 0 && normalized.issues.length === 0
+        ? parseAssistantReply(normalized.visibleText)
+        : undefined;
+      let visibleText = finalReply?.text ?? normalized.visibleText;
       let hostLimitedWebAnswer = false;
+      const used = context.budget.snapshot();
+      const canRecover = used.turns < context.budget.limits.maxTurns &&
+        used.modelRequests < context.budget.limits.maxModelRequests &&
+        used.recoveryAttempts < context.budget.limits.maxRecoveryAttempts &&
+        context.budget.limits.maxSameRecoveryKind > 0;
+      const capability = finalReply &&
+        (finalReply.kind === "unavailable" || finalReply.kind === "unclassified") &&
+        (web?.holdAssistantText || finalReply.kind !== "unclassified") &&
+        context.ledger.records().length === 0 && canRecover &&
+        context.budget.recoveryCount("capability") === 0
+        ? capabilityFeedback(visibleText, tools)
+        : undefined;
+      if (capability && context.budget.tryConsumeRecovery("capability")) {
+        turn.gate.discard();
+        context.journal.emit({
+          type: "notice",
+          level: "info",
+          code: "tool_capability_recovery",
+          message: "사용 가능한 도구와 요청 범위를 다시 확인해 작업을 이어갑니다.",
+        });
+        this.#appendUserFeedback(context, capability);
+        context.state.transition("MODEL");
+        continue;
+      }
       const webAssessment = web &&
         normalized.calls.length === 0 &&
         normalized.issues.length === 0 &&
         visibleText.trim()
-        ? web.assessCompletion(visibleText)
+        ? web.assessCompletion(
+            visibleText,
+            finalReply?.kind,
+            canRecover && context.budget.recoveryCount("web") === 0 &&
+              tools.some((tool) => tool.name === "web_search" || tool.name === "fetch_url"),
+          )
         : undefined;
       if (web && webAssessment && webAssessment.action !== "accept") {
         const webToolsAvailable = tools.some((tool) =>
@@ -743,6 +784,7 @@ export class AgentRunner {
         if (
           webAssessment.action === "needs_evidence" &&
           (webToolsAvailable || web.canRecoverWithoutTools) &&
+          canRecover &&
           context.budget.recoveryCount("web") === 0
         ) {
           if (!context.budget.tryConsumeRecovery("web")) {
@@ -764,25 +806,20 @@ export class AgentRunner {
           context.state.transition("MODEL");
           continue;
         }
-        const missingContext = webAssessment.action === "needs_user_context";
-        visibleText = web.limitationText(missingContext);
+        visibleText = web.limitationText();
         hostLimitedWebAnswer = true;
         context.journal.emit({
           type: "notice",
           level: "warning",
-          code: missingContext
-            ? "web_user_context_required"
-            : "web_evidence_unavailable",
-          message: missingContext
-            ? web.disposition.reason === "needs_user_context"
-              ? "사용자 위치를 추론하지 않고 날씨 조회에 필요한 지역을 다시 요청합니다."
-              : "근거 없는 주장을 노출하지 않고 공개 정보 확인에 필요한 대상을 다시 요청합니다."
-            : "실제 원문과 인용을 연결하지 못해 근거 없는 현재 정보 답변을 제한했습니다.",
+          code: "web_evidence_unavailable",
+          message: "실제 원문과 인용을 연결하지 못해 근거 없는 현재 정보 답변을 제한했습니다.",
         });
       }
       const suppressWebDraft = Boolean(
         web?.holdAssistantText &&
-        (normalized.calls.length > 0 || normalized.issues.length > 0),
+        (normalized.calls.length > 0 || normalized.issues.length > 0) &&
+        (web.disposition.requiresEvidence || normalized.issues.length > 0 ||
+          normalized.calls.some((call) => call.name === "web_search" || call.name === "fetch_url")),
       );
       if (suppressWebDraft) {
         turn.gate.discard();

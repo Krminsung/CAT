@@ -4,6 +4,11 @@
 `IMPLEMENTED`는 source와 제품 entrypoint의 정적 연결을 확인했다는 뜻이며 runtime 실행 검증을 뜻하지
 않는다. 동적 MCP 도구는 built-in 수에 포함하지 않는다.
 
+2026-09-29 P14.R13에서 기능 이름의 존재와 실제 작업 흐름의 동등성을 구분해 보완한다.
+모델 검색어·제한된 대안 탐색·후속 질문·최종 답변 구분·실제 도구 능력 안내의 차이와 수정은
+[하네스 복원 기록](phases/P14-R13.md)에 정리한다. 아래 과거 `IMPLEMENTED` 표시는 최신 공식
+Claude Code 전체 동등성 또는 이번 수정본의 실행 검증 통과를 뜻하지 않는다.
+
 | 계약 | 원본 근거 | cat 구현 경계 | 단계 | 상태 |
 |---|---|---|---|---|
 | 제품명·`cat-tui` 실행 정책 | `package.json`, `src/version.ts` | `package.json`, `src/core/version.ts`, `bin/cat` | P01/P14 | IMPLEMENTED |

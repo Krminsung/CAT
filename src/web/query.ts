@@ -1,7 +1,6 @@
 import { PermissionDeniedError } from "../core/errors.js";
 import { isSensitiveEnvironmentName } from "../security/environment.js";
 import { normalizePublicWebUrl } from "./public-http.js";
-import { normalizeSearchLanguage } from "./language.js";
 
 const MAX_SECRETS = 512;
 const MAX_SECRET_BYTES = 8 * 1024;
@@ -135,9 +134,8 @@ export class PublicWebInputGuard {
       .replace(/\s+/gu, " ")
       .replace(/^[ ?!.]+|[ ?!.]+$/gu, "")
       .trim();
-    query = normalizeSearchLanguage(query)
-      .replace(/^[ ?!.]+|[ ?!.]+$/gu, "")
-      .trim();
+    // Meaning, spelling and language selection belong to the model. This
+    // boundary removes protected data; it must not rewrite public identifiers.
     if (this.containsProtectedData(query)) {
       throw new PermissionDeniedError(
         "검색어 정규화 뒤 보호 데이터가 발견되어 공개 검색을 차단했습니다.",

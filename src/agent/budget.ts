@@ -13,6 +13,7 @@ export type RecoveryKind =
   | "malformed_tool_call"
   | "compaction"
   | "stop_hook"
+  | "capability"
   | "web";
 
 export type RunBudgetExhaustion =

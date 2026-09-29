@@ -6,6 +6,7 @@ import {
 } from "./content.js";
 import { normalizePublicWebUrl } from "./public-http.js";
 import {
+  isWeatherQuery,
   matchingSearchAnchors,
   normalizeSearchLanguage,
   searchAnchorToken,
@@ -97,7 +98,14 @@ const SEARCH_STOP_WORDS = new Set([
   "날시",
   "기온",
   "강수",
+  "강수량",
+  "강수확률",
+  "체감기온",
+  "체감온도",
+  "습도",
   "예보",
+  "일기예보",
+  "기상예보",
   "내일",
   "모레",
   "뉴스",
@@ -312,8 +320,9 @@ export function parseDuckDuckGoReaderResults(
 export function searchAnchors(query: string): string[] {
   const anchors: string[] = [];
   const withoutDomains = normalizeSearchLanguage(query).replace(/\bsite:\S+/giu, " ");
+  const weather = isWeatherQuery(withoutDomains);
   for (const raw of withoutDomains.match(/[A-Za-z0-9][A-Za-z0-9._-]*(?:[가-힣]+)?|[가-힣]+/gu) ?? []) {
-    const value = searchAnchorToken(raw);
+    const value = searchAnchorToken(raw, weather);
     if (
       !value ||
       SEARCH_STOP_WORDS.has(value) ||
@@ -350,7 +359,9 @@ export function relevantSearchResults(
       anchors,
       `${result.title} ${result.url} ${result.snippet}`,
     );
-    return anchors.length > 0 && score === 0 ? [] : [{ result, score }];
+    // Lexical overlap is a ranking hint, not a semantic acceptance test.
+    // Translations, aliases and spelling variants may have no shared tokens.
+    return [{ result, score }];
   }).sort((left, right) => right.score - left.score).map((item) => item.result);
 }
 
