@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.R13.RELEASE_BLOCKED",
-  "status": "BLOCKED_REVIEW",
+  "currentStep": "P14.R13.RELEASE_INPUTS",
+  "status": "REVIEWED",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "8869ff5fea46262f8b8059007ec729311b28d13a",
+  "lastCommitSha": "c9204efc4d187c23e78f3c8dd341e30e58a85983",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
@@ -22,8 +22,8 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Request explicit authorization for v0.1.7 version inputs and one additional build before packaging and the requested push/PR/merge/public Release. Do not overwrite v0.1.6 or publish mismatched version assets",
-  "blocker": "The verified source and package manifests still declare 0.1.6, already publicly released. The packager derives installer names from package.json and install.sh requires names matching the Release tag. Correct v0.1.7 publication needs frozen version inputs changed and another build, which requires explicit authorization under the repository rules",
+  "nextAction": "Reserve and execute the explicitly authorized additional build once for v0.1.7, then package once and push/PR/merge/publish without runtime execution or server installation",
+  "blocker": null,
   "harnessParityFollowUp": {
     "phase": "P14.R13",
     "baseCommitSha": "2bd247a16abaa899526a89aab80592ae40f6841a",
@@ -53,15 +53,19 @@
       "runtimeDisposition": "NOT_AUTHORIZED_NOT_RUN",
       "previousBudgets": "All earlier P14 budgets remain unchanged; only the explicitly authorized R13 build is reserved once, without runtime execution or retries"
     },
-    "publication": "BLOCKED_VERSION_AUTHORIZATION",
+    "publication": "AUTHORIZED_NOT_PUBLISHED",
     "release": {
       "version": "v0.1.7",
-      "authorization": "2026-09-29 사용자가 푸시와 배포를 요청함. 기존 빌드 이후 버전 입력 변경과 추가 빌드는 명시적으로 승인되지 않아 게시 전 중단함",
+      "authorization": "2026-09-29 푸시·배포 요청 후 v0.1.7 버전 입력 변경과 npm run build 추가 1회, 포장·푸시·PR/main 병합·공개 Release 진행 제안에 사용자가 '네 변경하세요'로 승인함",
       "plannedBranch": "cat/p14-harness-flow",
+      "packagingAuthorized": true,
       "packagingAttemptsUsed": 0,
-      "additionalBuildAuthorized": false,
+      "additionalBuildAuthorized": true,
       "additionalBuildAttemptsUsed": 0,
-      "result": "BLOCKED_BEFORE_PUSH",
+      "additionalBuildMaximumAttempts": 1,
+      "result": "INPUTS_READY",
+      "publicationReceipt": ".git/cat-progress/v0.1.7-publication.json",
+      "previousArtifactsBackup": ".git/cat-progress/artifacts-v0.1.6-before-v0.1.7",
       "remotePreflight": "Public Krminsung/CAT, authenticated Krminsung with push permission and merge commits enabled; no workflows, rulesets, main protection or open PR; main remains 8a3bc407d64271b9640f2161b2da4e0aaf8288a5; planned branch and v0.1.7 tag absent; latest public Release is v0.1.6",
       "runtimeVerification": "NOT_RUN",
       "serverUpdate": "NOT_IN_SCOPE"
