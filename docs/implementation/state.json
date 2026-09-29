@@ -3,10 +3,10 @@
   "project": "cat",
   "sourceArchiveSha256": "03a19f434b2c6a378c1828bc401449be87b72c175f692f98cf147a35dc361855",
   "currentPhase": "P14",
-  "currentStep": "P14.R13.VERIFIED",
-  "status": "VERIFIED",
+  "currentStep": "P14.R13.RELEASE_BLOCKED",
+  "status": "BLOCKED_REVIEW",
   "baseMainSha": "7d1cc7809871bb09bf704daab71a73299233f7c3",
-  "lastCommitSha": "cb1a1cc35836b11ae0a55de03686f1f6514b2e0e",
+  "lastCommitSha": "8869ff5fea46262f8b8059007ec729311b28d13a",
   "verification": {
     "attemptsUsed": 2,
     "maximumAttempts": 2,
@@ -22,8 +22,8 @@
     "mergeCommitSha": null,
     "result": "NOT_PUBLISHED"
   },
-  "nextAction": "Report the successful single R13 build with runtime unverified. Keep source and build inputs frozen; runtime verification, packaging and remote publication require further instruction",
-  "blocker": null,
+  "nextAction": "Request explicit authorization for v0.1.7 version inputs and one additional build before packaging and the requested push/PR/merge/public Release. Do not overwrite v0.1.6 or publish mismatched version assets",
+  "blocker": "The verified source and package manifests still declare 0.1.6, already publicly released. The packager derives installer names from package.json and install.sh requires names matching the Release tag. Correct v0.1.7 publication needs frozen version inputs changed and another build, which requires explicit authorization under the repository rules",
   "harnessParityFollowUp": {
     "phase": "P14.R13",
     "baseCommitSha": "2bd247a16abaa899526a89aab80592ae40f6841a",
@@ -53,7 +53,19 @@
       "runtimeDisposition": "NOT_AUTHORIZED_NOT_RUN",
       "previousBudgets": "All earlier P14 budgets remain unchanged; only the explicitly authorized R13 build is reserved once, without runtime execution or retries"
     },
-    "publication": "LOCAL_ONLY"
+    "publication": "BLOCKED_VERSION_AUTHORIZATION",
+    "release": {
+      "version": "v0.1.7",
+      "authorization": "2026-09-29 사용자가 푸시와 배포를 요청함. 기존 빌드 이후 버전 입력 변경과 추가 빌드는 명시적으로 승인되지 않아 게시 전 중단함",
+      "plannedBranch": "cat/p14-harness-flow",
+      "packagingAttemptsUsed": 0,
+      "additionalBuildAuthorized": false,
+      "additionalBuildAttemptsUsed": 0,
+      "result": "BLOCKED_BEFORE_PUSH",
+      "remotePreflight": "Public Krminsung/CAT, authenticated Krminsung with push permission and merge commits enabled; no workflows, rulesets, main protection or open PR; main remains 8a3bc407d64271b9640f2161b2da4e0aaf8288a5; planned branch and v0.1.7 tag absent; latest public Release is v0.1.6",
+      "runtimeVerification": "NOT_RUN",
+      "serverUpdate": "NOT_IN_SCOPE"
+    }
   },
   "webSpacingFollowUp": {
     "phase": "P14.R12",
